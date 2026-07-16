@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDrugs } from '../api/client'
 import type { DrugList } from '../api/types'
@@ -6,6 +6,8 @@ import { MaturityPill, PhasePill } from '../components/MaturityPill'
 import { formatCount } from '../format'
 
 const PAGE_SIZE = 25
+// Long enough that typing a drug name is one query, not eight.
+const SEARCH_DEBOUNCE_MS = 250
 
 /**
  * The overview: a light, scannable index. Index columns only -- no molecular
@@ -22,16 +24,46 @@ export function OverviewPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const target = params.get('target') ?? ''
+  const q = params.get('q') ?? ''
   const maxPhase = params.get('max_phase') ?? ''
   const offset = Number(params.get('offset') ?? 0)
+
+  // The input is uncontrolled-ish: it updates instantly while the URL (and the
+  // query) lag behind by a debounce. Binding it straight to the URL made every
+  // keystroke a request, and a search box that fires per character against an
+  // exact match returns nothing until the very last letter -- which reads as
+  // broken rather than strict.
+  const [draft, setDraft] = useState(q)
+  const firstRender = useRef(true)
+
+  useEffect(() => {
+    // Keep the box in step when the URL changes from outside (back button, a link).
+    setDraft(q)
+  }, [q])
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    if (draft === q) return
+    const timer = setTimeout(() => {
+      const merged = new URLSearchParams(params)
+      if (draft) merged.set('q', draft)
+      else merged.delete('q')
+      merged.delete('offset') // a new search invalidates the page cursor
+      setParams(merged, { replace: true })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     listDrugs({
-      target: target || undefined,
+      q: q || undefined,
       max_phase: maxPhase ? Number(maxPhase) : undefined,
       limit: PAGE_SIZE,
       offset,
@@ -42,7 +74,7 @@ export function OverviewPage() {
     return () => {
       cancelled = true
     }
-  }, [target, maxPhase, offset])
+  }, [q, maxPhase, offset])
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params)
@@ -50,7 +82,6 @@ export function OverviewPage() {
       if (v) merged.set(k, v)
       else merged.delete(k)
     }
-    // Any filter change invalidates the page cursor.
     if (!('offset' in next)) merged.delete('offset')
     setParams(merged)
   }
@@ -61,7 +92,7 @@ export function OverviewPage() {
         <h1 className="text-lg font-semibold tracking-tight text-ink">Drug programs</h1>
         {data && (
           <p className="text-xs text-ink-faint" data-testid="total-count">
-            {formatCount(data.total)} in catalog
+            {formatCount(data.total)} {q || maxPhase ? 'match' : 'in catalog'}
           </p>
         )}
       </div>
@@ -69,11 +100,11 @@ export function OverviewPage() {
       <div className="mb-3 flex flex-wrap gap-2">
         <input
           type="search"
-          value={target}
-          onChange={(e) => update({ target: e.target.value })}
-          placeholder="Filter by target, e.g. KRAS"
-          aria-label="Filter by target"
-          className="w-56 rounded-md border border-line bg-card px-2.5 py-1.5 text-sm
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Search name, ChEMBL id or target"
+          aria-label="Search drugs"
+          className="w-72 rounded-md border border-line bg-card px-2.5 py-1.5 text-sm
                      placeholder:text-ink-faint focus:border-accent focus:outline-none"
         />
         <select
@@ -89,6 +120,16 @@ export function OverviewPage() {
           <option value="3">Phase 3+</option>
           <option value="4">Approved</option>
         </select>
+        {(q || maxPhase) && (
+          <button
+            type="button"
+            onClick={() => setParams(new URLSearchParams())}
+            className="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted
+                       hover:border-accent hover:text-accent"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {error && (
@@ -126,9 +167,7 @@ export function OverviewPage() {
                   className="cursor-pointer border-b border-line last:border-b-0 hover:bg-surface"
                 >
                   <td className="px-3 py-2">
-                    <span className="font-medium text-ink">
-                      {drug.pref_name ?? drug.chembl_id}
-                    </span>
+                    <span className="font-medium text-ink">{drug.pref_name ?? drug.chembl_id}</span>
                     <span className="ml-2 font-mono text-[11px] text-ink-faint">
                       {drug.chembl_id}
                     </span>
@@ -149,7 +188,7 @@ export function OverviewPage() {
             {!loading && data?.items.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-ink-faint">
-                  No drugs match those filters.
+                  Nothing matches “{q}”.
                 </td>
               </tr>
             )}
@@ -160,7 +199,7 @@ export function OverviewPage() {
       {data && data.total > PAGE_SIZE && (
         <div className="mt-3 flex items-center justify-between text-xs text-ink-muted">
           <span>
-            {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of {data.total}
+            {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of {formatCount(data.total)}
           </span>
           <span className="flex gap-2">
             <button

@@ -138,8 +138,45 @@ class TestOverview:
         assert adc["drug_type"] == "Antibody"
         assert adc["maturity"] == "index_only"
 
+    async def test_search_is_partial_and_case_insensitive(
+        self, api: httpx.AsyncClient, seeded: None
+    ) -> None:
+        """The first cut matched exactly and case-sensitively, which made the search
+        box unusable: people type one character at a time, so every keystroke but the
+        last returned nothing. A field that reads as broken, not as strict."""
+        for query in ("adagrasib", "ADAGRASIB", "adag", "KRAS", "kras", "CHEMBL4594350"):
+            r = await api.get("/drugs", params={"q": query})
+            assert r.status_code == 200
+            items = r.json()["items"]
+            assert any(i["chembl_id"] == "CHEMBL4594350" for i in items), (
+                f"q={query!r} found nothing"
+            )
+
+    async def test_search_spans_name_id_and_target(
+        self, api: httpx.AsyncClient, seeded: None
+    ) -> None:
+        """One box, because a searcher does not know which field their word lives in."""
+        by_name = await api.get("/drugs", params={"q": "trastuzumab"})
+        by_id = await api.get("/drugs", params={"q": "chembl4297"})
+        by_target = await api.get("/drugs", params={"q": "erbb2"})
+
+        for r in (by_name, by_id, by_target):
+            assert [i["chembl_id"] for i in r.json()["items"]] == ["CHEMBL4297844"]
+
+    async def test_search_that_matches_nothing_is_an_empty_page(
+        self, api: httpx.AsyncClient, seeded: None
+    ) -> None:
+        r = await api.get("/drugs", params={"q": "zzzz-no-such-drug"})
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
+
     async def test_filters_and_pagination(self, api: httpx.AsyncClient, seeded: None) -> None:
         r = await api.get("/drugs", params={"target": "KRAS"})
+        assert r.json()["total"] == 1
+
+        # The target facet is case-insensitive too: it is set from data, and data
+        # capitalisation is not the user's problem.
+        r = await api.get("/drugs", params={"target": "kras"})
         assert r.json()["total"] == 1
 
         r = await api.get("/drugs", params={"max_phase": 4})

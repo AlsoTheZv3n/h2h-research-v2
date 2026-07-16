@@ -27,7 +27,13 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 @router.get("", response_model=DrugList, summary="Overview: a scannable index of drug programs")
 async def list_drugs(
     session: SessionDep,
-    target: Annotated[str | None, Query(description="Filter by primary target symbol")] = None,
+    q: Annotated[
+        str | None,
+        Query(description="Search drug name, ChEMBL id or target. Partial, case-insensitive."),
+    ] = None,
+    target: Annotated[
+        str | None, Query(description="Exact primary target symbol, e.g. KRAS")
+    ] = None,
     max_phase: Annotated[
         int | None, Query(ge=0, le=4, description="Minimum clinical phase")
     ] = None,
@@ -36,7 +42,7 @@ async def list_drugs(
 ) -> DrugList:
     repo = DrugRepository(session)
     rows, total = await repo.list_drugs(
-        target=target, max_phase=max_phase, limit=limit, offset=offset
+        q=q, target=target, max_phase=max_phase, limit=limit, offset=offset
     )
     return DrugList(
         items=[DrugSummary.model_validate(r, from_attributes=True) for r in rows],

@@ -35,6 +35,7 @@ async function get<T>(path: string, params?: Record<string, string | number | un
 
 export function listDrugs(params: DrugListParams = {}): Promise<DrugList> {
   return get<DrugList>('/drugs', {
+    q: params.q,
     target: params.target,
     max_phase: params.max_phase,
     limit: params.limit ?? 25,

@@ -76,6 +76,9 @@ export interface DrugDetail {
 }
 
 export interface DrugListParams {
+  /** Free text: drug name, ChEMBL id or target. Partial, case-insensitive. */
+  q?: string
+  /** Exact target symbol. A facet, not a search box. */
   target?: string
   max_phase?: number
   limit?: number

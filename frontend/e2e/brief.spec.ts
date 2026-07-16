@@ -28,19 +28,45 @@ test.describe('overview', () => {
     await expect(rows).not.toHaveCount(0)
   })
 
-  test('filters hit the API and change the result set', async ({ page }) => {
+  test('search narrows the result set through the API', async ({ page }) => {
     await page.goto('/')
     const before = await page.getByTestId('total-count').textContent()
 
-    await page.getByLabel('Filter by target').fill('KRAS')
+    await page.getByLabel('Search drugs').fill('sotorasib')
     await expect(page.getByTestId('total-count')).not.toHaveText(before ?? '')
 
-    // The filter is a query param, not a client-side slice -- so it survives a reload.
-    await expect(page).toHaveURL(/target=KRAS/)
+    // A query param, not a client-side slice of one page -- so it survives a reload
+    // and `total` keeps meaning the corpus.
+    await expect(page).toHaveURL(/q=sotorasib/)
+    await expect(page.getByTestId('drug-row').first()).toContainText(/sotorasib/i)
+  })
+
+  test('search is partial and case-insensitive', async ({ page }) => {
+    // The first cut matched exactly and case-sensitively. Since people type one
+    // character at a time, every keystroke but the last returned nothing -- a field
+    // that reads as broken rather than strict.
+    await page.goto('/')
+    await page.getByLabel('Search drugs').fill('sotor')
+
+    await expect(page.getByTestId('drug-row').first()).toContainText(/sotorasib/i)
+  })
+
+  test('the phase filter narrows the corpus', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByTestId('total-count')).toBeVisible()
+    const all = Number((await page.getByTestId('total-count').textContent())!.replace(/\D/g, ''))
+
+    await page.getByLabel('Minimum phase').selectOption('4')
+    await expect(page).toHaveURL(/max_phase=4/)
+    await expect
+      .poll(async () =>
+        Number((await page.getByTestId('total-count').textContent())!.replace(/\D/g, '')),
+      )
+      .toBeLessThan(all)
   })
 
   test('a row click opens that drug’s brief', async ({ page }) => {
-    await page.goto(`/?target=KRAS`)
+    await page.goto(`/?q=kras`)
     const row = page.getByTestId('drug-row').first()
     await expect(row).toBeVisible()
     await row.click()

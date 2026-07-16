@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,6 +94,7 @@ class DrugRepository:
     async def list_drugs(
         self,
         *,
+        q: str | None = None,
         target: str | None = None,
         max_phase: int | None = None,
         limit: int = 50,
@@ -105,8 +106,23 @@ class DrugRepository:
         length was reported as a total, and osimertinib's 383 trials read as 100.
         """
         filters = []
+        if q:
+            # Partial and case-insensitive, across the three things someone would
+            # actually type into a search box. An exact match was unusable: people
+            # type one character at a time, so every keystroke but the last returned
+            # nothing, which reads as a broken field rather than a strict one.
+            pattern = f"%{q.strip()}%"
+            filters.append(
+                or_(
+                    Drug.pref_name.ilike(pattern),
+                    Drug.chembl_id.ilike(pattern),
+                    Drug.primary_target.ilike(pattern),
+                )
+            )
         if target:
-            filters.append(Drug.primary_target == target)
+            # Exact-but-case-insensitive: this one is a facet ("show me the KRAS
+            # programs"), not a search box, and it is set from a known value.
+            filters.append(func.lower(Drug.primary_target) == target.strip().lower())
         if max_phase is not None:
             filters.append(Drug.max_phase >= max_phase)
 
