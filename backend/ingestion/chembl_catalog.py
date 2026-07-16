@@ -28,7 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
-from backend.ingestion.chembl import _as_float, _as_int
+from backend.ingestion.chembl import _as_float, _as_int, pick_molecule
 from backend.ingestion.http import build_client
 from backend.models import Drug
 from backend.repositories.drugs import DrugRepository, classify_maturity
@@ -300,6 +300,72 @@ def to_columns(mol: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def resolve_query(client: httpx.AsyncClient, query: str) -> str | None:
+    """A ChEMBL id passes through; a name is resolved to one.
+
+    Name resolution goes through pick_molecule, so it obeys the same rule as the
+    adapter: a relevance-ranked search does not get to pick the molecule for us.
+    """
+    if query.upper().startswith("CHEMBL") and query[6:].isdigit():
+        return query.upper()
+
+    body = await _get_json(client, f"{BASE}/molecule/search.json", {"q": query})
+    if body is None:
+        logger.warning("could not search for %r", query)
+        return None
+    mol = pick_molecule(body.get("molecules", []), query)
+    if mol is None:
+        logger.warning("no ChEMBL molecule named %r", query)
+        return None
+    cid: str | None = mol.get("molecule_chembl_id")
+    return cid
+
+
+async def seed_catalog(
+    session: AsyncSession,
+    queries: list[str],
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> LoadStats:
+    """Load specific molecules by id or name, skipping discovery.
+
+    Discovery walks tens of thousands of indication rows against a source that 500s
+    a third of the time -- an hour or more before it reaches any given drug. That is
+    the right shape for building the whole catalog and the wrong one for putting a
+    known handful of drugs in front of a developer. Same upserts, so it composes
+    with a full load rather than competing with it.
+
+    Deliberately does NOT apply the oncology or phase filters: if you asked for this
+    molecule by name, you meant it.
+    """
+    if client is None:
+        async with build_client() as owned:
+            return await seed_catalog(session, queries, client=owned)
+
+    stats = LoadStats()
+    repo = DrugRepository(session)
+
+    ids: list[str] = []
+    for query in queries:
+        cid = await resolve_query(client, query)
+        if cid is None:
+            stats.failed.append(query)
+        else:
+            ids.append(cid)
+    stats.candidates = len(ids)
+
+    async for molecules in fetch_molecules(client, ids, stats):
+        for mol in molecules:
+            cid = mol.get("molecule_chembl_id")
+            if not cid:
+                continue
+            await repo.upsert_drug(cid, **to_columns(mol))
+            stats.loaded += 1
+        await session.commit()
+
+    return stats
+
+
 async def load_catalog(
     session: AsyncSession,
     *,
@@ -363,12 +429,24 @@ async def main() -> None:
         action="store_true",
         help="fetch only molecules not already in the catalog (fills gaps after an outage)",
     )
+    parser.add_argument(
+        "--ids",
+        help=(
+            "comma-separated ChEMBL ids or drug names to load directly, skipping"
+            " discovery (e.g. 'sotorasib,CHEMBL4594350'). Ignores the oncology and"
+            " phase filters -- you asked for these by name."
+        ),
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     async with get_sessionmaker()() as session:
-        stats = await load_catalog(session, only_missing=args.only_missing)
+        if args.ids:
+            queries = [q.strip() for q in args.ids.split(",") if q.strip()]
+            stats = await seed_catalog(session, queries)
+        else:
+            stats = await load_catalog(session, only_missing=args.only_missing)
 
     print("\n=== ChEMBL oncology catalog ===")
     print(stats.report())

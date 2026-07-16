@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Tailwind v4 is CSS-first: tokens live here, not in a tailwind.config.js.
+   The palette is deliberately narrow -- this is an evidence tool, and colour is
+   reserved for meaning: confidence, maturity, and the red "source unavailable"
+   state. Nothing here is decoration. */
+@theme {
+  --color-surface: oklch(98.5% 0.002 250);
+  --color-card: oklch(100% 0 0);
+  --color-line: oklch(92% 0.004 250);
+  --color-ink: oklch(25% 0.01 250);
+  --color-ink-muted: oklch(52% 0.012 250);
+  --color-ink-faint: oklch(66% 0.01 250);
+
+  --color-unavailable: oklch(52% 0.19 25);
+  --color-unavailable-bg: oklch(96% 0.03 25);
+  --color-confident: oklch(48% 0.12 155);
+  --color-confident-bg: oklch(96% 0.03 155);
+  --color-partial: oklch(55% 0.12 75);
+  --color-partial-bg: oklch(96% 0.04 75);
+  --color-accent: oklch(48% 0.11 250);
+  --color-accent-bg: oklch(96% 0.02 250);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+
+html {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

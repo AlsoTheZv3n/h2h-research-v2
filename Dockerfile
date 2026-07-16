@@ -26,6 +26,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------- runtime ----------
 FROM python:3.12-slim AS runtime
 
+# RDKit's drawing module links against shared libs that python:*-slim omits, so
+# `import rdMolDraw2D` dies at import with an ImportError. Only ever surfaces in the
+# image: a local venv on a desktop OS already has all of these.
+#   libxrender1, libxext6  X11, for the 2D drawer
+#   libexpat1              XML, pulled in by the SVG writer
+#   libgomp1               OpenMP, RDKit's threading runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libxrender1 libxext6 libexpat1 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # UID 1000 so bind-mounted files stay writable by the usual host user.
 RUN groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid 1000 --create-home appuser

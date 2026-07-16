@@ -15,6 +15,11 @@ dependencies = [
     "alembic>=1.14",
     "redis>=5.2",
     "httpx>=0.27",
+    # Renders the structure SVG server-side. The molecule is the detail page's visual
+    # anchor, and RDKit is also the only thing that can tell a valid SMILES from a
+    # plausible string -- the spike proved that matters. Keeping it here rather than
+    # shipping a JS chem library keeps one canonical renderer.
+    "rdkit>=2024.3.1",
 ]
 
 [dependency-groups]
@@ -46,11 +51,18 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+# Our own rdkit stubs shadow the ones rdkit ships, which do not parse. See
+# stubs/rdkit/Chem/__init__.pyi.
+mypy_path = "stubs"
 # The spike is finished code kept for reference; it is not on the app's import path.
 exclude = ["^experiment/", "^backend/migrations/"]
 
 [[tool.mypy.overrides]]
 module = ["asgi_lifespan.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["rdkit.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

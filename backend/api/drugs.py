@@ -6,12 +6,13 @@ import logging
 from collections import defaultdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cache import get_redis
 from backend.config import get_settings
 from backend.db import get_session
+from backend.domain.structure import render_svg
 from backend.ingestion.base import FactStatus
 from backend.repositories import DrugRepository
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
@@ -42,6 +43,37 @@ async def list_drugs(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get(
+    "/{chembl_id}/structure.svg",
+    response_class=Response,
+    summary="The molecule, rendered. 404 when there is no structure to draw.",
+    responses={200: {"content": {"image/svg+xml": {}}}},
+)
+async def get_structure(chembl_id: str, session: SessionDep) -> Response:
+    """Render the drug's SMILES to SVG.
+
+    A 404 here is a real answer, not an error: biologics have no SMILES, and that
+    absence is a finding the detail page states plainly. The alternative -- serving
+    a blank image -- would be the same lie this codebase keeps refusing to tell.
+    """
+    drug = await DrugRepository(session).get(chembl_id)
+    if drug is None:
+        raise HTTPException(status_code=404, detail=f"no drug {chembl_id}")
+    if not drug.smiles:
+        raise HTTPException(status_code=404, detail=f"{chembl_id} has no structure")
+
+    svg = render_svg(drug.smiles)
+    if svg is None:
+        raise HTTPException(status_code=404, detail=f"{chembl_id}: SMILES is not renderable")
+
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        # Structures change only when the catalog is re-ingested.
+        headers={"Cache-Control": f"public, max-age={get_settings().cache_ttl_seconds}"},
     )
 
 
