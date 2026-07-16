@@ -20,9 +20,18 @@ from backend.ingestion import (
     FactStatus,
     OpenTargetsAdapter,
     PubMedAdapter,
+    SourceRecord,
     build_client,
 )
 from backend.ingestion.chembl import pick_molecule
+
+
+def summary_of(record: SourceRecord) -> dict[str, Any]:
+    """The ic50_summary fact's payload, with its shape asserted."""
+    value = record.facts["ic50_summary"].value
+    assert isinstance(value, dict)
+    return value
+
 
 CHEMBL = "https://www.ebi.ac.uk/chembl/api/data"
 CT = "https://clinicaltrials.gov/api/v2/studies"
@@ -194,6 +203,99 @@ class TestChEMBLPartialFailure:
         # No structure -- measured and absent, not a failure to measure.
         assert record.facts["smiles"].status is FactStatus.EMPTY
         assert record.facts["smiles"].value is None
+
+    @respx.mock
+    async def test_activities_become_an_on_target_summary(self, client: Any) -> None:
+        """The adapter emits a potency answer, not just a row count."""
+        respx.get(f"{CHEMBL}/molecule/search.json").mock(
+            return_value=httpx.Response(200, json=_SEARCH_SOTORASIB)
+        )
+        respx.get(f"{CHEMBL}/mechanism.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "mechanisms": [
+                        {
+                            "mechanism_of_action": "GTPase KRas inhibitor",
+                            "action_type": "INHIBITOR",
+                            "target_chembl_id": "CHEMBL2189121",
+                        }
+                    ]
+                },
+            )
+        )
+        respx.get(f"{CHEMBL}/activity.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "page_meta": {"total_count": 3},
+                    "activities": [
+                        {
+                            "target_chembl_id": "CHEMBL2189121",
+                            "target_pref_name": "GTPase KRas",
+                            "standard_value": "10",
+                            "standard_relation": "=",
+                            "standard_units": "nM",
+                        },
+                        {
+                            "target_chembl_id": "CHEMBL4303835",
+                            "target_pref_name": "SARS-CoV-2",
+                            "standard_value": "45000",
+                            "standard_relation": "=",
+                            "standard_units": "nM",
+                        },
+                        {
+                            "target_chembl_id": "CHEMBL2189121",
+                            "target_pref_name": "GTPase KRas",
+                            "standard_value": "10000",
+                            "standard_relation": ">",
+                            "standard_units": "nM",
+                        },
+                    ],
+                },
+            )
+        )
+
+        record = await ChEMBLAdapter(client).fetch("sotorasib")
+        summary = summary_of(record)
+
+        assert summary["median_nm"] == 10.0
+        assert summary["n_on_target"] == 2
+        assert summary["n_censored"] == 1
+        assert summary["off_target"] == {"SARS-CoV-2": 1}
+
+    @respx.mock
+    async def test_a_failing_mechanism_leaves_potency_unclassifiable(self, client: Any) -> None:
+        """No target, no on/off-target split -- so no potency is quoted. The rows are
+        still reported; what is missing is the claim, not the data."""
+        respx.get(f"{CHEMBL}/molecule/search.json").mock(
+            return_value=httpx.Response(200, json=_SEARCH_SOTORASIB)
+        )
+        respx.get(f"{CHEMBL}/mechanism.json").mock(return_value=httpx.Response(500))
+        respx.get(f"{CHEMBL}/activity.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "page_meta": {"total_count": 1},
+                    "activities": [
+                        {
+                            "target_chembl_id": "CHEMBL2189121",
+                            "target_pref_name": "GTPase KRas",
+                            "standard_value": "10",
+                            "standard_relation": "=",
+                            "standard_units": "nM",
+                        }
+                    ],
+                },
+            )
+        )
+
+        record = await ChEMBLAdapter(client).fetch("sotorasib")
+
+        assert record.facts["target_chembl_id"].status is FactStatus.SOURCE_FAILED
+        summary = summary_of(record)
+        assert summary["median_nm"] is None
+        assert summary["n_activities"] == 1
 
     @respx.mock
     async def test_search_failure_is_hard(self, client: Any) -> None:

@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from backend.domain.potency import summarize_ic50
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 
 BASE = "https://www.ebi.ac.uk/chembl/api/data"
@@ -112,6 +113,24 @@ class ChEMBLAdapter:
         # sub-endpoint must not discard it. The spike threw away a SMILES and 57 IC50s
         # because mechanism.json 500'd at the end -- under-reporting coverage, which is
         # the same lie as over-reporting it. Each degrades to its own source_failed fact.
+        #
+        # Mechanism first: its target_chembl_id is what makes the activities readable.
+        # Without it there is no way to tell a KRAS measurement from a SARS-CoV-2 screen.
+        target_id: str | None = None
+        try:
+            mech = await self.client.get(
+                f"{BASE}/mechanism.json", params={"molecule_chembl_id": cid}
+            )
+            mech.raise_for_status()
+            mechanisms = mech.json().get("mechanisms", [])
+            target_id = mechanisms[0].get("target_chembl_id") if mechanisms else None
+            facts["moa"] = ok(mechanisms[0].get("mechanism_of_action") if mechanisms else None)
+            facts["action_type"] = ok(mechanisms[0].get("action_type") if mechanisms else None)
+            facts["target_chembl_id"] = ok(target_id)
+        except Exception as exc:
+            facts["moa"] = failed(self.name, f"mechanism: {exc}", source_url=url)
+            facts["target_chembl_id"] = failed(self.name, f"mechanism: {exc}", source_url=url)
+
         try:
             act = await self.client.get(
                 f"{BASE}/activity.json",
@@ -119,26 +138,18 @@ class ChEMBLAdapter:
             )
             act.raise_for_status()
             body = act.json()
+            activities = body.get("activities", [])
             # From page_meta, not len(): the page saturates at `limit` (osimertinib
             # returns 100 of a true 701) and reads as a real measurement.
             facts["n_ic50"] = ok((body.get("page_meta") or {}).get("total_count"))
-            facts["n_ic50_scanned"] = ok(len(body.get("activities", [])))
+            facts["n_ic50_scanned"] = ok(len(activities))
+            # The count is a row count, not a potency. Measured on adagrasib: 23 of
+            # its 30 IC50s are off-target (cell lines, a CDK7 assay, two SARS-CoV-2
+            # screens), so this is where the number becomes an answer.
+            facts["ic50_summary"] = ok(summarize_ic50(activities, target_id).as_dict())
         except Exception as exc:
             facts["n_ic50"] = failed(self.name, f"activity: {exc}", source_url=url)
-
-        try:
-            mech = await self.client.get(
-                f"{BASE}/mechanism.json", params={"molecule_chembl_id": cid}
-            )
-            mech.raise_for_status()
-            mechanisms = mech.json().get("mechanisms", [])
-            facts["moa"] = ok(mechanisms[0].get("mechanism_of_action") if mechanisms else None)
-            facts["action_type"] = ok(mechanisms[0].get("action_type") if mechanisms else None)
-            facts["target_chembl_id"] = ok(
-                mechanisms[0].get("target_chembl_id") if mechanisms else None
-            )
-        except Exception as exc:
-            facts["moa"] = failed(self.name, f"mechanism: {exc}", source_url=url)
+            facts["ic50_summary"] = failed(self.name, f"activity: {exc}", source_url=url)
 
         # ok means "the molecule resolved", not "it has a structure". The spike's
         # `bool(smiles) or n_ic50` was fine for a small-molecule probe but wrong here:
