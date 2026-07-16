@@ -1,77 +1,61 @@
-# H2H -- source probe (experiment)
+# H2H
 
-A throwaway spike that answers one question before we build anything:
-**do the sources actually return usable data for real oncology drugs?**
+A biochemistry-centered evidence tool for oncology drug programs.
 
-If yes, the adapters here graduate to the main app almost unchanged -- they already
-return a normalized `SourceRecord`; the app just persists it instead of printing it.
+For a given small-molecule cancer drug, H2H aggregates a sourced **evidence brief** from open
+databases: molecular structure, physchem properties, on-target binding/potency, mechanism,
+selectivity, target & pathway, clinical status, and literature. Every fact carries its source and
+a confidence, and unsupported facts are **visibly flagged rather than hidden**.
 
-## Run
+H2H surfaces evidence. It is explicitly **not** an ML predictor and **not** an investment advisor.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `backend/` | FastAPI app, data model, ingestion, domain logic |
+| `experiment/` | The original source-probing spike. Finished — see its README. Not part of the app. |
+
+The spike answered one question before any app code existed: *do the sources carry the product?*
+The answer is **yes, for small molecules** — all four sources deliver, and the ADC case showed
+biologics need their own data model. Its corrected adapters are the basis of `backend/ingestion/`.
+
+## Sources
+
+All open: no login, no API key required (an NCBI key is optional and only raises PubMed rate limits).
+
+| Source | Transport | Pulls |
+|---|---|---|
+| ChEMBL | REST | structure, physchem, IC50 activities, mechanism |
+| ClinicalTrials.gov | REST v2 | trials, phases, status |
+| Open Targets | GraphQL v4 | drug type, max stage, mechanism, target, indications |
+| PubMed | E-utilities | literature counts + titles (metadata only; never full text) |
+
+Every fact is stored with `source_url` + `retrieved_at`, and sources are attributed in the UI.
+This satisfies ChEMBL's **CC BY-SA** attribution (note: share-alike) and keeps PubMed to metadata.
+
+## Hard-won lessons
+
+These came from running the spike against the live APIs — a code review missed all of them.
+They are load-bearing; see `experiment/README.md` for the evidence.
+
+1. **`None` ≠ `0`.** `None` means "not measured / source unavailable"; `0` means "measured,
+   nothing found". The data model represents "source failed" separately from "empty result".
+2. **ClinicalTrials.gov 403s unknown User-Agents.** Its WAF passes UAs carrying a
+   `python-httpx/<version>` token. Never retry a 403 — it's a deterministic verdict.
+3. **Enrichment failures must not discard resolved data.** A failing sub-request degrades its own
+   field to `None` with a reason; the core resolve stays hard.
+4. **Counts come from totals, not page length.** `len(page)` saturates silently.
+5. **ChEMBL resolves by structure, not name.** Match `pref_name`/synonym, or error out — never
+   take the top hit.
+6. **ChEMBL is the least reliable source.** It needs caching / bulk pre-load, not live calls.
+7. **Verify API schemas against live.** Open Targets v4 drifted under us.
+
+## Development
+
+Python is `>=3.11,<3.14`. Dependencies are managed with **uv only** — never pip.
 
 ```bash
 uv sync
-uv run python probe.py    # ~15-20 min; ChEMBL /activity is the slow leg
+docker compose up          # api + postgres (pgvector) + redis
 ```
-
-Run it locally -- the external APIs (EBI/ChEMBL, ClinicalTrials.gov, Open Targets,
-NCBI) are not reachable from every sandbox.
-
-Python is pinned to `>=3.11,<3.14` (`.python-version`: 3.12). The upper bound is
-load-bearing: without it uv picks 3.14, where the scientific wheels don't exist yet.
-
-Optional: `cp .env.example .env` and add an `NCBI_API_KEY` for higher PubMed limits.
-
-## What it probes
-
-| Source | Adapter | Pulls |
-|---|---|---|
-| ChEMBL | `adapters/chembl.py` | SMILES, physchem props, IC50 activities, mechanism |
-| ClinicalTrials.gov | `adapters/clinicaltrials.py` | trial count, phases, max phase, terminations |
-| Open Targets | `adapters/opentargets.py` | drug type, max stage, mechanisms, targets, indications |
-| PubMed | `adapters/pubmed.py` | literature hit count + sample titles |
-
-Seed drugs are in `drugs.py` (mostly KRAS G12C for a dense entity space, plus one
-different target and one ADC to see where the small-molecule model breaks).
-
-## Outputs (`out/`)
-
-- `coverage.csv` + a printed coverage table
-- `raw_<drug>.json` -- full normalized response per drug (inspect these first)
-- `structure_<drug>.svg` -- one SVG, proof that RDKit renders the structure
-- a console summary: how many drugs got SMILES / IC50 / trials / mechanism / literature
-
-## Reading the output
-
-**Read the `errors` column before any number.** A source outage and a genuine coverage
-gap look identical in a count, so the summary block flags when the `N/5` figures are a
-floor rather than a finding. `None` in a count means "not measured", `0` means
-"measured, none found" -- they are not collapsed.
-
-Then check `chembl_id` / `chembl_pref_name`: ChEMBL's molecule search ranks by structure,
-not name, so a wrong-molecule match is otherwise invisible (see below).
-
-## What to look for
-
-- Do small molecules get a valid SMILES that renders? (The ADC won't -- that
-  tells us v1 = small molecules only.)
-- Are IC50 values present and sane? (Currently only *present* is answered -- the
-  adapter counts activities without checking units, censored `>`/`<` bounds, or target.)
-- Do the Open Targets field names still match? (Schema drifts -- verify here, not in the app.)
-- Which cards from the mockup would actually be populated vs empty?
-
-## Findings so far
-
-- **Open Targets drifted.** `maximumClinicalTrialPhase` is now `maximumClinicalStage` and
-  returns a string enum (`"APPROVAL"`), not the 0-4 int that `clinicaltrials.py` still emits
-  as `max_phase`. `linkedTargets` is gone; targets are derived from the MoA rows. The old
-  query 400s, and because GraphQL validates the whole document up front, that zeroed the
-  *entire* source -- which read as "Open Targets carries nothing".
-- **ChEMBL name resolution is not optional.** `molecule/search.json` ranks by structural
-  relevance: for `sotorasib` an unnamed analog outranks SOTORASIB itself. Taking the top hit
-  silently describes the wrong compound with a valid SMILES and no error.
-- **ChEMBL is the least reliable source** -- broad 500s (including `status.json`) and
-  30-60s latencies on `/activity`, seen repeatedly. The main app needs caching, not just retries.
-- **ClinicalTrials.gov 403s unknown User-Agents.** Its WAF allowlists known client tokens;
-  a bare `h2h-experiment/0.1` and even `Mozilla/5.0` are rejected. See `USER_AGENT` in `probe.py`.
-- Counts come from `totalCount` / `page_meta.total_count`, not `len(page)` -- the latter
-  silently capped osimertinib at 100 trials (true: 383) and 100 IC50s (true: 701).
