@@ -16,10 +16,24 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from backend.config import get_settings
+from backend.ingestion.http import build_client
 from backend.main import app
 from backend.models import Base
 
 TEST_DB_NAME = "h2h_test"
+
+
+@pytest.fixture
+async def fast_client() -> AsyncIterator[httpx.AsyncClient]:
+    """A source client with retries and backoff turned down.
+
+    The production client retries 5xx four times with exponential backoff, which is
+    right against a source that 500s as often as ChEMBL -- and turns a mocked
+    failure path into minutes of real sleeping. Tests assert the retry policy
+    directly (test_adapters); everything else should not pay for it.
+    """
+    async with build_client(timeout=5.0, attempts=1) as c:
+        yield c
 
 
 @pytest.fixture

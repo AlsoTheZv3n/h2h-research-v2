@@ -1,0 +1,285 @@
+"""Bulk-load the oncology drug catalog from ChEMBL.
+
+Why bulk, and not on demand: ChEMBL is the least reliable of the four sources --
+broad 500s (its own /status.json included) and 30-60s latencies, observed
+repeatedly. A product that resolved drugs live at query time would inherit that.
+So the catalog is pulled once, ahead of time, and served from Postgres.
+
+Which means this command must survive ChEMBL misbehaving *while it runs*:
+
+  idempotent  every write is an upsert keyed by chembl_id, so a re-run is safe
+  resumable   per-record failures are logged and skipped, never fatal; re-running
+              fills the gaps, and `--only-missing` fetches just those
+
+Run:  uv run python -m backend.ingestion.chembl_catalog
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any
+
+import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.db import get_sessionmaker
+from backend.ingestion.chembl import _as_float, _as_int
+from backend.ingestion.http import build_client
+from backend.models import Drug
+from backend.repositories.drugs import DrugRepository, classify_maturity
+
+logger = logging.getLogger(__name__)
+
+BASE = "https://www.ebi.ac.uk/chembl/api/data"
+
+# How we define "oncology". ChEMBL has no cancer flag, so we go through
+# drug_indication and match the disease term.
+#
+# Matched against BOTH mesh_heading and efo_term, because neither alone is
+# sufficient: MeSH names organ cancers "<Organ> Neoplasms" (so "neoplasm" catches
+# them) but calls others "Carcinoma, Non-Small-Cell Lung" (which it does not).
+# Substring matching is blunt and will pull in the odd benign neoplasm -- the
+# alternative is vendoring a MeSH/EFO ontology, which is a Phase-2-sized problem.
+# Kept as one visible list rather than buried in a query string, so the definition
+# can be argued with.
+CANCER_TERMS = (
+    "neoplasm",
+    "carcinoma",
+    "sarcoma",
+    "lymphoma",
+    "leukemia",
+    "leukaemia",
+    "myeloma",
+    "melanoma",
+    "glioma",
+    "glioblastoma",
+    "blastoma",
+    "mesothelioma",
+    "cancer",
+    "tumor",
+    "tumour",
+)
+
+# Only drugs that reached a patient. max_phase >= 1 per the brief: preclinical
+# compounds are a different product.
+MIN_PHASE = 1
+
+_PAGE = 1000
+# Small batches: ChEMBL 500s on long __in lists, and a failed batch costs a retry
+# of everything in it.
+_BATCH = 20
+
+
+@dataclass
+class LoadStats:
+    indications_scanned: int = 0
+    candidates: int = 0
+    loaded: int = 0
+    skipped_phase: int = 0
+    failed: list[str] = field(default_factory=list)
+    pages_failed: int = 0
+
+    def report(self) -> str:
+        lines = [
+            f"  indication rows scanned : {self.indications_scanned}",
+            f"  oncology candidates     : {self.candidates}",
+            f"  loaded into `drug`      : {self.loaded}",
+            f"  skipped (phase < {MIN_PHASE})    : {self.skipped_phase}",
+        ]
+        if self.pages_failed:
+            lines.append(f"  !! discovery pages lost : {self.pages_failed} (catalog is incomplete)")
+        if self.failed:
+            lines.append(f"  !! molecules failed     : {len(self.failed)} -- re-run to fill")
+            lines.append(f"     first few: {self.failed[:5]}")
+        if self.pages_failed or self.failed:
+            # Never let a partial load read as a complete one.
+            lines.append("  NOTE: this run is a FLOOR, not the catalog size. Re-run to fill gaps.")
+        return "\n".join(lines)
+
+
+def is_cancer_indication(row: dict[str, Any]) -> bool:
+    """Does this indication row describe a cancer?"""
+    haystack = f"{row.get('mesh_heading') or ''} {row.get('efo_term') or ''}".lower()
+    return any(term in haystack for term in CANCER_TERMS)
+
+
+async def _get_json(
+    client: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    """GET returning parsed JSON, or None when ChEMBL misbehaves.
+
+    ChEMBL answers a 500 with an HTML page, so .json() raises rather than returning
+    an error body -- both failure shapes have to collapse to the same None here.
+    """
+    try:
+        r = await client.get(url, params=params)
+        r.raise_for_status()
+        return r.json()  # type: ignore[no-any-return]
+    except Exception as exc:
+        logger.warning("chembl request failed (%s): %s", url, str(exc)[:120])
+        return None
+
+
+async def discover_oncology_ids(client: httpx.AsyncClient, stats: LoadStats) -> dict[str, int]:
+    """Walk drug_indication and collect the molecules with a cancer indication.
+
+    Returns chembl_id -> highest max_phase_for_ind seen.
+    """
+    found: dict[str, int] = {}
+    seen_terms: set[str] = set()
+
+    for term in CANCER_TERMS:
+        for field_name in ("mesh_heading__icontains", "efo_term__icontains"):
+            url: str | None = f"{BASE}/drug_indication.json"
+            params: dict[str, Any] | None = {field_name: term, "limit": _PAGE}
+            while url:
+                body = await _get_json(client, url, params)
+                if body is None:
+                    stats.pages_failed += 1
+                    break  # lost this page: recorded, and the run says so at the end
+                # Note the plural: the path is drug_indication, the payload key is
+                # drug_indications.
+                rows = body.get("drug_indications", [])
+                stats.indications_scanned += len(rows)
+                for row in rows:
+                    if not is_cancer_indication(row):
+                        continue
+                    cid = row.get("molecule_chembl_id")
+                    if not cid:
+                        continue
+                    phase = _as_int(row.get("max_phase_for_ind")) or 0
+                    found[cid] = max(found.get(cid, 0), phase)
+                    seen_terms.add((row.get("mesh_heading") or row.get("efo_term") or "")[:60])
+
+                nxt = (body.get("page_meta") or {}).get("next")
+                url = f"https://www.ebi.ac.uk{nxt}" if nxt else None
+                params = None  # `next` already carries the query string
+            logger.info("discovered %d molecules after %s=%s", len(found), field_name, term)
+
+    stats.candidates = len(found)
+    logger.info(
+        "discovery done: %d candidate molecules across %d distinct terms",
+        len(found),
+        len(seen_terms),
+    )
+    return found
+
+
+async def fetch_molecules(
+    client: httpx.AsyncClient, ids: list[str], stats: LoadStats
+) -> list[dict[str, Any]]:
+    """Fetch molecule records in batches, degrading to single fetches on failure."""
+    out: list[dict[str, Any]] = []
+    for i in range(0, len(ids), _BATCH):
+        chunk = ids[i : i + _BATCH]
+        body = await _get_json(
+            client,
+            f"{BASE}/molecule.json",
+            {"molecule_chembl_id__in": ",".join(chunk), "limit": _BATCH},
+        )
+        if body is not None and body.get("molecules"):
+            out.extend(body["molecules"])
+            continue
+        # The batch failed. Fall back to one-by-one so a single bad record cannot
+        # cost us the other 19.
+        logger.info("batch of %d failed; falling back to single fetches", len(chunk))
+        for cid in chunk:
+            single = await _get_json(client, f"{BASE}/molecule/{cid}.json")
+            if single is None:
+                stats.failed.append(cid)
+            else:
+                out.append(single)
+    return out
+
+
+def to_columns(mol: dict[str, Any]) -> dict[str, Any]:
+    """Map a ChEMBL molecule onto the catalog's index columns."""
+    structures = mol.get("molecule_structures") or {}
+    props = mol.get("molecule_properties") or {}
+    smiles = structures.get("canonical_smiles")
+    return {
+        "pref_name": mol.get("pref_name"),
+        "smiles": smiles,
+        "mw": _as_float(props.get("full_mwt")),
+        "alogp": _as_float(props.get("alogp")),
+        "hbd": _as_int(props.get("hbd")),
+        "hba": _as_int(props.get("hba")),
+        "psa": _as_float(props.get("psa")),
+        "ro5_violations": _as_int(props.get("num_ro5_violations")),
+        # ChEMBL's own modality label ("Small molecule", "Antibody", ...). Open
+        # Targets phrases it differently ("Antibody drug conjugate"); T6 reconciles.
+        "drug_type": mol.get("molecule_type"),
+        "max_phase": _as_int(mol.get("max_phase")),
+        # No potency yet -- that is T5's job, and it upgrades the row afterwards.
+        "maturity": classify_maturity(mol.get("molecule_type"), smiles, has_potency=False),
+    }
+
+
+async def load_catalog(
+    session: AsyncSession,
+    *,
+    client: httpx.AsyncClient | None = None,
+    only_missing: bool = False,
+) -> LoadStats:
+    """Load the catalog. Pass a client to control timeouts/retries; otherwise one
+    is built with the production settings."""
+    if client is None:
+        async with build_client() as owned:
+            return await load_catalog(session, client=owned, only_missing=only_missing)
+
+    stats = LoadStats()
+    repo = DrugRepository(session)
+
+    candidates = await discover_oncology_ids(client, stats)
+
+    wanted = [cid for cid, phase in candidates.items() if phase >= MIN_PHASE]
+    stats.skipped_phase = len(candidates) - len(wanted)
+
+    if only_missing:
+        existing = set((await session.execute(select(Drug.chembl_id))).scalars().all())
+        wanted = [c for c in wanted if c not in existing]
+        logger.info("only-missing: %d of %d still to fetch", len(wanted), len(candidates))
+
+    molecules = await fetch_molecules(client, wanted, stats)
+
+    for mol in molecules:
+        cid = mol.get("molecule_chembl_id")
+        if not cid:
+            continue
+        columns = to_columns(mol)
+        # max_phase from the molecule record is authoritative; the indication's
+        # phase is per-indication and only used to shortlist.
+        if (columns["max_phase"] or 0) < MIN_PHASE:
+            stats.skipped_phase += 1
+            continue
+        await repo.upsert_drug(cid, **columns)
+        stats.loaded += 1
+
+    await session.commit()
+    return stats
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--only-missing",
+        action="store_true",
+        help="fetch only molecules not already in the catalog (fills gaps after an outage)",
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    async with get_sessionmaker()() as session:
+        stats = await load_catalog(session, only_missing=args.only_missing)
+
+    print("\n=== ChEMBL oncology catalog ===")
+    print(stats.report())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
