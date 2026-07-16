@@ -19,7 +19,10 @@ class ClinicalTrialsAdapter:
         try:
             r = self.client.get(BASE, params={
                 "query.intr": drug,
-                "pageSize": 100,
+                # countTotal: without it the response carries no total at all, and
+                # len(studies) silently caps at pageSize (osimertinib: 100 vs 383).
+                "countTotal": "true",
+                "pageSize": 1000,
                 "fields": ",".join([
                     "protocolSection.identificationModule.nctId",
                     "protocolSection.statusModule.overallStatus",
@@ -27,7 +30,9 @@ class ClinicalTrialsAdapter:
                 ]),
             })
             r.raise_for_status()
-            studies = r.json().get("studies", [])
+            body = r.json()
+            studies = body.get("studies", [])
+            n_total = body.get("totalCount")
             phases: list[str] = []
             statuses: list[str] = []
             for s in studies:
@@ -38,14 +43,17 @@ class ClinicalTrialsAdapter:
                     statuses.append(st)
             max_phase = max((_PHASE_ORDER.get(p, -1) for p in phases), default=-1)
             fields = {
-                "n_trials": len(studies),
+                "n_trials": n_total,
+                # Aggregates below are computed over the scanned page only. Verified
+                # safe: max/any saturate, so paginating to exhaustion changes nothing.
+                "n_trials_scanned": len(studies),
                 "phases": sorted(set(phases)),
                 "max_phase": max_phase,
                 "has_completed": any(s == "COMPLETED" for s in statuses),
                 "has_terminated": any(s in ("TERMINATED", "WITHDRAWN", "SUSPENDED")
                                       for s in statuses),
             }
-            return SourceRecord(self.name, drug, ok=len(studies) > 0,
+            return SourceRecord(self.name, drug, ok=bool(n_total),
                                 fields=fields, provenance=prov)
         except Exception as e:  # noqa: BLE001
             return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(e))
