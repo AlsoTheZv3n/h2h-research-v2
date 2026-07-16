@@ -10,7 +10,11 @@ services:
       ENVIRONMENT: development
       NCBI_API_KEY: ${NCBI_API_KEY:-}
     ports:
-      - "8000:8000"
+      # Host ports are overridable via .env because localhost is shared with whatever
+      # else a dev runs -- WSL forwards its own listeners onto Windows' localhost, and
+      # a shadowed port fails as a confusing 404/timeout from a *different* server
+      # rather than as a bind error. Container ports never move.
+      - "${API_PORT:-8080}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,7 +31,9 @@ services:
       POSTGRES_PASSWORD: h2h
       POSTGRES_DB: h2h
     ports:
-      - "5432:5432"
+      # Published only so host tooling (alembic, psql) can reach it; the api talks
+      # over the compose network regardless.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -43,7 +49,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:

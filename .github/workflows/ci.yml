@@ -69,6 +69,11 @@ jobs:
       - name: Alembic migrations
         run: uv run alembic upgrade head
 
+      - name: Models and migrations must not drift
+        # Catches a model edited without a migration -- which would otherwise only
+        # surface as a production error long after the PR merged.
+        run: uv run alembic check
+
       - name: Pytest
         run: uv run pytest -v
 
