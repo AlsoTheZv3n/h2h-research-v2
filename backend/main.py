@@ -11,7 +11,8 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from backend import __version__
-from backend.cache import get_redis
+from backend.api import drugs_router
+from backend.cache import close_redis, get_redis
 from backend.config import get_settings
 from backend.db import dispose_engine, get_sessionmaker
 
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("starting h2h %s (%s)", __version__, settings.environment)
     yield
     await dispose_engine()
+    await close_redis()
 
 
 app = FastAPI(
@@ -33,6 +35,8 @@ app = FastAPI(
     summary="Sourced evidence briefs for oncology drug programs.",
     lifespan=lifespan,
 )
+
+app.include_router(drugs_router)
 
 
 @app.get("/health", tags=["ops"])

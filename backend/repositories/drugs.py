@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,6 +90,35 @@ class DrugRepository:
             select(FactRow).where(FactRow.drug_chembl_id == chembl_id).order_by(FactRow.key)
         )
         return result.scalars().all()
+
+    async def list_drugs(
+        self,
+        *,
+        target: str | None = None,
+        max_phase: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[Sequence[Drug], int]:
+        """One page of the overview, plus the unpaginated total.
+
+        The total is counted, not len()'d: the spike shipped a bug where a page
+        length was reported as a total, and osimertinib's 383 trials read as 100.
+        """
+        filters = []
+        if target:
+            filters.append(Drug.primary_target == target)
+        if max_phase is not None:
+            filters.append(Drug.max_phase >= max_phase)
+
+        total = await self.session.scalar(select(func.count()).select_from(Drug).where(*filters))
+        rows = await self.session.execute(
+            select(Drug)
+            .where(*filters)
+            .order_by(Drug.max_phase.desc().nullslast(), Drug.pref_name)
+            .limit(limit)
+            .offset(offset)
+        )
+        return rows.scalars().all(), int(total or 0)
 
     async def promote_index_columns(self, chembl_id: str, record: SourceRecord) -> None:
         """Copy a ChEMBL record's index columns into the catalog row.
