@@ -74,6 +74,13 @@ class Drug(Base):
         index=True,
     )
 
+    # NULL means the sources have never been asked about this drug -- a fourth state,
+    # distinct from "asked, and a source failed" and from "asked, and the answer is
+    # nothing". The catalog loader leaves it NULL; only enrichment sets it. Reading a
+    # never-analyzed drug as "no data" would be the None-vs-0 confusion at the level
+    # of the whole record.
+    last_enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { getDrug, structureUrl } from '../api/client'
 import type { DrugDetail, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
-import { Fact } from '../components/Fact'
+import { AnalyzingNotice } from '../components/AnalyzingNotice'
+import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { PotencyCard } from '../components/PotencyCard'
 
@@ -19,6 +20,10 @@ function firstOkValue<T>(facts: SourcedFact[] | undefined): T | null {
 
 const list = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v))
 
+// Long enough not to hammer the API, short enough that a finished enrichment shows
+// up while the reader is still looking at the page.
+const POLL_MS = 2000
+
 export function DetailPage() {
   const { chemblId = '' } = useParams()
   const [detail, setDetail] = useState<DrugDetail | null>(null)
@@ -27,14 +32,31 @@ export function DetailPage() {
 
   useEffect(() => {
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     setDetail(null)
     setError(null)
     setStructureFailed(false)
-    getDrug(chemblId)
-      .then((d) => !cancelled && setDetail(d))
-      .catch((e: Error) => !cancelled && setError(e.message))
+
+    // Opening a never-analyzed drug starts its enrichment server-side and returns
+    // immediately, so poll until the facts land. The alternative -- holding the
+    // request open -- would mean a 60s spinner against a source that often takes
+    // that long, with nothing on screen explaining why.
+    async function load() {
+      try {
+        const d = await getDrug(chemblId)
+        if (cancelled) return
+        setDetail(d)
+        if (d.state !== 'ready') timer = setTimeout(load, POLL_MS)
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message)
+      }
+    }
+    void load()
+
     return () => {
       cancelled = true
+      if (timer) clearTimeout(timer)
     }
   }, [chemblId])
 
@@ -54,6 +76,7 @@ export function DetailPage() {
   const isBiologic = detail.maturity === 'index_only' && !smiles
 
   return (
+    <BriefStateProvider value={detail.state}>
     <article>
       <nav className="mb-3 text-xs">
         <Link to="/" className="text-accent hover:underline">
@@ -68,6 +91,8 @@ export function DetailPage() {
         <span className="font-mono text-xs text-ink-faint">{detail.chembl_id}</span>
         <MaturityPill maturity={detail.maturity} />
       </header>
+
+      <AnalyzingNotice state={detail.state} />
 
       {detail.unavailable.length > 0 && (
         <p
@@ -233,5 +258,6 @@ export function DetailPage() {
         Every fact links its source. H2H surfaces evidence; it does not predict.
       </p>
     </article>
+    </BriefStateProvider>
   )
 }

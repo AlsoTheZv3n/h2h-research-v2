@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.db import get_sessionmaker
-from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord
+from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, utcnow
 from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
 from backend.ingestion.http import build_client
@@ -165,6 +165,11 @@ async def _promote(
     columns["maturity"] = classify_maturity(
         resolved_type if isinstance(resolved_type, str) else None, smiles, has_potency
     )
+    # Stamped even when every source failed: it records that we *looked*, which is a
+    # different statement from "there is nothing here". A drug whose enrichment found
+    # only outages has a brief full of source_failed facts -- an answer. A drug that
+    # was never asked has no facts at all, and must not be mistaken for the first.
+    columns["last_enriched_at"] = utcnow()
     await repo.upsert_drug(drug.chembl_id, **columns)
 
 

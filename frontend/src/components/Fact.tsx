@@ -1,6 +1,19 @@
-import type { ReactNode } from 'react'
-import type { SourcedFact } from '../api/types'
+import { createContext, useContext, type ReactNode } from 'react'
+import type { BriefState, SourcedFact } from '../api/types'
 import { CitationChip } from './CitationChip'
+
+/**
+ * The brief's state, available to every Fact without threading it through twenty
+ * call sites.
+ *
+ * A Fact needs it for one reason, and it is the important one: a missing fact means
+ * something completely different depending on whether we have looked yet. Mid-
+ * enrichment, "no mechanism row" means "not back from ChEMBL". Afterwards it means
+ * "no source asserted one". Same absence, opposite readings.
+ */
+const BriefStateContext = createContext<BriefState>('ready')
+
+export const BriefStateProvider = BriefStateContext.Provider
 
 /**
  * One fact, rendered according to its status. This component is the product.
@@ -39,10 +52,25 @@ export function Fact({ label, facts, render, emptyLabel = 'None found' }: FactPr
 }
 
 function FactValue({ facts, render, emptyLabel }: Omit<FactProps, 'label'>) {
-  // No row at all: this source was never asked about this field. Distinct again
-  // from both "nothing found" and "the source fell over".
+  const briefState = useContext(BriefStateContext)
+
   if (!facts || facts.length === 0) {
-    return <span className="text-ink-faint italic">Not collected</span>
+    // An absent fact says one of two opposite things, and only the brief's state
+    // tells them apart: mid-enrichment it has not arrived yet; afterwards no source
+    // asserted it. Showing "not collected" while a fetch is in flight would be this
+    // codebase's founding bug wearing a new hat.
+    if (briefState !== 'ready') {
+      return (
+        <span data-testid="fact-pending" className="text-ink-faint italic">
+          Waiting for sources…
+        </span>
+      )
+    }
+    return (
+      <span data-testid="fact-not-collected" className="text-ink-faint italic">
+        Not collected
+      </span>
+    )
   }
 
   return (

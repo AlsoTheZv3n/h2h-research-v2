@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from backend.ingestion.base import FactStatus
 from backend.models.drug import DataMaturity
+from backend.services.briefs import BriefState
 
 
 class SourcedFact(BaseModel):
@@ -66,6 +67,13 @@ class DrugDetail(BaseModel):
     chembl_id: str
     pref_name: str | None = None
     maturity: DataMaturity
+
+    state: BriefState = BriefState.READY
+    """Where this brief is in its life, which is a different axis from any fact's
+    status. `not_analyzed` and `enriching` mean we have not looked yet -- neither is
+    "we looked and found nothing", and the UI must never render them as such."""
+
+    last_enriched_at: datetime | None = None
 
     facts: dict[str, list[SourcedFact]] = Field(
         default_factory=dict,

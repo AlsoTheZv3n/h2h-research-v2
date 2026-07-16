@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { SourcedFact } from '../api/types'
-import { Fact } from './Fact'
+import { BriefStateProvider, Fact } from './Fact'
 
 /**
  * The three states are the product. These tests are the last guard against the
@@ -78,7 +78,7 @@ describe('Fact', () => {
 
   it('says "not collected" when no source asserted the key at all', () => {
     render(<Fact label="Mechanism" facts={[]} />)
-    expect(screen.getByText(/not collected/i)).toBeInTheDocument()
+    expect(screen.getByTestId('fact-not-collected')).toBeInTheDocument()
   })
 
   it('renders every source when they disagree', () => {
@@ -106,6 +106,79 @@ describe('Fact', () => {
       />,
     )
     expect(screen.getByText('Yes')).toBeInTheDocument()
+  })
+})
+
+describe('the four states', () => {
+  /**
+   * The distinction this whole project keeps having to re-establish at each new
+   * layer. Four absences that mean four different things:
+   *
+   *   not_analyzed / enriching  we have not looked
+   *   source_failed             we looked, the source fell over
+   *   empty                     we looked, there is nothing
+   *   ok                        here it is
+   *
+   * Any two of these rendering identically is a defect, not a style choice.
+   */
+  it('an absent fact reads as "waiting" while the brief is still enriching', () => {
+    render(
+      <BriefStateProvider value="enriching">
+        <Fact label="Mechanism" facts={undefined} emptyLabel="No mechanism annotated" />
+      </BriefStateProvider>,
+    )
+
+    expect(screen.getByTestId('fact-pending')).toBeInTheDocument()
+    // Not a finding about the drug -- we have not asked yet.
+    expect(screen.queryByText('No mechanism annotated')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('fact-not-collected')).not.toBeInTheDocument()
+  })
+
+  it('the same absence reads as "not collected" once the brief is ready', () => {
+    render(
+      <BriefStateProvider value="ready">
+        <Fact label="Mechanism" facts={undefined} />
+      </BriefStateProvider>,
+    )
+
+    expect(screen.getByTestId('fact-not-collected')).toBeInTheDocument()
+    expect(screen.queryByTestId('fact-pending')).not.toBeInTheDocument()
+  })
+
+  it('a not-yet-analyzed brief never renders as source_failed', () => {
+    render(
+      <BriefStateProvider value="not_analyzed">
+        <Fact label="Mechanism" facts={undefined} />
+      </BriefStateProvider>,
+    )
+
+    // "We have not looked" must not be dressed up as "the source is broken".
+    expect(screen.queryByTestId('fact-source-failed')).not.toBeInTheDocument()
+    expect(screen.getByTestId('fact-pending')).toBeInTheDocument()
+  })
+
+  it('all four render distinctly', () => {
+    const rendered = new Set<string>()
+
+    for (const [state, facts] of [
+      ['enriching', undefined],
+      ['ready', undefined],
+      ['ready', [fact({ value: 0, status: 'empty' })]],
+      ['ready', [fact({ value: null, status: 'source_failed' })]],
+      ['ready', [fact({ value: 42 })]],
+    ] as const) {
+      const { container, unmount } = render(
+        <BriefStateProvider value={state}>
+          <Fact label="X" facts={facts} emptyLabel="None found" />
+        </BriefStateProvider>,
+      )
+      rendered.add(container.textContent ?? '')
+      unmount()
+    }
+
+    // Five renders, five different sentences. A collision here means two different
+    // truths look the same to a reader.
+    expect(rendered.size).toBe(5)
   })
 })
 

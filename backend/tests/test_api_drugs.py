@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from backend.cache import close_redis, get_redis
 from backend.db import get_session
-from backend.ingestion.base import FactStatus, SourceRecord, fact, failed
+from backend.ingestion.base import FactStatus, SourceRecord, fact, failed, utcnow
 from backend.main import app
 from backend.models import DataMaturity
 from backend.repositories import DrugRepository
@@ -56,7 +56,13 @@ async def api(db_engine: AsyncEngine) -> AsyncIterator[httpx.AsyncClient]:
 
 @pytest.fixture
 async def seeded(db_engine: AsyncEngine) -> None:
-    """Two drugs: a small molecule with a partly-failed fetch, and the ADC."""
+    """Two drugs: a small molecule with a partly-failed fetch, and the ADC.
+
+    Both carry last_enriched_at, because both have been enriched -- that is what
+    having facts means. Without it the API reads them as never-analyzed, fires a
+    lazy enrichment at the real ChEMBL from inside the test suite, and declines to
+    cache. These fixtures describe finished drugs; say so.
+    """
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
     async with maker() as s:
         repo = DrugRepository(s)
@@ -68,6 +74,7 @@ async def seeded(db_engine: AsyncEngine) -> None:
             primary_target="KRAS",
             smiles="CCO",
             maturity=DataMaturity.FULL,
+            last_enriched_at=utcnow(),
         )
         await repo.save_record(
             "CHEMBL4594350",
@@ -100,6 +107,7 @@ async def seeded(db_engine: AsyncEngine) -> None:
             max_phase=4,
             primary_target="ERBB2",
             maturity=DataMaturity.INDEX_ONLY,
+            last_enriched_at=utcnow(),
         )
         await repo.save_record(
             "CHEMBL4297844",

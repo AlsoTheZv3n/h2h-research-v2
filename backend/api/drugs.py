@@ -16,6 +16,7 @@ from backend.domain.structure import render_svg
 from backend.ingestion.base import FactStatus
 from backend.repositories import DrugRepository
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
+from backend.services.briefs import BriefState, get_or_start_brief
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,12 @@ async def get_structure(chembl_id: str, session: SessionDep) -> Response:
     summary="Detail: the evidence brief, every fact with provenance and status",
 )
 async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
+    """The brief, enriching it first if nobody ever has.
+
+    Only a `ready` brief is cached. An enriching one is a moving target, and caching
+    "we haven't looked yet" for an hour would strand the drug in that state long
+    after its facts landed.
+    """
     settings = get_settings()
     cache_key = f"drug:detail:{chembl_id}"
     redis = get_redis()
@@ -107,6 +114,7 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
     if drug is None:
         raise HTTPException(status_code=404, detail=f"no drug {chembl_id}")
 
+    state = await get_or_start_brief(session, chembl_id)
     rows = await repo.facts_for(chembl_id)
 
     facts: dict[str, list[SourcedFact]] = defaultdict(list)
@@ -136,13 +144,18 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         chembl_id=drug.chembl_id,
         pref_name=drug.pref_name,
         maturity=drug.maturity,
+        state=state,
+        last_enriched_at=drug.last_enriched_at,
         facts=dict(facts),
         unavailable=unavailable,
     )
 
-    try:
-        await redis.set(cache_key, detail.model_dump_json(), ex=settings.cache_ttl_seconds)
-    except Exception as exc:
-        logger.warning("cache write failed for %s: %s", chembl_id, exc)
+    # Only cache a finished brief. Caching an in-flight one would pin "analyzing" in
+    # front of every reader for the whole TTL, long after the facts had landed.
+    if state is BriefState.READY:
+        try:
+            await redis.set(cache_key, detail.model_dump_json(), ex=settings.cache_ttl_seconds)
+        except Exception as exc:
+            logger.warning("cache write failed for %s: %s", chembl_id, exc)
 
     return detail

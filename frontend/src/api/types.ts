@@ -62,10 +62,25 @@ export interface PotencySummary {
   other_units: Record<string, number>
 }
 
+/**
+ * Where a brief is in its life -- a different axis from any fact's status.
+ *
+ *   not_analyzed  nobody has asked the sources about this drug yet
+ *   enriching     a fetch is in flight; the facts are on their way
+ *   ready         the facts are stored and served
+ *
+ * The first two mean "we have not looked", which is not "we looked and found
+ * nothing" (empty) and not "we looked and the source fell over" (source_failed).
+ * Four states, four different sentences, and the UI owes the reader the right one.
+ */
+export type BriefState = 'not_analyzed' | 'enriching' | 'ready'
+
 export interface DrugDetail {
   chembl_id: string
   pref_name: string | null
   maturity: DataMaturity
+  state: BriefState
+  last_enriched_at: string | null
   /**
    * Keyed by fact name; a list because sources disagree. ChEMBL and Open Targets
    * both assert a mechanism, and keeping both is the evidence.
