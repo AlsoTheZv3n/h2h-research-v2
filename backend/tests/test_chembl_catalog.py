@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.chembl_catalog import (
+    _CONCURRENCY,
     LoadStats,
     is_cancer_indication,
     load_catalog,
@@ -24,6 +25,16 @@ from backend.ingestion.chembl_catalog import (
 from backend.models import DataMaturity, Drug
 
 CHEMBL = "https://www.ebi.ac.uk/chembl/api/data"
+
+
+class Interrupted(BaseException):
+    """Stands in for a Ctrl-C mid-run.
+
+    A BaseException on purpose: the loader deliberately swallows every Exception
+    from the HTTP layer into a retry or a skip, so only something outside that
+    hierarchy can model a real interruption. KeyboardInterrupt itself would abort
+    the pytest session rather than be caught.
+    """
 
 
 class TestCancerFilter:
@@ -252,6 +263,67 @@ class TestLoad:
         assert stats.pages_failed > 0
         assert "FLOOR" in stats.report()
         assert "incomplete" in stats.report()
+
+    @respx.mock
+    async def test_a_crash_mid_run_keeps_what_already_landed(
+        self, session: AsyncSession, fast_client: httpx.AsyncClient
+    ) -> None:
+        """Resumable has to be behaviour, not a docstring.
+
+        The loader committed only once, at the very end, so a crash after an
+        hours-long run rolled everything back and left --only-missing nothing to
+        skip. Waves commit as they land: kill it mid-flight and the earlier waves
+        survive.
+
+        Interrupted with a BaseException because that is both the realistic case
+        (a Ctrl-C during a ChEMBL stall) and the only one that gets through: every
+        HTTP-layer Exception is deliberately swallowed into a retry or a skip.
+        """
+        # Enough molecules for more than one wave: 200 ids / 20 per batch = 10
+        # batches, so the interrupt on batch 7 lands after wave 1 has committed.
+        rows = [
+            {
+                "molecule_chembl_id": f"CHEMBL_{i}",
+                "mesh_heading": "Breast Neoplasms",
+                "max_phase_for_ind": "4",
+            }
+            for i in range(200)
+        ]
+        _mock_discovery(rows)
+
+        calls = {"n": 0}
+
+        def molecules_then_boom(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] > _CONCURRENCY:
+                raise Interrupted("interrupted mid-run")
+            ids = request.url.params["molecule_chembl_id__in"].split(",")
+            return httpx.Response(
+                200,
+                json={
+                    "molecules": [
+                        {
+                            "molecule_chembl_id": cid,
+                            "pref_name": cid,
+                            "molecule_type": "Small molecule",
+                            "max_phase": "4",
+                            "molecule_structures": {"canonical_smiles": "CCO"},
+                            "molecule_properties": {},
+                        }
+                        for cid in ids
+                    ]
+                },
+            )
+
+        respx.get(url__startswith=f"{CHEMBL}/molecule.json").mock(side_effect=molecules_then_boom)
+        respx.get(url__startswith=f"{CHEMBL}/molecule/").mock(return_value=httpx.Response(500))
+
+        with pytest.raises(Interrupted):
+            await load_catalog(session, client=fast_client)
+
+        # The first wave was committed before the crash, so it is still there.
+        survived = await session.scalar(select(func.count()).select_from(Drug))
+        assert survived and survived > 0, "a crash rolled back work that had already landed"
 
 
 class TestStatsReport:

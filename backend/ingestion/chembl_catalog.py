@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -72,6 +73,10 @@ _PAGE = 1000
 # Small batches: ChEMBL 500s on long __in lists, and a failed batch costs a retry
 # of everything in it.
 _BATCH = 20
+# ChEMBL answers a batch in tens of seconds, so serially this ran for hours. Six is
+# deliberately modest: this is a public, already-struggling service, and the point
+# is to finish in a sitting, not to squeeze it.
+_CONCURRENCY = 6
 
 
 @dataclass
@@ -82,6 +87,7 @@ class LoadStats:
     skipped_phase: int = 0
     failed: list[str] = field(default_factory=list)
     pages_failed: int = 0
+    terms_seen: set[str] = field(default_factory=set)
 
     def report(self) -> str:
         lines = [
@@ -124,76 +130,117 @@ async def _get_json(
         return None
 
 
+async def _walk_term(
+    client: httpx.AsyncClient, field_name: str, term: str, stats: LoadStats
+) -> dict[str, int]:
+    """Paginate one (field, term) query. Returns chembl_id -> max_phase_for_ind."""
+    found: dict[str, int] = {}
+    url: str | None = f"{BASE}/drug_indication.json"
+    params: dict[str, Any] | None = {field_name: term, "limit": _PAGE}
+
+    while url:
+        body = await _get_json(client, url, params)
+        if body is None:
+            stats.pages_failed += 1
+            break  # lost this page: recorded, and the run says so at the end
+        # Note the plural: the path is drug_indication, the payload key is
+        # drug_indications.
+        rows = body.get("drug_indications", [])
+        stats.indications_scanned += len(rows)
+        for row in rows:
+            if not is_cancer_indication(row):
+                continue
+            cid = row.get("molecule_chembl_id")
+            if not cid:
+                continue
+            phase = _as_int(row.get("max_phase_for_ind")) or 0
+            found[cid] = max(found.get(cid, 0), phase)
+            stats.terms_seen.add((row.get("mesh_heading") or row.get("efo_term") or "")[:60])
+
+        nxt = (body.get("page_meta") or {}).get("next")
+        url = f"https://www.ebi.ac.uk{nxt}" if nxt else None
+        params = None  # `next` already carries the query string
+
+    logger.info("%s=%s -> %d molecules", field_name, term, len(found))
+    return found
+
+
 async def discover_oncology_ids(client: httpx.AsyncClient, stats: LoadStats) -> dict[str, int]:
     """Walk drug_indication and collect the molecules with a cancer indication.
 
-    Returns chembl_id -> highest max_phase_for_ind seen.
+    Returns chembl_id -> highest max_phase_for_ind seen. The queries overlap heavily
+    (a breast carcinoma row matches both "carcinoma" and "neoplasm"), which is fine:
+    the union is what we want, and max() reconciles the phase.
     """
+    queries = [
+        (field_name, term)
+        for term in CANCER_TERMS
+        for field_name in ("mesh_heading__icontains", "efo_term__icontains")
+    ]
+
     found: dict[str, int] = {}
-    seen_terms: set[str] = set()
-
-    for term in CANCER_TERMS:
-        for field_name in ("mesh_heading__icontains", "efo_term__icontains"):
-            url: str | None = f"{BASE}/drug_indication.json"
-            params: dict[str, Any] | None = {field_name: term, "limit": _PAGE}
-            while url:
-                body = await _get_json(client, url, params)
-                if body is None:
-                    stats.pages_failed += 1
-                    break  # lost this page: recorded, and the run says so at the end
-                # Note the plural: the path is drug_indication, the payload key is
-                # drug_indications.
-                rows = body.get("drug_indications", [])
-                stats.indications_scanned += len(rows)
-                for row in rows:
-                    if not is_cancer_indication(row):
-                        continue
-                    cid = row.get("molecule_chembl_id")
-                    if not cid:
-                        continue
-                    phase = _as_int(row.get("max_phase_for_ind")) or 0
-                    found[cid] = max(found.get(cid, 0), phase)
-                    seen_terms.add((row.get("mesh_heading") or row.get("efo_term") or "")[:60])
-
-                nxt = (body.get("page_meta") or {}).get("next")
-                url = f"https://www.ebi.ac.uk{nxt}" if nxt else None
-                params = None  # `next` already carries the query string
-            logger.info("discovered %d molecules after %s=%s", len(found), field_name, term)
+    for i in range(0, len(queries), _CONCURRENCY):
+        wave = queries[i : i + _CONCURRENCY]
+        results = await asyncio.gather(
+            *(_walk_term(client, field_name, term, stats) for field_name, term in wave)
+        )
+        for result in results:
+            for cid, phase in result.items():
+                found[cid] = max(found.get(cid, 0), phase)
+        logger.info(
+            "discovery: %d molecules after %d/%d queries", len(found), i + len(wave), len(queries)
+        )
 
     stats.candidates = len(found)
     logger.info(
         "discovery done: %d candidate molecules across %d distinct terms",
         len(found),
-        len(seen_terms),
+        len(stats.terms_seen),
     )
     return found
 
 
+async def _fetch_batch(
+    client: httpx.AsyncClient, chunk: list[str], stats: LoadStats
+) -> list[dict[str, Any]]:
+    """One batch, degrading to single fetches so one bad record cannot cost the rest."""
+    body = await _get_json(
+        client,
+        f"{BASE}/molecule.json",
+        {"molecule_chembl_id__in": ",".join(chunk), "limit": _BATCH},
+    )
+    if body is not None and body.get("molecules"):
+        return list(body["molecules"])
+
+    logger.info("batch of %d failed; falling back to single fetches", len(chunk))
+    out: list[dict[str, Any]] = []
+    for cid in chunk:
+        single = await _get_json(client, f"{BASE}/molecule/{cid}.json")
+        if single is None:
+            stats.failed.append(cid)
+        else:
+            out.append(single)
+    return out
+
+
 async def fetch_molecules(
     client: httpx.AsyncClient, ids: list[str], stats: LoadStats
-) -> list[dict[str, Any]]:
-    """Fetch molecule records in batches, degrading to single fetches on failure."""
-    out: list[dict[str, Any]] = []
-    for i in range(0, len(ids), _BATCH):
-        chunk = ids[i : i + _BATCH]
-        body = await _get_json(
-            client,
-            f"{BASE}/molecule.json",
-            {"molecule_chembl_id__in": ",".join(chunk), "limit": _BATCH},
-        )
-        if body is not None and body.get("molecules"):
-            out.extend(body["molecules"])
-            continue
-        # The batch failed. Fall back to one-by-one so a single bad record cannot
-        # cost us the other 19.
-        logger.info("batch of %d failed; falling back to single fetches", len(chunk))
-        for cid in chunk:
-            single = await _get_json(client, f"{BASE}/molecule/{cid}.json")
-            if single is None:
-                stats.failed.append(cid)
-            else:
-                out.append(single)
-    return out
+) -> AsyncIterator[list[dict[str, Any]]]:
+    """Yield molecules a wave at a time.
+
+    Concurrent, and a generator rather than one big list, for the same reason:
+    ChEMBL answers a batch in tens of seconds, so serially this ran for hours --
+    and the caller could not persist anything until all of it was in memory. Waves
+    let the caller commit as it goes, which is what makes the run resumable rather
+    than all-or-nothing.
+    """
+    chunks = [ids[i : i + _BATCH] for i in range(0, len(ids), _BATCH)]
+    for i in range(0, len(chunks), _CONCURRENCY):
+        wave = chunks[i : i + _CONCURRENCY]
+        results = await asyncio.gather(*(_fetch_batch(client, c, stats) for c in wave))
+        done = min(i + _CONCURRENCY, len(chunks))
+        logger.info("fetched wave %d-%d of %d batches", i + 1, done, len(chunks))
+        yield [mol for batch in results for mol in batch]
 
 
 def to_columns(mol: dict[str, Any]) -> dict[str, Any]:
@@ -244,22 +291,27 @@ async def load_catalog(
         wanted = [c for c in wanted if c not in existing]
         logger.info("only-missing: %d of %d still to fetch", len(wanted), len(candidates))
 
-    molecules = await fetch_molecules(client, wanted, stats)
+    # Commit per wave, not once at the end. The docstring above promises resumable,
+    # and a single commit after an hours-long run would make that a lie: any crash
+    # (or a Ctrl-C during a ChEMBL stall) would roll back everything, leaving
+    # --only-missing nothing to skip. Committing as we go is what makes the promise
+    # true -- each wave that lands, stays landed.
+    async for molecules in fetch_molecules(client, wanted, stats):
+        for mol in molecules:
+            cid = mol.get("molecule_chembl_id")
+            if not cid:
+                continue
+            columns = to_columns(mol)
+            # max_phase from the molecule record is authoritative; the indication's
+            # phase is per-indication and only used to shortlist.
+            if (columns["max_phase"] or 0) < MIN_PHASE:
+                stats.skipped_phase += 1
+                continue
+            await repo.upsert_drug(cid, **columns)
+            stats.loaded += 1
+        await session.commit()
+        logger.info("committed: %d loaded so far", stats.loaded)
 
-    for mol in molecules:
-        cid = mol.get("molecule_chembl_id")
-        if not cid:
-            continue
-        columns = to_columns(mol)
-        # max_phase from the molecule record is authoritative; the indication's
-        # phase is per-indication and only used to shortlist.
-        if (columns["max_phase"] or 0) < MIN_PHASE:
-            stats.skipped_phase += 1
-            continue
-        await repo.upsert_drug(cid, **columns)
-        stats.loaded += 1
-
-    await session.commit()
     return stats
 
 
