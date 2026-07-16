@@ -1,0 +1,26 @@
+# The build context is the repo root; keep it to what the image actually needs.
+.git/
+.github/
+experiment/
+frontend/
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.env
+.env.*
+!.env.example
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+Dockerfile
+.dockerignore
+docker-compose*.yml
+*.md
+!README.md

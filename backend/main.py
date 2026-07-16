@@ -1,0 +1,67 @@
+"""FastAPI application entrypoint."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI
+from sqlalchemy import text
+
+from backend import __version__
+from backend.cache import get_redis
+from backend.config import get_settings
+from backend.db import dispose_engine, get_sessionmaker
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    logging.basicConfig(level=settings.log_level)
+    logger.info("starting h2h %s (%s)", __version__, settings.environment)
+    yield
+    await dispose_engine()
+
+
+app = FastAPI(
+    title="H2H",
+    version=__version__,
+    summary="Sourced evidence briefs for oncology drug programs.",
+    lifespan=lifespan,
+)
+
+
+@app.get("/health", tags=["ops"])
+async def health() -> dict[str, str]:
+    """Liveness. Deliberately dependency-free.
+
+    This is what the container HEALTHCHECK hits: a slow database must not make the
+    API look dead and trigger a restart loop. Dependency state lives on /health/ready.
+    """
+    return {"status": "ok", "version": __version__}
+
+
+@app.get("/health/ready", tags=["ops"])
+async def ready() -> dict[str, Any]:
+    """Readiness: can we actually reach Postgres and Redis?"""
+    checks: dict[str, str] = {}
+
+    try:
+        async with get_sessionmaker()() as session:
+            await session.execute(text("SELECT 1"))
+        checks["postgres"] = "ok"
+    except Exception as exc:
+        checks["postgres"] = f"error: {exc}"
+
+    try:
+        await get_redis().ping()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = f"error: {exc}"
+
+    ready = all(v == "ok" for v in checks.values())
+    return {"ready": ready, "checks": checks}

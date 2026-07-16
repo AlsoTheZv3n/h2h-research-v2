@@ -1,0 +1,59 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Service names, not localhost: these resolve on the compose network.
+      DATABASE_URL: postgresql+asyncpg://h2h:h2h@postgres:5432/h2h
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      NCBI_API_KEY: ${NCBI_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    # pgvector-enabled: RAG lands later, and swapping the image afterwards would
+    # mean a migration on a populated volume.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: h2h
+      POSTGRES_PASSWORD: h2h
+      POSTGRES_DB: h2h
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # -U/-d: without them pg_isready probes the postgres/postgres default and
+      # can report ready before this database exists.
+      test: ["CMD-SHELL", "pg_isready -U h2h -d h2h"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
