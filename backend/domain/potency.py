@@ -42,7 +42,10 @@ CENSORED_RELATIONS = frozenset({">", "<", ">=", "<=", ">>", "<<"})
 class PotencySummary:
     """On-target IC50 potency, with everything it had to discard made explicit."""
 
-    target_chembl_id: str | None
+    target_chembl_ids: list[str] = field(default_factory=list)
+    """Every target the drug's mechanisms name. A multi-kinase inhibitor genuinely
+    has several: dasatinib hits ABL1, SRC, KIT and PDGFRA, and calling three of them
+    off-target would be a false claim about its defining mechanism."""
 
     n_activities: int = 0
     """Every IC50 row ChEMBL returned for this molecule."""
@@ -69,7 +72,7 @@ class PotencySummary:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "target_chembl_id": self.target_chembl_id,
+            "target_chembl_ids": self.target_chembl_ids,
             "n_activities": self.n_activities,
             "n_on_target": self.n_on_target,
             "n_censored": self.n_censored,
@@ -98,18 +101,25 @@ def _to_float(value: Any) -> float | None:
 
 
 def summarize_ic50(
-    activities: list[dict[str, Any]], target_chembl_id: str | None
+    activities: list[dict[str, Any]], target_chembl_ids: str | list[str] | None
 ) -> PotencySummary:
-    """Summarize IC50 activities against the drug's own target.
+    """Summarize IC50 activities against the drug's own target(s).
 
-    `target_chembl_id` comes from the drug's mechanism -- what it is *meant* to hit.
-    Without it we cannot separate signal from off-target screening noise, so the
-    summary reports the rows and refuses to quote a potency, rather than quoting one
-    over everything.
+    The targets come from the drug's mechanisms -- what it is *meant* to hit. Without
+    them we cannot separate signal from off-target screening noise, so the summary
+    reports the rows and refuses to quote a potency, rather than quoting one over
+    everything.
+
+    Accepts a single id for convenience; a drug with several mechanism targets is on
+    target against all of them.
     """
-    summary = PotencySummary(target_chembl_id=target_chembl_id, n_activities=len(activities))
+    if isinstance(target_chembl_ids, str):
+        target_chembl_ids = [target_chembl_ids]
+    targets = set(target_chembl_ids or [])
 
-    if not target_chembl_id:
+    summary = PotencySummary(target_chembl_ids=sorted(targets), n_activities=len(activities))
+
+    if not targets:
         # No known target: every row is unclassifiable. Say so instead of guessing.
         summary.off_target = dict(
             Counter(a.get("target_pref_name") or "unknown" for a in activities)
@@ -121,7 +131,7 @@ def summarize_ic50(
     other_units: Counter[str] = Counter()
 
     for a in activities:
-        if a.get("target_chembl_id") != target_chembl_id:
+        if a.get("target_chembl_id") not in targets:
             # Matched on ID, not name: "MIA PaCa-2" is a cell line and "SARS-CoV-2"
             # is a different organism entirely, but both sit in target_pref_name.
             off_target[a.get("target_pref_name") or "unknown"] += 1

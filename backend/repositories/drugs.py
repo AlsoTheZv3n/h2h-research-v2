@@ -114,7 +114,12 @@ class DrugRepository:
         rows = await self.session.execute(
             select(Drug)
             .where(*filters)
-            .order_by(Drug.max_phase.desc().nullslast(), Drug.pref_name)
+            # chembl_id last as a tiebreaker: max_phase and pref_name are both
+            # nullable, so without it tied rows have no defined order. Postgres may
+            # then order them differently per query, and since LIMIT/OFFSET is applied
+            # per query, a paging client sees one drug twice and never sees another --
+            # while `total` stays correct. A trustworthy count over a lossy list.
+            .order_by(Drug.max_phase.desc().nullslast(), Drug.pref_name, Drug.chembl_id)
             .limit(limit)
             .offset(offset)
         )
@@ -123,17 +128,31 @@ class DrugRepository:
     async def promote_index_columns(self, chembl_id: str, record: SourceRecord) -> None:
         """Copy a ChEMBL record's index columns into the catalog row.
 
-        Only `ok` facts are promoted. A `source_failed` fact must never overwrite a
-        good column with NULL: re-running the loader during an outage would otherwise
-        erase data we already had.
+        A `source_failed` fact must never overwrite a good column with NULL:
+        re-running the loader during an outage would otherwise erase data we had.
+
+        But everything else promotes, EMPTY included. `fact()` classifies 0 as EMPTY
+        ("measured, and the answer is nothing"), and `ro5_violations=0` is a measured
+        zero -- the best possible value. Promoting only OK dropped it to NULL, which
+        the model reads as "not measured": None != 0, running backwards.
         """
         columns: dict[str, object] = {}
         for key in _CHEMBL_INDEX_FIELDS:
             f = record.facts.get(key)
-            if f is not None and f.status is FactStatus.OK:
+            if f is not None and f.status is not FactStatus.SOURCE_FAILED:
                 columns[key] = f.value
         if columns:
             await self.upsert_drug(chembl_id, **columns)
+
+
+# ChEMBL's molecule_type values that the small-molecule data model covers. Anything
+# else -- Antibody, Protein, Oligonucleotide, Oligosaccharide, Cell, Gene, Enzyme,
+# Unknown -- is v2's problem.
+SMALL_MOLECULE_TYPES = frozenset({"small molecule"})
+
+
+def is_small_molecule(drug_type: str | None) -> bool:
+    return (drug_type or "").strip().lower() in SMALL_MOLECULE_TYPES
 
 
 def classify_maturity(drug_type: str | None, smiles: str | None, has_potency: bool) -> DataMaturity:
@@ -142,8 +161,17 @@ def classify_maturity(drug_type: str | None, smiles: str | None, has_potency: bo
     Honest by construction: a biologic lands in the catalog but says up front that
     there is no structure or binding card to show, instead of rendering empty cards
     that read as missing data.
+
+    Modality decides first, structure second. Testing only `smiles` happened to
+    classify biologics correctly -- but by accident, because they usually lack one.
+    ChEMBL does carry a SMILES for some peptides and conjugates, and those would have
+    been offered the structure and binding cards the contract reserves for small
+    molecules. The two fields are read independently from the same payload; nothing
+    links them.
     """
+    if not is_small_molecule(drug_type):
+        return DataMaturity.INDEX_ONLY
     if not smiles:
-        # No structure: biologics/ADCs, and anything ChEMBL could not resolve.
+        # A small molecule ChEMBL has no structure for: in the index, no cards.
         return DataMaturity.INDEX_ONLY
     return DataMaturity.FULL if has_potency else DataMaturity.PARTIAL

@@ -41,8 +41,16 @@ class PubMedAdapter:
                 ESEARCH, params=self._params({"term": drug, "retmax": 5, "sort": "relevance"})
             )
             r.raise_for_status()
-            result = r.json().get("esearchresult", {})
-            count = int(result.get("count", 0))
+            result = r.json().get("esearchresult") or {}
+            # E-utilities reports failures *inside* a 200: {"esearchresult": {"ERROR":
+            # "..."}}, with no count key. raise_for_status sees nothing wrong, so a
+            # count defaulting to 0 would classify as EMPTY -- "measured, no
+            # literature" -- and persist indistinguishably from a drug that genuinely
+            # has none. Never default a count: a missing count means we did not measure.
+            if result.get("ERROR") or result.get("count") is None:
+                reason = result.get("ERROR") or "esearch returned no count"
+                return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(reason))
+            count = int(result["count"])
             ids = result.get("idlist", []) or []
         except Exception as exc:
             return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(exc))

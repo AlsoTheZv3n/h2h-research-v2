@@ -85,6 +85,7 @@ class LoadStats:
     candidates: int = 0
     loaded: int = 0
     skipped_phase: int = 0
+    unknown_phase: int = 0
     failed: list[str] = field(default_factory=list)
     pages_failed: int = 0
     terms_seen: set[str] = field(default_factory=set)
@@ -96,6 +97,10 @@ class LoadStats:
             f"  loaded into `drug`      : {self.loaded}",
             f"  skipped (phase < {MIN_PHASE})    : {self.skipped_phase}",
         ]
+        if self.unknown_phase:
+            # Its own line, never folded into skipped_phase: "no phase annotated on
+            # the indication" is not "measured below phase 1".
+            lines.append(f"  indication phase unknown: {self.unknown_phase} (molecule decided)")
         if self.pages_failed:
             lines.append(f"  !! discovery pages lost : {self.pages_failed} (catalog is incomplete)")
         if self.failed:
@@ -105,6 +110,30 @@ class LoadStats:
             # Never let a partial load read as a complete one.
             lines.append("  NOTE: this run is a FLOOR, not the catalog size. Re-run to fill gaps.")
         return "\n".join(lines)
+
+
+# Sentinel for "this molecule has not been seen yet", distinct from "seen, with an
+# unknown phase" (None). Two different absences, and collapsing them is the bug this
+# whole codebase is built to avoid.
+_MISSING = object()
+
+
+def _merge_phase(existing: Any, phase: int | None) -> int | None:
+    """Highest known phase across a molecule's indication rows; None if none is known.
+
+    `max_phase_for_ind` is routinely null -- "no phase annotated for this indication",
+    not "phase 0". The old `or 0` turned that into a measured zero, which the shortlist
+    filter then dropped, so an approved drug whose cancer rows all lack a phase never
+    reached the authoritative molecule-level check. Worse, the run positively reported
+    it as "skipped (phase < 1)". A known phase always wins over an unknown one.
+    """
+    if existing is _MISSING:
+        return phase
+    if existing is None:
+        return phase
+    if phase is None:
+        return existing  # type: ignore[no-any-return]
+    return max(existing, phase)  # type: ignore[no-any-return]
 
 
 def is_cancer_indication(row: dict[str, Any]) -> bool:
@@ -132,9 +161,12 @@ async def _get_json(
 
 async def _walk_term(
     client: httpx.AsyncClient, field_name: str, term: str, stats: LoadStats
-) -> dict[str, int]:
-    """Paginate one (field, term) query. Returns chembl_id -> max_phase_for_ind."""
-    found: dict[str, int] = {}
+) -> dict[str, int | None]:
+    """Paginate one (field, term) query. Returns chembl_id -> max_phase_for_ind.
+
+    None means the indication row carries no phase -- not phase 0. See _merge_phase.
+    """
+    found: dict[str, int | None] = {}
     url: str | None = f"{BASE}/drug_indication.json"
     params: dict[str, Any] | None = {field_name: term, "limit": _PAGE}
 
@@ -153,8 +185,8 @@ async def _walk_term(
             cid = row.get("molecule_chembl_id")
             if not cid:
                 continue
-            phase = _as_int(row.get("max_phase_for_ind")) or 0
-            found[cid] = max(found.get(cid, 0), phase)
+            phase = _as_int(row.get("max_phase_for_ind"))
+            found[cid] = _merge_phase(found.get(cid, _MISSING), phase)
             stats.terms_seen.add((row.get("mesh_heading") or row.get("efo_term") or "")[:60])
 
         nxt = (body.get("page_meta") or {}).get("next")
@@ -165,12 +197,14 @@ async def _walk_term(
     return found
 
 
-async def discover_oncology_ids(client: httpx.AsyncClient, stats: LoadStats) -> dict[str, int]:
+async def discover_oncology_ids(
+    client: httpx.AsyncClient, stats: LoadStats
+) -> dict[str, int | None]:
     """Walk drug_indication and collect the molecules with a cancer indication.
 
-    Returns chembl_id -> highest max_phase_for_ind seen. The queries overlap heavily
-    (a breast carcinoma row matches both "carcinoma" and "neoplasm"), which is fine:
-    the union is what we want, and max() reconciles the phase.
+    Returns chembl_id -> highest known max_phase_for_ind, or None where no row
+    annotated one. The queries overlap heavily (a breast carcinoma row matches both
+    "carcinoma" and "neoplasm"), which is fine: the union is what we want.
     """
     queries = [
         (field_name, term)
@@ -178,7 +212,7 @@ async def discover_oncology_ids(client: httpx.AsyncClient, stats: LoadStats) -> 
         for field_name in ("mesh_heading__icontains", "efo_term__icontains")
     ]
 
-    found: dict[str, int] = {}
+    found: dict[str, int | None] = {}
     for i in range(0, len(queries), _CONCURRENCY):
         wave = queries[i : i + _CONCURRENCY]
         results = await asyncio.gather(
@@ -186,7 +220,7 @@ async def discover_oncology_ids(client: httpx.AsyncClient, stats: LoadStats) -> 
         )
         for result in results:
             for cid, phase in result.items():
-                found[cid] = max(found.get(cid, 0), phase)
+                found[cid] = _merge_phase(found.get(cid, _MISSING), phase)
         logger.info(
             "discovery: %d molecules after %d/%d queries", len(found), i + len(wave), len(queries)
         )
@@ -283,8 +317,15 @@ async def load_catalog(
 
     candidates = await discover_oncology_ids(client, stats)
 
-    wanted = [cid for cid, phase in candidates.items() if phase >= MIN_PHASE]
-    stats.skipped_phase = len(candidates) - len(wanted)
+    # An unknown indication phase shortlists the molecule rather than dropping it:
+    # the molecule record's own max_phase is the authority (checked below), and this
+    # filter exists only to keep the fetch volume down. Measured-low rows are still
+    # dropped here -- it is specifically *not knowing* that must not decide.
+    wanted = [cid for cid, phase in candidates.items() if phase is None or phase >= MIN_PHASE]
+    stats.skipped_phase = sum(
+        1 for phase in candidates.values() if phase is not None and phase < MIN_PHASE
+    )
+    stats.unknown_phase = sum(1 for phase in candidates.values() if phase is None)
 
     if only_missing:
         existing = set((await session.execute(select(Drug.chembl_id))).scalars().all())

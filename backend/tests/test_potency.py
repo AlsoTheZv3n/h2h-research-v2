@@ -119,7 +119,7 @@ class TestAdagrasibGoldenSet:
         assert d["n_censored"] == 1
         assert sum(d["off_target"].values()) == 23
         assert d["units"] == "nM"
-        assert d["target_chembl_id"] == KRAS
+        assert d["target_chembl_ids"] == [KRAS]
 
 
 class TestEdges:
@@ -175,3 +175,46 @@ class TestEdges:
 
         assert s.n_exact == 1
         assert s.median_nm == pytest.approx(5.0)
+
+
+class TestMultiTargetDrugs:
+    """A multi-kinase inhibitor has several real targets.
+
+    Taking mechanisms[0] would file the rest as off-target -- a false claim about the
+    drug's defining mechanism -- and quote the median against whichever target ChEMBL
+    happened to return first. Same defect as molecules[0], one endpoint over.
+    """
+
+    ABL1 = "CHEMBL1862"
+    SRC = "CHEMBL267"
+
+    def test_every_mechanism_target_is_on_target(self) -> None:
+        rows = [
+            _activity(self.ABL1, "ABL1", 1.0),
+            _activity(self.SRC, "SRC", 3.0),
+            _activity("CHEMBL_OTHER", "some cell line", 40000.0),
+        ]
+        s = summarize_ic50(rows, [self.ABL1, self.SRC])
+
+        assert s.n_on_target == 2
+        assert s.n_exact == 2
+        assert s.median_nm == pytest.approx(2.0)
+        assert s.off_target == {"some cell line": 1}
+        assert s.target_chembl_ids == sorted([self.ABL1, self.SRC])
+
+    def test_taking_only_the_first_target_would_misreport(self) -> None:
+        """Pins the regression: with just ABL1, SRC becomes 'off-target'."""
+        rows = [_activity(self.ABL1, "ABL1", 1.0), _activity(self.SRC, "SRC", 3.0)]
+
+        both = summarize_ic50(rows, [self.ABL1, self.SRC])
+        first_only = summarize_ic50(rows, [self.ABL1])
+
+        assert both.n_on_target == 2
+        assert first_only.n_on_target == 1
+        assert "SRC" in first_only.off_target
+
+    def test_a_single_id_is_still_accepted(self) -> None:
+        """Convenience: most drugs have one target, and callers should not wrap it."""
+        s = summarize_ic50([_activity(KRAS, "GTPase KRas", 10.0)], KRAS)
+        assert s.n_on_target == 1
+        assert s.target_chembl_ids == [KRAS]

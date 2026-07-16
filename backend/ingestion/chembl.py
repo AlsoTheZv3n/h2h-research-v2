@@ -11,6 +11,15 @@ from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 
 BASE = "https://www.ebi.ac.uk/chembl/api/data"
 
+# The facts each enrichment call is responsible for. Declared once so the success
+# and failure paths cannot drift apart: a key written on success but forgotten in
+# the `except` produces no row at all, which means the API can never list it in
+# `unavailable[]` -- the outage goes invisible. Worse, a re-ingest during an outage
+# would leave a stale status=ok row in place while its siblings' retrieved_at moved
+# on, turning a missing fact into an actively wrong one.
+_MECHANISM_KEYS = ("moa", "all_moas", "action_type", "target_chembl_id", "target_chembl_ids")
+_ACTIVITY_KEYS = ("n_ic50", "n_ic50_scanned", "ic50_summary")
+
 
 def pick_molecule(molecules: list[dict[str, Any]], drug: str) -> dict[str, Any] | None:
     """Resolve the molecule whose name actually IS the drug.
@@ -116,20 +125,38 @@ class ChEMBLAdapter:
         #
         # Mechanism first: its target_chembl_id is what makes the activities readable.
         # Without it there is no way to tell a KRAS measurement from a SARS-CoV-2 screen.
-        target_id: str | None = None
+        target_ids: list[str] = []
         try:
             mech = await self.client.get(
                 f"{BASE}/mechanism.json", params={"molecule_chembl_id": cid}
             )
             mech.raise_for_status()
             mechanisms = mech.json().get("mechanisms", [])
-            target_id = mechanisms[0].get("target_chembl_id") if mechanisms else None
-            facts["moa"] = ok(mechanisms[0].get("mechanism_of_action") if mechanisms else None)
-            facts["action_type"] = ok(mechanisms[0].get("action_type") if mechanisms else None)
-            facts["target_chembl_id"] = ok(target_id)
+            # Every mechanism, not [0]. List order is not authority -- the same rule
+            # pick_molecule enforces one endpoint earlier. Dasatinib has ABL1, SRC,
+            # KIT and PDGFRA; taking the first would file the other three as
+            # "off-target" and quote potency against whichever row came back first.
+            target_ids = list(
+                dict.fromkeys(
+                    m["target_chembl_id"] for m in mechanisms if m.get("target_chembl_id")
+                )
+            )
+            moas = list(
+                dict.fromkeys(
+                    m["mechanism_of_action"] for m in mechanisms if m.get("mechanism_of_action")
+                )
+            )
+            action_types = list(
+                dict.fromkeys(m["action_type"] for m in mechanisms if m.get("action_type"))
+            )
+            facts["moa"] = ok(moas[0] if moas else None)
+            facts["all_moas"] = ok(moas)
+            facts["action_type"] = ok(action_types[0] if action_types else None)
+            facts["target_chembl_id"] = ok(target_ids[0] if target_ids else None)
+            facts["target_chembl_ids"] = ok(target_ids)
         except Exception as exc:
-            facts["moa"] = failed(self.name, f"mechanism: {exc}", source_url=url)
-            facts["target_chembl_id"] = failed(self.name, f"mechanism: {exc}", source_url=url)
+            for key in _MECHANISM_KEYS:
+                facts[key] = failed(self.name, f"mechanism: {exc}", source_url=url)
 
         try:
             act = await self.client.get(
@@ -146,10 +173,10 @@ class ChEMBLAdapter:
             # The count is a row count, not a potency. Measured on adagrasib: 23 of
             # its 30 IC50s are off-target (cell lines, a CDK7 assay, two SARS-CoV-2
             # screens), so this is where the number becomes an answer.
-            facts["ic50_summary"] = ok(summarize_ic50(activities, target_id).as_dict())
+            facts["ic50_summary"] = ok(summarize_ic50(activities, target_ids).as_dict())
         except Exception as exc:
-            facts["n_ic50"] = failed(self.name, f"activity: {exc}", source_url=url)
-            facts["ic50_summary"] = failed(self.name, f"activity: {exc}", source_url=url)
+            for key in _ACTIVITY_KEYS:
+                facts[key] = failed(self.name, f"activity: {exc}", source_url=url)
 
         # ok means "the molecule resolved", not "it has a structure". The spike's
         # `bool(smiles) or n_ic50` was fine for a small-molecule probe but wrong here:
