@@ -41,9 +41,27 @@ export function listDrugs(params: DrugListParams = {}): Promise<DrugList> {
     q: params.q,
     target: params.target,
     max_phase: params.max_phase,
+    modality: params.modality,
+    maturity: params.maturity,
+    // Only send has_target when set: a bare key would filter to "false".
+    has_target: params.has_target === undefined ? undefined : String(params.has_target),
+    target_class: params.target_class,
+    // Only send when opting in; the default (oncology-only) needs no param.
+    include_out_of_scope: params.include_out_of_scope ? 'true' : undefined,
+    sort: params.sort,
+    order: params.order,
     limit: params.limit ?? 25,
     offset: params.offset ?? 0,
   })
+}
+
+/**
+ * The target-class facet's options: families actually present in the catalog, most
+ * common first. The overview appends its own "Unclassified" (target_class IS NULL),
+ * which this list never includes.
+ */
+export function listTargetClasses(): Promise<string[]> {
+  return get<string[]>('/drugs/target-classes')
 }
 
 export function getDrug(chemblId: string): Promise<DrugDetail> {

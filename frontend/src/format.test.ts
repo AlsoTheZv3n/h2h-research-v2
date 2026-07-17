@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCount, formatNm } from './format'
+import { countLabel, formatCount, formatNm } from './format'
 
 /**
  * These exist because the rendered page showed "480.000 nM" on a German browser.
@@ -34,5 +34,25 @@ describe('formatCount', () => {
   it('groups thousands the en-US way', () => {
     expect(formatCount(3856)).toBe('3,856')
     expect(formatCount(894)).toBe('894')
+  })
+})
+
+describe('countLabel', () => {
+  it('shows "X of Y" for a known-corpus subset', () => {
+    expect(countLabel(412, 3922, true)).toBe('412 of 3,922 shown')
+    // Scoping hides the tail even with no explicit filter: still a subset of Y.
+    expect(countLabel(3641, 3922, false)).toBe('3,641 of 3,922 shown')
+  })
+
+  it('says "match", never "in catalog", when filtered but the corpus size is unknown', () => {
+    // The regression this guards: with the size probe down, a filtered subset must not
+    // read as the whole catalog. 3 hits for a query is "3 match", not "3 in catalog".
+    expect(countLabel(3, null, true)).toBe('3 match')
+  })
+
+  it('says "in catalog" only for the unfiltered full view', () => {
+    expect(countLabel(3922, null, false)).toBe('3,922 in catalog')
+    // Whole corpus showing (data === catalogTotal) is not a subset.
+    expect(countLabel(3922, 3922, false)).toBe('3,922 in catalog')
   })
 })

@@ -80,6 +80,8 @@ export interface DrugSummary {
   drug_type: string | null
   max_phase: number | null
   primary_target: string | null
+  /** The primary target's protein family ("Kinase", ...). null = no class recorded. */
+  target_class: string | null
   primary_indication: string | null
   maturity: DataMaturity
   updated_at: string
@@ -142,12 +144,28 @@ export interface DrugDetail {
   unavailable: string[]
 }
 
+/** Columns the overview can sort by; must match the API's accepted `sort` values. */
+export type SortField = 'data' | 'name' | 'phase' | 'target' | 'class' | 'indication'
+export type SortOrder = 'asc' | 'desc'
+
 export interface DrugListParams {
   /** Free text: drug name, ChEMBL id or target. Partial, case-insensitive. */
   q?: string
   /** Exact target symbol. A facet, not a search box. */
   target?: string
   max_phase?: number
+  /** Exact drug type, e.g. "Small molecule", "Antibody". */
+  modality?: string
+  /** Data completeness. */
+  maturity?: DataMaturity
+  /** Only drugs with (true) or without (false) an annotated target. */
+  has_target?: boolean
+  /** Exact target family, e.g. "Kinase". "unclassified" selects rows with no class. */
+  target_class?: string
+  /** Include drugs scoped out as non-oncology. Off by default: the catalog is oncology. */
+  include_out_of_scope?: boolean
+  sort?: SortField
+  order?: SortOrder
   limit?: number
   offset?: number
 }

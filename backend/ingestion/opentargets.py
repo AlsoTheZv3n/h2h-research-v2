@@ -34,11 +34,33 @@ query Drug($id: String!) {
     name
     drugType
     maximumClinicalStage
-    mechanismsOfAction { rows { mechanismOfAction actionType targets { approvedSymbol } } }
+    mechanismsOfAction {
+      rows {
+        mechanismOfAction
+        actionType
+        targets { approvedSymbol targetClass { label level } }
+      }
+    }
     indications { count rows { disease { name } } }
   }
 }
 """
+
+
+def _pick_target_class(entries: list[dict[str, Any]] | None) -> str | None:
+    """A target's family, at the level that makes a useful facet.
+
+    Open Targets returns the ChEMBL protein-class hierarchy as a flat list tagged by
+    level -- for EGFR: l1 Enzyme, l2 Kinase, l3 Protein Kinase, ... l5 the single
+    protein. l1 is too coarse to slice a catalog by (everything with a mechanism is an
+    "Enzyme"); l5 is one protein, which is what `primary_target` already says. l2 is
+    the family a reader means -- "Kinase", "Protease", "Hydrolase" -- so prefer it,
+    fall back to l1 when that is all the target carries, and to None when it carries no
+    class at all. None is honest: it becomes the overview's "Unclassified", not an
+    invented bucket.
+    """
+    by_level = {e.get("level"): e.get("label") for e in (entries or []) if e.get("label")}
+    return by_level.get("l2") or by_level.get("l1")
 
 
 class OpenTargetsAdapter:
@@ -50,6 +72,7 @@ class OpenTargetsAdapter:
         "ot_moa",
         "all_moas",
         "targets",
+        "target_class",
         "n_indications",
         "indications",
     )
@@ -105,14 +128,19 @@ class OpenTargetsAdapter:
                 r.get("mechanismOfAction") for r in moa_rows if r.get("mechanismOfAction")
             )
         )
-        targets = sorted(
-            {
-                t.get("approvedSymbol")
-                for r in moa_rows
-                for t in (r.get("targets") or [])
-                if t.get("approvedSymbol")
-            }
-        )
+        # One pass keeps each symbol's family beside it, so target_class below is the
+        # class of the *same* symbol that becomes primary_target -- not a second,
+        # separately-sorted answer that could disagree with it.
+        class_by_symbol: dict[str, str | None] = {}
+        for r in moa_rows:
+            for t in r.get("targets") or []:
+                sym = t.get("approvedSymbol")
+                if sym and sym not in class_by_symbol:
+                    class_by_symbol[sym] = _pick_target_class(t.get("targetClass"))
+        targets = sorted(class_by_symbol)
+        # The class of the primary target -- targets[0], exactly what _promote lifts
+        # into primary_target -- so the overview's target and its class always agree.
+        primary_target_class = class_by_symbol.get(targets[0]) if targets else None
 
         facts = {
             "ot_id": ok(drug_id),
@@ -126,6 +154,10 @@ class OpenTargetsAdapter:
             # Derived from the MoA rows since linkedTargets is gone, so 0 here means
             # "no targets annotated on the mechanism" -- divarasib's rows carry none.
             "targets": ok(targets),
+            # The primary target's protein family, for the overview's target-class
+            # facet. EMPTY (None) when the target carries no class, which the overview
+            # reads as "Unclassified" -- distinct from a source_failed outage.
+            "target_class": ok(primary_target_class),
             "n_indications": ok((d.get("indications") or {}).get("count")),
             "indications": ok(
                 [

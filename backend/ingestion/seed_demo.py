@@ -40,25 +40,35 @@ async def seed(session: AsyncSession, *, fixture: Path = FIXTURE) -> tuple[int, 
     payload: dict[str, Any] = json.loads(fixture.read_text())
     now = utcnow()
 
+    # last_enriched_at is stamped only for drugs that actually carry facts. A catalog-only
+    # row (the scoping demo's atorvastatin has zero facts) must keep it NULL -- "never
+    # enriched" -- or it asserts an enrichment that never happened, the exact
+    # never-asked-vs-asked collapse the model's last_enriched_at exists to prevent.
+    enriched_ids = {fact["drug_chembl_id"] for fact in payload["facts"]}
+
     for drug in payload["drugs"]:
         await session.execute(
             text(
                 """
                 INSERT INTO drug (chembl_id, pref_name, smiles, mw, alogp, hbd, hba, psa,
                                   ro5_violations, drug_type, max_phase, primary_target,
-                                  primary_indication, maturity, last_enriched_at)
+                                  target_class, primary_indication, maturity, in_scope,
+                                  last_enriched_at)
                 VALUES (:chembl_id, :pref_name, :smiles, :mw, :alogp, :hbd, :hba, :psa,
                         :ro5_violations, :drug_type, :max_phase, :primary_target,
-                        :primary_indication, CAST(:maturity AS data_maturity), :now)
+                        :target_class, :primary_indication, CAST(:maturity AS data_maturity),
+                        :in_scope, :last_enriched)
                 ON CONFLICT (chembl_id) DO UPDATE SET
                     pref_name = excluded.pref_name,
                     smiles = excluded.smiles,
                     maturity = excluded.maturity,
                     primary_target = excluded.primary_target,
+                    target_class = excluded.target_class,
+                    in_scope = excluded.in_scope,
                     last_enriched_at = excluded.last_enriched_at
                 """
             ),
-            {**drug, "now": now},
+            {**drug, "last_enriched": now if drug["chembl_id"] in enriched_ids else None},
         )
 
     for fact in payload["facts"]:

@@ -1,44 +1,92 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { listDrugs } from '../api/client'
-import type { DrugList } from '../api/types'
+import { listDrugs, listTargetClasses } from '../api/client'
+import type { DataMaturity, DrugList, SortField, SortOrder } from '../api/types'
 import { MaturityPill, PhasePill } from '../components/MaturityPill'
-import { formatCount } from '../format'
+import { countLabel, formatCount } from '../format'
 
 const PAGE_SIZE = 25
 // Long enough that typing a drug name is one query, not eight.
 const SEARCH_DEBOUNCE_MS = 250
 
+// The facet value for "no class recorded" (target_class IS NULL). Matches the API's
+// sentinel, so the one token means the same thing on both sides of the wire.
+const UNCLASSIFIED = 'unclassified'
+
+// The drug types the catalog actually holds, most common first. Exact values, so the
+// modality filter (an exact, case-insensitive match) has something to match.
+const MODALITIES = [
+  'Small molecule',
+  'Antibody',
+  'Antibody drug conjugate',
+  'Protein',
+  'Oligonucleotide',
+  'Gene',
+  'Cell',
+  'Enzyme',
+]
+
+const MATURITY_LABELS: Record<string, string> = {
+  full: 'Full brief',
+  partial: 'Partial',
+  index_only: 'Index only',
+}
+
+// A new column sorts in the direction a reader expects first: names A→Z, but the
+// most complete data and the highest phase at the top.
+const DEFAULT_ORDER: Record<SortField, SortOrder> = {
+  data: 'desc',
+  phase: 'desc',
+  name: 'asc',
+  target: 'asc',
+  class: 'asc',
+  indication: 'asc',
+}
+
 /**
- * The overview: a light, scannable index. Index columns only -- no molecular
- * detail, that is what the brief is for.
+ * The overview: a light, scannable index. Index columns only -- no molecular detail,
+ * that is what the brief is for.
  *
- * Filters and paging go through the API's query params rather than filtering a
- * fetched page in the browser: the catalog is thousands of drugs, and `total` has
- * to mean the corpus, not the page. (The spike shipped exactly that bug once.)
+ * Everything -- search, facets, sort, paging -- goes through the API's query params
+ * and is reflected in the URL, so a filtered view survives a refresh and is
+ * shareable. Nothing is filtered or sorted in the browser: the catalog is thousands
+ * of drugs and `total` has to mean the filtered corpus, not the page. (The spike
+ * shipped exactly that bug once.)
  */
 export function OverviewPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState<DrugList | null>(null)
+  const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
+  const [targetClasses, setTargetClasses] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const q = params.get('q') ?? ''
+  const target = params.get('target') ?? ''
   const maxPhase = params.get('max_phase') ?? ''
+  const modality = params.get('modality') ?? ''
+  const maturity = params.get('maturity') ?? ''
+  const hasTarget = params.get('has_target') ?? '' // '', 'true', 'false'
+  const targetClass = params.get('target_class') ?? '' // '', a family, or 'unclassified'
+  const includeOutOfScope = params.get('include_out_of_scope') === 'true'
+  const sort = (params.get('sort') as SortField | null) ?? 'data'
+  const order = (params.get('order') as SortOrder | null) ?? 'desc'
   const offset = Number(params.get('offset') ?? 0)
 
-  // The input is uncontrolled-ish: it updates instantly while the URL (and the
-  // query) lag behind by a debounce. Binding it straight to the URL made every
-  // keystroke a request, and a search box that fires per character against an
-  // exact match returns nothing until the very last letter -- which reads as
-  // broken rather than strict.
+  // Filters that make the view a strict SUBSET (the scope toggle widens, so it is not
+  // one). Used only to label the count honestly when the catalog-size probe is
+  // unavailable: a filtered subset must not read as "N in catalog".
+  const hasFilter = Boolean(q || target || maxPhase || modality || maturity || hasTarget || targetClass)
+
+  // The search box updates instantly while the URL (and query) lag by a debounce.
+  // Binding it straight to the URL made every keystroke a request against a partial
+  // match -- readable, but a request per character.
   const [draft, setDraft] = useState(q)
   const firstRender = useRef(true)
 
   useEffect(() => {
-    // Keep the box in step when the URL changes from outside (back button, a link).
-    setDraft(q)
+    setDraft(q) // keep the box in step with the URL (back button, a shared link)
   }, [q])
 
   useEffect(() => {
@@ -51,12 +99,29 @@ export function OverviewPage() {
       const merged = new URLSearchParams(params)
       if (draft) merged.set('q', draft)
       else merged.delete('q')
-      merged.delete('offset') // a new search invalidates the page cursor
+      merged.delete('offset')
       setParams(merged, { replace: true })
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft])
+
+  // The catalog total, once, so the count can read "612 of 3,923 shown" -- the second
+  // number is the WHOLE corpus, out-of-scope drugs included, so the default view can
+  // say "3,892 of 3,922 shown" and surface that scoping is hiding the rest.
+  useEffect(() => {
+    listDrugs({ limit: 1, include_out_of_scope: true })
+      .then((r) => setCatalogTotal(r.total))
+      .catch(() => setCatalogTotal(null))
+  }, [])
+
+  // The target-class facet's options, once. A failure just leaves the facet with its
+  // "Unclassified" option -- a missing dropdown is better than a broken page.
+  useEffect(() => {
+    listTargetClasses()
+      .then(setTargetClasses)
+      .catch(() => setTargetClasses([]))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -64,7 +129,15 @@ export function OverviewPage() {
     setError(null)
     listDrugs({
       q: q || undefined,
+      target: target || undefined,
       max_phase: maxPhase ? Number(maxPhase) : undefined,
+      modality: modality || undefined,
+      maturity: (maturity || undefined) as DataMaturity | undefined,
+      has_target: hasTarget === '' ? undefined : hasTarget === 'true',
+      target_class: targetClass || undefined,
+      include_out_of_scope: includeOutOfScope || undefined,
+      sort,
+      order,
       limit: PAGE_SIZE,
       offset,
     })
@@ -74,7 +147,19 @@ export function OverviewPage() {
     return () => {
       cancelled = true
     }
-  }, [q, maxPhase, offset])
+  }, [
+    q,
+    target,
+    maxPhase,
+    modality,
+    maturity,
+    hasTarget,
+    targetClass,
+    includeOutOfScope,
+    sort,
+    order,
+    offset,
+  ])
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params)
@@ -82,9 +167,41 @@ export function OverviewPage() {
       if (v) merged.set(k, v)
       else merged.delete(k)
     }
-    if (!('offset' in next)) merged.delete('offset')
+    if (!('offset' in next)) merged.delete('offset') // any filter change resets the page
     setParams(merged)
   }
+
+  function toggleSort(field: SortField) {
+    // Same column: flip direction. New column: its natural first direction.
+    const nextOrder = sort === field ? (order === 'asc' ? 'desc' : 'asc') : DEFAULT_ORDER[field]
+    update({ sort: field, order: nextOrder })
+  }
+
+  // One removable chip per active filter, in the order they read.
+  const chips: { key: string; label: string; clear: Record<string, string> }[] = []
+  if (q) chips.push({ key: 'q', label: `“${q}”`, clear: { q: '' } })
+  if (modality) chips.push({ key: 'modality', label: modality, clear: { modality: '' } })
+  if (maturity)
+    chips.push({ key: 'maturity', label: MATURITY_LABELS[maturity] ?? maturity, clear: { maturity: '' } })
+  if (maxPhase)
+    chips.push({
+      key: 'phase',
+      label: maxPhase === '4' ? 'Approved' : `Phase ${maxPhase}+`,
+      clear: { max_phase: '' },
+    })
+  if (target) chips.push({ key: 'target', label: `Target: ${target}`, clear: { target: '' } })
+  if (hasTarget)
+    chips.push({
+      key: 'has_target',
+      label: hasTarget === 'true' ? 'Has target' : 'No target',
+      clear: { has_target: '' },
+    })
+  if (targetClass)
+    chips.push({
+      key: 'target_class',
+      label: targetClass === UNCLASSIFIED ? 'Unclassified' : `Class: ${targetClass}`,
+      clear: { target_class: '' },
+    })
 
   return (
     <section>
@@ -92,12 +209,12 @@ export function OverviewPage() {
         <h1 className="text-lg font-semibold tracking-tight text-ink">Drug programs</h1>
         {data && (
           <p className="text-xs text-ink-faint" data-testid="total-count">
-            {formatCount(data.total)} {q || maxPhase ? 'match' : 'in catalog'}
+            {countLabel(data.total, catalogTotal, hasFilter)}
           </p>
         )}
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           type="search"
           value={draft}
@@ -107,30 +224,96 @@ export function OverviewPage() {
           className="w-72 rounded-md border border-line bg-card px-2.5 py-1.5 text-sm
                      placeholder:text-ink-faint focus:border-accent focus:outline-none"
         />
-        <select
+        <Facet
+          name="Modality"
+          placeholder="Modality"
+          value={modality}
+          onChange={(v) => update({ modality: v })}
+          options={MODALITIES.map((m) => [m, m])}
+        />
+        <Facet
+          name="Data completeness"
+          placeholder="Data"
+          value={maturity}
+          onChange={(v) => update({ maturity: v })}
+          options={[
+            ['full', 'Full brief'],
+            ['partial', 'Partial'],
+            ['index_only', 'Index only'],
+          ]}
+        />
+        <Facet
+          name="Minimum phase"
+          placeholder="Any phase"
           value={maxPhase}
-          onChange={(e) => update({ max_phase: e.target.value })}
-          aria-label="Minimum phase"
-          className="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-ink
-                     focus:border-accent focus:outline-none"
-        >
-          <option value="">Any phase</option>
-          <option value="1">Phase 1+</option>
-          <option value="2">Phase 2+</option>
-          <option value="3">Phase 3+</option>
-          <option value="4">Approved</option>
-        </select>
-        {(q || maxPhase) && (
+          onChange={(v) => update({ max_phase: v })}
+          options={[
+            ['1', 'Phase 1+'],
+            ['2', 'Phase 2+'],
+            ['3', 'Phase 3+'],
+            ['4', 'Approved'],
+          ]}
+        />
+        <Facet
+          name="Target presence"
+          placeholder="Target"
+          value={hasTarget}
+          onChange={(v) => update({ has_target: v })}
+          options={[
+            ['true', 'Has target'],
+            ['false', 'No target'],
+          ]}
+        />
+        <Facet
+          name="Target class"
+          placeholder="Class"
+          value={targetClass}
+          onChange={(v) => update({ target_class: v })}
+          // Families come from the API (data-driven); "Unclassified" is appended here
+          // because "no class" is always a valid choice, present in the data or not.
+          options={[
+            ...targetClasses.map((c): [string, string] => [c, c]),
+            [UNCLASSIFIED, 'Unclassified'],
+          ]}
+        />
+        <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <input
+            type="checkbox"
+            checked={includeOutOfScope}
+            onChange={(e) => update({ include_out_of_scope: e.target.checked ? 'true' : '' })}
+            data-testid="toggle-out-of-scope"
+            className="accent-accent"
+          />
+          Show non-oncology
+        </label>
+      </div>
+
+      {chips.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="active-filters">
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              data-testid={`chip-${chip.key}`}
+              onClick={() => update(chip.clear)}
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-surface
+                         px-2.5 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
+            >
+              {chip.label}
+              <span aria-hidden="true">✕</span>
+              <span className="sr-only">remove filter</span>
+            </button>
+          ))}
           <button
             type="button"
+            data-testid="clear-all"
             onClick={() => setParams(new URLSearchParams())}
-            className="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted
-                       hover:border-accent hover:text-accent"
+            className="text-xs text-ink-faint underline hover:text-accent"
           >
-            Clear
+            Clear all
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && (
         <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
@@ -142,12 +325,18 @@ export function OverviewPage() {
         <table className="w-full min-w-[46rem] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-ink-faint">
-              <th className="px-3 py-2 font-medium">Drug</th>
-              <th className="px-3 py-2 font-medium">Target</th>
-              <th className="px-3 py-2 font-medium">Indication</th>
+              <SortableTh label="Drug" field="name" sort={sort} order={order} onSort={toggleSort} />
+              <SortableTh label="Target" field="target" sort={sort} order={order} onSort={toggleSort} />
+              <SortableTh
+                label="Indication"
+                field="indication"
+                sort={sort}
+                order={order}
+                onSort={toggleSort}
+              />
               <th className="px-3 py-2 font-medium">Modality</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Data</th>
+              <SortableTh label="Phase" field="phase" sort={sort} order={order} onSort={toggleSort} />
+              <SortableTh label="Data" field="data" sort={sort} order={order} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
@@ -172,7 +361,12 @@ export function OverviewPage() {
                       {drug.chembl_id}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-ink-muted">{drug.primary_target ?? '—'}</td>
+                  <td className="px-3 py-2 text-ink-muted">
+                    {drug.primary_target ?? '—'}
+                    {drug.target_class && (
+                      <span className="block text-[11px] text-ink-faint">{drug.target_class}</span>
+                    )}
+                  </td>
                   <td className="max-w-[16rem] truncate px-3 py-2 text-ink-muted">
                     {drug.primary_indication ?? '—'}
                   </td>
@@ -188,7 +382,7 @@ export function OverviewPage() {
             {!loading && data?.items.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-ink-faint">
-                  Nothing matches “{q}”.
+                  Nothing matches these filters.
                 </td>
               </tr>
             )}
@@ -222,5 +416,78 @@ export function OverviewPage() {
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * A facet dropdown whose first option clears it.
+ *
+ * `name` is the accessible name and the testid basis; `placeholder` is the empty
+ * option's text. They are separate on purpose: the phase facet reads "Any phase" but
+ * is named "Minimum phase" (what it does), and conflating the two renamed the
+ * accessible label out from under an existing E2E.
+ */
+function Facet({
+  name,
+  placeholder,
+  value,
+  onChange,
+  options,
+}: {
+  name: string
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+  options: [string, string][]
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={name}
+      data-testid={`facet-${name.toLowerCase().replace(/\s+/g, '-')}`}
+      className="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-ink
+                 focus:border-accent focus:outline-none"
+    >
+      <option value="">{placeholder}</option>
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/** A column header that sorts on click and shows a caret when it is the active sort. */
+function SortableTh({
+  label,
+  field,
+  sort,
+  order,
+  onSort,
+}: {
+  label: string
+  field: SortField
+  sort: SortField
+  order: SortOrder
+  onSort: (f: SortField) => void
+}) {
+  const active = sort === field
+  return (
+    <th className="px-3 py-2 font-medium">
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        data-testid={`sort-${field}`}
+        aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`inline-flex items-center gap-1 hover:text-accent ${active ? 'text-ink' : ''}`}
+      >
+        {label}
+        <span aria-hidden="true" className="text-[9px]">
+          {active ? (order === 'asc' ? '▲' : '▼') : '↕'}
+        </span>
+      </button>
+    </th>
   )
 }

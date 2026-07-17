@@ -49,6 +49,7 @@ class DrugSummary(BaseModel):
     drug_type: str | None = None
     max_phase: int | None = None
     primary_target: str | None = None
+    target_class: str | None = None
     primary_indication: str | None = None
     maturity: DataMaturity
     updated_at: datetime

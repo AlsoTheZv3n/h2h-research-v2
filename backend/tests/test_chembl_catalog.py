@@ -19,6 +19,7 @@ from backend.ingestion.chembl_catalog import (
     _CONCURRENCY,
     LoadStats,
     is_cancer_indication,
+    is_out_of_scope,
     load_catalog,
     to_columns,
 )
@@ -63,6 +64,63 @@ class TestCancerFilter:
     )
     def test_non_cancer_rows_do_not_match(self, row: dict[str, Any]) -> None:
         assert is_cancer_indication(row) is False
+
+
+class TestScopeClassifier:
+    """The soft-scoping rule: which catalog drugs are non-oncology false positives.
+
+    Conservative by design -- it only excludes on positive evidence (a blunt-only match
+    that trails the drug's overall development), and keeps on any doubt. Every case here
+    is a real shape from the live catalog sample.
+    """
+
+    def _rows(self, *specs: tuple[str, str | None]) -> list[dict[str, str | None]]:
+        return [
+            {"mesh_heading": term, "efo_term": None, "max_phase_for_ind": phase}
+            for term, phase in specs
+        ]
+
+    def test_a_specific_cancer_keeps_it_at_any_phase(self) -> None:
+        # Osimertinib: a named malignancy is oncology whatever the phase.
+        rows = self._rows(("Carcinoma, Non-Small-Cell Lung", "1"))
+        assert is_out_of_scope(rows, molecule_max_phase=4) is False
+
+    def test_no_cancer_indication_is_out(self) -> None:
+        rows = self._rows(("Hypertension", "4"))
+        assert is_out_of_scope(rows, molecule_max_phase=4) is True
+
+    def test_blunt_only_and_trailing_phase_is_out(self) -> None:
+        # Atorvastatin: approved (phase 4) for cholesterol, only a phase-2 "Neoplasms"
+        # study. Blunt term, phase 3+, and the cancer work trails it -> out.
+        rows = self._rows(("Neoplasms", "2"))
+        assert is_out_of_scope(rows, molecule_max_phase=4) is True
+
+    def test_blunt_only_but_cancer_is_the_lead_programme_stays(self) -> None:
+        # BMS-754807: an experimental oncology compound whose only indication is the
+        # generic "Neoplasms", at the same phase as the whole molecule -> keep.
+        rows = self._rows(("Neoplasms", "2"))
+        assert is_out_of_scope(rows, molecule_max_phase=2) is False
+
+    def test_experimental_below_phase_3_is_protected_even_when_cancer_trails(self) -> None:
+        # E-6201: a real MEK/FLT3 oncology compound, phase 2 overall (a non-cancer use),
+        # with a blunt phase-1 cancer row. Under a bare "cancer trails" rule this was
+        # wrongly excluded; the phase-3 gate protects every early-stage compound.
+        rows = self._rows(("Neoplasms", "1"))
+        assert is_out_of_scope(rows, molecule_max_phase=2) is False
+
+    def test_unknown_cancer_phase_keeps_it(self) -> None:
+        # Ignorance must not hide a drug: no phase on the cancer row -> keep.
+        rows = self._rows(("Neoplasms", None))
+        assert is_out_of_scope(rows, molecule_max_phase=4) is False
+
+    def test_unknown_molecule_phase_keeps_it(self) -> None:
+        rows = self._rows(("Neoplasms", "1"))
+        assert is_out_of_scope(rows, molecule_max_phase=None) is False
+
+    def test_a_specific_row_beside_a_blunt_one_keeps_it(self) -> None:
+        # A blunt row does not condemn a drug that also has a named malignancy.
+        rows = self._rows(("Neoplasms", "1"), ("melanoma", "1"))
+        assert is_out_of_scope(rows, molecule_max_phase=4) is False
 
 
 class TestColumnMapping:

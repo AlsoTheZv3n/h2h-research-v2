@@ -142,6 +142,55 @@ def is_cancer_indication(row: dict[str, Any]) -> bool:
     return any(term in haystack for term in CANCER_TERMS)
 
 
+# The blunt terms: they match cancer, but also benign neoplasms and incidental "tumor"
+# mentions. A drug matched ONLY by these is not yet established as oncology. The rest of
+# CANCER_TERMS name a specific malignancy -- a drug indicated against one of those is
+# doing oncology whatever its phase.
+_BLUNT_TERMS = frozenset({"neoplasm", "tumor", "tumour", "cancer"})
+_SPECIFIC_CANCER = frozenset(CANCER_TERMS) - _BLUNT_TERMS
+
+
+def is_out_of_scope(rows: list[dict[str, Any]], molecule_max_phase: int | None) -> bool:
+    """Is this drug outside the oncology scope -- in the catalog only by a blunt match?
+
+    The catalog is built by substring-matching disease terms, which pulls in drugs whose
+    cancer link is incidental: an approved statin or contrast agent with a single
+    exploratory "Neoplasms" trial. This separates those from real oncology programs, and
+    is deliberately conservative -- it biases toward keeping, because losing a real
+    oncology drug is the expensive error and the exclusion is reversible anyway.
+
+    A drug is OUT of scope when:
+      - it has no cancer indication at all (nothing anchors it here), or
+      - its cancer indications match only the blunt terms AND the drug has reached phase
+        3+ on a programme its cancer work trails -- an approved (or near-approved)
+        non-oncology drug with an incidental cancer study.
+
+    It stays IN scope when a specific malignancy is named (at any phase), when its cancer
+    work reaches its overall max_phase, whenever the phases are unknown, and -- crucially
+    -- for any experimental compound below phase 3: an early oncology drug's overall
+    phase IS its cancer phase, so the phase-3 gate never hides one. Ignorance and youth
+    both keep a drug; only a clearly-advanced non-cancer programme excludes it.
+    """
+    cancer = [r for r in rows if is_cancer_indication(r)]
+    if not cancer:
+        return True
+
+    haystack = " ".join(
+        f"{r.get('mesh_heading') or ''} {r.get('efo_term') or ''}" for r in cancer
+    ).lower()
+    if any(term in haystack for term in _SPECIFIC_CANCER):
+        return False
+
+    # Blunt-only. Exclude only a drug developed to phase 3+ on a lead programme its
+    # cancer work trails -- never an experimental (phase 1-2) compound, whose overall
+    # phase is its cancer phase and which the phase-3 gate deliberately protects.
+    phases = [_as_int(r.get("max_phase_for_ind")) for r in cancer]
+    best = max((p for p in phases if p is not None), default=None)
+    if molecule_max_phase is None or best is None:
+        return False  # unknown phase -> keep; do not exclude on missing data
+    return molecule_max_phase >= 3 and best < molecule_max_phase
+
+
 async def _get_json(
     client: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None
 ) -> dict[str, Any] | None:
