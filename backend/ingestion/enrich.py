@@ -285,10 +285,17 @@ async def enrich_catalog(
     client: httpx.AsyncClient | None = None,
     limit: int | None = None,
     chembl_id: str | None = None,
+    only_unenriched: bool = False,
 ) -> EnrichStats:
     if client is None:
         async with build_client() as owned:
-            return await enrich_catalog(session, client=owned, limit=limit, chembl_id=chembl_id)
+            return await enrich_catalog(
+                session,
+                client=owned,
+                limit=limit,
+                chembl_id=chembl_id,
+                only_unenriched=only_unenriched,
+            )
 
     stats = EnrichStats()
     adapters = build_adapters(client)
@@ -297,8 +304,17 @@ async def enrich_catalog(
     query = select(Drug).order_by(Drug.max_phase.desc().nullslast(), Drug.chembl_id)
     if chembl_id:
         query = select(Drug).where(Drug.chembl_id == chembl_id)
-    elif limit:
-        query = query.limit(limit)
+    else:
+        # The pre-warmer's dedup and resumability, in one clause. Enriching only the
+        # never-touched drugs means it skips whatever the lazy on-demand path (or a
+        # previous pass) already did, and a crash-and-restart picks up exactly where
+        # it stopped -- no bookkeeping, because last_enriched_at IS the bookmark. A
+        # collision with an on-demand enrich of the same null drug is possible and
+        # harmless: enrich_drug upserts, so the worst case is one drug fetched twice.
+        if only_unenriched:
+            query = query.where(Drug.last_enriched_at.is_(None))
+        if limit:
+            query = query.limit(limit)
 
     drugs = list((await session.execute(query)).scalars().all())
     stats.drugs = len(drugs)

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # after a re-ingest -- it is not a hot path against the sources.
     cache_ttl_seconds: int = 3600
 
+    # How long the pre-warmer waits between passes over the catalog. A pass enriches
+    # every not-yet-enriched drug; the interval only governs how often it re-checks
+    # for drugs added since. Long by default: the whole point is to work quietly ahead
+    # of demand, not to poll.
+    prewarm_interval_seconds: int = 300
+
     # Optional: raises PubMed (E-utilities) rate limits. Never required.
     ncbi_api_key: str | None = None
 
