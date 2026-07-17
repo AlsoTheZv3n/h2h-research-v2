@@ -1,4 +1,4 @@
-import type { DrugDetail, DrugList, DrugListParams } from './types'
+import type { Answer, DrugDetail, DrugList, DrugListParams } from './types'
 
 /**
  * Same-origin /api by default, which Vite's proxy forwards to the backend with the
@@ -53,4 +53,25 @@ export function getDrug(chemblId: string): Promise<DrugDetail> {
 /** The structure SVG is rendered server-side by RDKit; the browser just shows it. */
 export function structureUrl(chemblId: string): string {
   return `${BASE}/drugs/${encodeURIComponent(chemblId)}/structure.svg`
+}
+
+/**
+ * Ask about one drug. Scoped by URL, because a question is always about a molecule.
+ *
+ * A non-ok `state` is not an error and must not be thrown: "no model is configured"
+ * and "the model cited a source we never gave it" are answers the reader needs to
+ * see, and throwing here would collapse both into a generic failure toast. The
+ * distinction the backend works to preserve dies at this line if it is written
+ * carelessly.
+ */
+export async function askDrug(chemblId: string, question: string): Promise<Answer> {
+  const response = await fetch(`${BASE}/drugs/${encodeURIComponent(chemblId)}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ question }),
+  })
+  if (!response.ok) {
+    throw new ApiError(`${response.status} ${response.statusText}`, response.status)
+  }
+  return response.json() as Promise<Answer>
 }

@@ -81,6 +81,19 @@ class Drug(Base):
     # of the whole record.
     last_enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
+    # The same distinction for the literature index, and it needs its own column for
+    # exactly the reason the one above exists.
+    #
+    # Without it, "nobody has fetched this drug's abstracts" and "we fetched them and
+    # PubMed has nothing" are both *no rows in drug_abstract* -- one observation,
+    # two opposite meanings, and the retriever cannot tell the reader which. That is
+    # this project's founding bug, and it got written into the literature layer by
+    # the same hand that wrote the comments warning about it. Found in review.
+    #
+    # NULL means never fetched. Set means we asked on that date; whether anything
+    # came back is then a question about the links, which is a different question.
+    literature_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

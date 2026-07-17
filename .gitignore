@@ -20,3 +20,4 @@ htmlcov/
 # node (Phase 2)
 node_modules/
 dist/
+scratchpad/

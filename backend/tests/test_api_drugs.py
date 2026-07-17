@@ -7,51 +7,17 @@ source and its status, and "we could not reach ChEMBL" never arrives looking lik
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-
 import httpx
 import pytest
 import sqlalchemy as sa
-from asgi_lifespan import LifespanManager
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from backend.cache import close_redis, get_redis
-from backend.db import get_session
 from backend.ingestion.base import FactStatus, SourceRecord, fact, failed, utcnow
-from backend.main import app
 from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 
-
-@pytest.fixture
-async def api(db_engine: AsyncEngine) -> AsyncIterator[httpx.AsyncClient]:
-    """An ASGI client whose sessions point at the test database.
-
-    Flushes the cache around each test: Redis outlives the database truncation, so
-    without this a cached brief from an earlier test could answer a later one and
-    the suite would be testing its own leftovers.
-
-    And disposes the Redis client afterwards. It is a module singleton whose
-    connection belongs to the loop that opened it, and pytest-asyncio hands each
-    test a fresh loop -- so a client surviving the test poisons the next one.
-    """
-    maker = async_sessionmaker(db_engine, expire_on_commit=False)
-
-    async def _override() -> AsyncIterator[object]:
-        async with maker() as s:
-            yield s
-
-    await get_redis().flushdb()
-    app.dependency_overrides[get_session] = _override
-    try:
-        async with LifespanManager(app):
-            transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-                yield c
-    finally:
-        app.dependency_overrides.clear()
-        await get_redis().flushdb()
-        await close_redis()
+# The `api` fixture lives in conftest.py -- it is shared with the output-boundary
+# suite, and one definition is what keeps the two from drifting.
 
 
 @pytest.fixture

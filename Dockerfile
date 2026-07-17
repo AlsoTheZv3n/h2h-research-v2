@@ -55,6 +55,26 @@ RUN chmod +x backend/entrypoint.sh
 
 USER appuser
 
+# Bake the embedding model into the image rather than fetching it at first use.
+#
+# fastembed downloads bge-small from HuggingFace the first time something calls it.
+# Left alone, that turns the first question anyone asks into a ~130 MB download --
+# slow, and a hard failure on any host that cannot reach huggingface.co, in a
+# container that had otherwise started perfectly. `docker compose up` promises a
+# working system; a working system does not depend on a CDN nobody was told about.
+#
+# Run as appuser, after the USER switch: the cache lands in /home/appuser, which is
+# where the process will look for it. Doing this as root would put it in /root and
+# the download would silently happen again at runtime -- the image would be bigger
+# AND still fetch, which is the worst of both.
+#
+# verify_dimension() rather than a bare load, because it does the download AND
+# checks the model still emits the 384-wide vectors the schema declares. Swapping
+# the model without migrating the column now fails the build, which is the cheapest
+# place to find it -- the alternative is an INSERT blowing up mid-ingest.
+ENV FASTEMBED_CACHE_PATH=/home/appuser/.cache/fastembed
+RUN python -c "from backend.embeddings import verify_dimension; verify_dimension()"
+
 EXPOSE 8000
 
 # urllib, not curl: slim images have no curl, and installing one just to probe is

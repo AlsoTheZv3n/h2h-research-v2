@@ -4,6 +4,7 @@ import { getDrug, structureUrl } from '../api/client'
 import type { DrugDetail, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
+import { Ask } from '../components/Ask'
 import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { PotencyCard } from '../components/PotencyCard'
@@ -262,16 +263,32 @@ export function DetailPage() {
         </Card>
       </div>
 
+      {/* This was a disabled input promising "coming in a later phase" since v0.1.0.
+          It now works.
+
+          The label said "answered only from the sourced evidence on this page",
+          which was not true and was caught in review: the answer also draws on this
+          drug's PubMed abstracts, and the page shows only their titles and counts.
+          "On this page" is a claim a reader can check by looking, and it would not
+          have survived the check. The wording below says what actually happens.
+
+          `key` is not cosmetic. Without it React keeps this component mounted across
+          a navigation from one drug to another -- so the previous drug's answer stays
+          on screen under the new drug's name, and a request already in flight
+          resolves into the new page. Remounting on chembl_id makes the component's
+          lifetime match the thing it is about. */}
       <div className="mt-4 rounded-lg border border-line bg-card p-4">
-        <label htmlFor="followup" className="text-xs text-ink-faint">
-          Follow-up
-        </label>
-        <input
-          id="followup"
-          disabled
-          placeholder="Ask a follow-up about this drug — coming in a later phase"
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm
-                     text-ink-faint placeholder:text-ink-faint disabled:cursor-not-allowed"
+        <h2 className="mb-2 text-xs text-ink-faint">
+          Ask about this drug
+          <span className="ml-2 normal-case">
+            — answered only from this drug's sourced facts and its PubMed abstracts,
+            never from what a model happens to remember
+          </span>
+        </h2>
+        <Ask
+          key={detail.chembl_id}
+          chemblId={detail.chembl_id}
+          drugName={detail.pref_name ?? detail.chembl_id}
         />
       </div>
 

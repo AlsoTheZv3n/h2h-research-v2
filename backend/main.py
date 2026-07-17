@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from backend import __version__
-from backend.api import drugs_router
+from backend.api import chat_router, drugs_router
 from backend.cache import close_redis, get_redis
 from backend.config import get_settings
 from backend.db import dispose_engine, get_sessionmaker
@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
+
+    # httpx logs every request URL at INFO, and our NCBI calls carry api_key= as a
+    # query param -- so at the default INFO level `docker compose logs api` prints the
+    # key verbatim on every PubMed request. The pre-release audit reproduced it. This
+    # is the same leak class safe_error() closed on the fact-serving path, on the
+    # logging path instead; WARNING keeps httpx's real errors and drops the URL line.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     logger.info("starting h2h %s (%s)", __version__, settings.environment)
     yield
     await dispose_engine()
@@ -37,6 +45,7 @@ app = FastAPI(
 )
 
 app.include_router(drugs_router)
+app.include_router(chat_router)
 
 
 @app.get("/health", tags=["ops"])

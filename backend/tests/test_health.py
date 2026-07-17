@@ -68,3 +68,25 @@ async def test_ready_names_the_dependency_that_is_down(
     assert body["checks"]["postgres"] == "ok"
     assert body["checks"]["redis"].startswith("error:")
     assert "down" in body["checks"]["redis"]
+
+
+async def test_startup_mutes_httpx_so_the_ncbi_key_cannot_leak_to_logs(
+    client: httpx.AsyncClient,
+) -> None:
+    """httpx logs each request URL at INFO, and NCBI calls carry api_key= in the query
+    string -- so at the default INFO level the key prints verbatim to
+    `docker compose logs api` on every PubMed request. The pre-release audit
+    reproduced it. Startup mutes the httpx logger to WARNING; this locks it, so a
+    future logging change that re-opens the leak fails here rather than in production.
+
+    The `client` fixture runs the app lifespan, which is what applies the mute.
+
+    Asserts the httpx logger's OWN level, not getEffectiveLevel(): pytest sets the
+    root logger to WARNING for its capture, so the effective level reads WARNING even
+    with no mute at all -- the first version of this test used getEffectiveLevel() and
+    could not fail. In production root is INFO (from basicConfig), so only httpx's own
+    level standing at WARNING actually filters the request-URL line.
+    """
+    import logging
+
+    assert logging.getLogger("httpx").level >= logging.WARNING
