@@ -64,6 +64,38 @@
       "primary_target": "KRAS",
       "primary_indication": "breast cancer",
       "maturity": "partial"
+    },
+    {
+      "chembl_id": "CHEMBL5095236",
+      "pref_name": "DIVARASIB",
+      "smiles": "C=CC(=O)N1CCN(c2nc(OC[C@@H]3CCCN3C)nc3c(F)c(-c4nc(N)cc(C)c4C(F)(F)F)c(Cl)cc23)[C@@H](C)C1",
+      "mw": 622.07,
+      "alogp": 5.09,
+      "hbd": 1,
+      "hba": 8,
+      "psa": 100.71,
+      "ro5_violations": 2,
+      "drug_type": "Small molecule",
+      "max_phase": 2,
+      "primary_target": null,
+      "primary_indication": "colorectal cancer",
+      "maturity": "partial"
+    },
+    {
+      "chembl_id": "CHEMBL5314518",
+      "pref_name": "GLECIRASIB",
+      "smiles": "C=CC(=O)N1CCN(c2c(C#N)c(=O)n(-c3c(C)ccnc3C(C)C)c3nc(-c4c(N)c(F)c(F)c(F)c4F)c(Cl)cc23)CC1",
+      "mw": 640.04,
+      "alogp": 5.38,
+      "hbd": 1,
+      "hba": 8,
+      "psa": 121.14,
+      "ro5_violations": 2,
+      "drug_type": "Small molecule",
+      "max_phase": 2,
+      "primary_target": null,
+      "primary_indication": "small intestine cancer",
+      "maturity": "partial"
     }
   ],
   "facts": [
@@ -1699,6 +1731,754 @@
       ],
       "status": "ok",
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "action_type",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "alogp",
+      "source": "chembl",
+      "value": 5.09,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL5095236",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "hba",
+      "source": "chembl",
+      "value": 8,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "hbd",
+      "source": "chembl",
+      "value": 1,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": null,
+        "min_nm": null,
+        "n_exact": 0,
+        "median_nm": null,
+        "n_censored": 0,
+        "off_target": {
+          "GTPase KRas": 2
+        },
+        "n_on_target": 0,
+        "other_units": {},
+        "n_activities": 2,
+        "target_chembl_ids": []
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "moa",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "mw",
+      "source": "chembl",
+      "value": 622.07,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "DIVARASIB",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "psa",
+      "source": "chembl",
+      "value": 100.71,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "smiles",
+      "source": "chembl",
+      "value": "C=CC(=O)N1CCN(c2nc(OC[C@@H]3CCCN3C)nc3c(F)c(-c4nc(N)cc(C)c4C(F)(F)F)c(Cl)cc23)[C@@H](C)C1",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 3,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": false,
+      "status": "empty",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 13,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 13,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "PHASE1",
+        "PHASE2",
+        "PHASE3"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Small molecule",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "colorectal cancer",
+        "non-small cell lung carcinoma",
+        "central nervous system cancer",
+        "central nervous system neoplasm",
+        "neoplasm"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "PHASE_3",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 5,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL5095236",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5095236",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 25,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Single-Agent Divarasib (GDC-6036) in Solid Tumors with a KRAS G12C Mutation.",
+        "Divarasib plus cetuximab in KRAS G12C-positive colorectal cancer: a phase 1b trial.",
+        "Divarasib in the Evolving Landscape of KRAS G12C Inhibitors for NSCLC.",
+        "Single-Agent Divarasib in Patients With KRAS G12C-Positive Non-Small Cell Lung Cancer: Long-Term Follow-Up of a Phase I Study.",
+        "The structure of KRAS(G12C) bound to divarasib highlights features of potent switch-II pocket engagement."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=DIVARASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "action_type",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "alogp",
+      "source": "chembl",
+      "value": 5.38,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL5314518",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "hba",
+      "source": "chembl",
+      "value": 8,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "hbd",
+      "source": "chembl",
+      "value": 1,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": null,
+        "min_nm": null,
+        "n_exact": 0,
+        "median_nm": null,
+        "n_censored": 0,
+        "off_target": {
+          "NCI-H358": 2,
+          "Unchecked": 2,
+          "GTPase KRas": 2,
+          "Cytochrome P450 3A": 2,
+          "Cytochrome P450 2C9": 1,
+          "Cytochrome P450 2D6": 1,
+          "Cytochrome P450 2C19": 1,
+          "UDP-glucuronosyltransferase 1A1": 1,
+          "Voltage-gated inwardly rectifying potassium channel KCNH2": 1
+        },
+        "n_on_target": 0,
+        "other_units": {},
+        "n_activities": 13,
+        "target_chembl_ids": []
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "moa",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "mw",
+      "source": "chembl",
+      "value": 640.04,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 13,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 13,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "GLECIRASIB",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "psa",
+      "source": "chembl",
+      "value": 121.14,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "smiles",
+      "source": "chembl",
+      "value": "C=CC(=O)N1CCN(c2c(C#N)c(=O)n(-c3c(C)ccnc3C(C)C)c3nc(-c4c(N)c(F)c(F)c(F)c4F)c(Cl)cc23)CC1",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 3,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": false,
+      "status": "empty",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": false,
+      "status": "empty",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 7,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 7,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "PHASE1",
+        "PHASE2",
+        "PHASE3"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Small molecule",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "small intestine cancer",
+        "non-small cell lung carcinoma",
+        "colorectal cancer",
+        "malignant pancreatic neoplasm",
+        "neoplasm"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "PHASE_3",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 5,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL5314518",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [],
+      "status": "empty",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL5314518",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 10,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Glecirasib in KRAS(G12C)-mutated nonsmall-cell lung cancer: a phase 2b trial.",
+        "Glecirasib plus sitneprotafib in patients with KRAS(G12C)-mutated non-small-cell lung cancer in China: an open-label, multicentre, single-arm, phase 1/2a trial.",
+        "Glecirasib with or without cetuximab in previously treated locally advanced or metastatic colorectal cancer with KRAS(G12C) mutation (JAB-21822-1002 and JAB-21822-1007): two open-label, non-randomised phase 1/2 trials.",
+        "Efficacy and safety of glecirasib in solid tumors with KRAS G12C mutation: A pooled analysis of two phase I/II trials.",
+        "Glecirasib, a Potent and Selective Covalent KRAS G12C Inhibitor Exhibiting Synergism with Cetuximab or SHP2 Inhibitor JAB-3312."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=GLECIRASIB",
       "error": null,
       "confidence": null
     }

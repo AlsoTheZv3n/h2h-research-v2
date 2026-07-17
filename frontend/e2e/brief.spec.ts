@@ -60,18 +60,28 @@ test.describe('overview', () => {
     await expect(page.getByTestId('drug-row').first()).toContainText(/sotorasib/i)
   })
 
-  test('the phase filter narrows the corpus', async ({ page }) => {
+  test('the phase filter narrows the corpus', async ({ page, request }) => {
+    // The premise, checked rather than assumed: there has to be something below
+    // phase 4 for the filter to remove. The first cut took that for granted, and
+    // against a demo fixture of nothing but approved drugs it failed with "expected
+    // < 5, received 5" -- a green filter reported as a bug.
+    const all = await (await request.get('/api/drugs?limit=1')).json()
+    const approved = await (await request.get('/api/drugs?limit=1&max_phase=4')).json()
+    expect(approved.total, 'the catalog has nothing below phase 4 to filter out').toBeLessThan(
+      all.total,
+    )
+
     await page.goto('/')
-    await expect(page.getByTestId('total-count')).toBeVisible()
-    const all = Number((await page.getByTestId('total-count').textContent())!.replace(/\D/g, ''))
+    await expect(page.getByTestId('total-count')).toContainText(all.total.toLocaleString('en-US'))
 
     await page.getByLabel('Minimum phase').selectOption('4')
+
     await expect(page).toHaveURL(/max_phase=4/)
-    await expect
-      .poll(async () =>
-        Number((await page.getByTestId('total-count').textContent())!.replace(/\D/g, '')),
-      )
-      .toBeLessThan(all)
+    // The UI's number has to be the API's number -- filtering is a query param, not
+    // a slice of the page the browser already had.
+    await expect(page.getByTestId('total-count')).toContainText(
+      approved.total.toLocaleString('en-US'),
+    )
   })
 
   test('a row click opens that drug’s brief', async ({ page }) => {
