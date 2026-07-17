@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,32 @@ class Settings(BaseSettings):
 
     # Optional: raises PubMed (E-utilities) rate limits. Never required.
     ncbi_api_key: str | None = None
+
+    # E-utilities asks every client to identify itself, and this is not decoration:
+    # "should be a complete and valid e-mail address of the software developer", so
+    # NCBI can reach an operator whose script is misbehaving before they block the IP.
+    # Defaulted rather than required -- a stranger's `docker compose up` must not die
+    # on a field only we can fill -- but the default names the project, not a person
+    # who never agreed to field the mail.
+    ncbi_tool: str = "h2h-research"
+    ncbi_email: str = "noreply@h2h-research.invalid"
+
+    @field_validator("ncbi_tool", "ncbi_email")
+    @classmethod
+    def _blank_means_unset(cls, v: str, info: ValidationInfo) -> str:
+        """An empty env var falls back to the default instead of winning.
+
+        `.env.example` carries `NCBI_EMAIL=` with nothing after it, and copying it to
+        `.env` is the documented first step. Without this, pydantic reads that as the
+        string "" -- a *set* value, which beats the default -- and we would send
+        `email=` empty on every request: the identification requirement quietly
+        undone by the file that exists to explain it. An operator who wants no email
+        cannot have one anyway; the choice is between our default and nothing.
+        """
+        if not v.strip():
+            default = cls.model_fields[info.field_name or ""].default
+            return str(default)
+        return v.strip()
 
 
 @lru_cache

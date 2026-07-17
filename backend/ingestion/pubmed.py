@@ -41,13 +41,31 @@ class PubMedAdapter:
     name: str = "pubmed"
     owned_keys: tuple[str, ...] = ("n_pubmed", "sample_titles")
 
-    def __init__(self, client: httpx.AsyncClient, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        api_key: str | None = None,
+        tool: str = "h2h-research",
+        email: str = "noreply@h2h-research.invalid",
+    ) -> None:
         self.client = client
         # Optional: only raises rate limits. Nothing here requires it.
         self.api_key = api_key or None
+        self.tool = tool
+        self.email = email
 
     def _params(self, extra: dict[str, Any]) -> dict[str, Any]:
-        p: dict[str, Any] = {"db": "pubmed", "retmode": "json"}
+        # tool and email are not optional courtesies -- the E-utilities usage
+        # guidelines require both on every request, and v0.1.0 shipped without them.
+        # They are how NCBI identifies a client and contacts its operator instead of
+        # silently blocking the IP, which is the failure mode you cannot debug from
+        # this side: requests simply start failing and nothing says why.
+        p: dict[str, Any] = {
+            "db": "pubmed",
+            "retmode": "json",
+            "tool": self.tool,
+            "email": self.email,
+        }
         if self.api_key:
             p["api_key"] = self.api_key
         p.update(extra)

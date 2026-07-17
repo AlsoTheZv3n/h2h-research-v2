@@ -73,11 +73,17 @@ class EnrichStats:
 
 def build_adapters(client: httpx.AsyncClient) -> list[SourceAdapter]:
     """The plugin layer, assembled. One adapter per source, one shared client."""
+    settings = get_settings()
     return [
         ChEMBLAdapter(client),
         ClinicalTrialsAdapter(client),
         OpenTargetsAdapter(client),
-        PubMedAdapter(client, api_key=get_settings().ncbi_api_key),
+        PubMedAdapter(
+            client,
+            api_key=settings.ncbi_api_key,
+            tool=settings.ncbi_tool,
+            email=settings.ncbi_email,
+        ),
     ]
 
 

@@ -518,3 +518,37 @@ class TestPubMed:
 
         await PubMedAdapter(client, api_key="secret").fetch("x")
         assert route.calls.last.request.url.params["api_key"] == "secret"
+
+    @respx.mock
+    async def test_every_request_identifies_the_client(self, client: Any) -> None:
+        """`tool` and `email` on every E-utilities call -- both are required.
+
+        v0.1.0 sent neither, and nothing here noticed, because every test asserted on
+        the *answer* and none on the request we made to get it. That asymmetry is the
+        gap: a mocked source will happily reply to a request that the real one would
+        throttle or block, so the mock cannot tell you that you are a bad citizen.
+
+        NCBI's guidelines are explicit -- `tool` "uniquely identifies the software
+        producing the request", `email` is how they reach its operator before
+        blocking the IP. Nothing fails loudly when they are missing; requests just
+        start failing later, for reasons invisible from this side.
+        """
+        search = respx.get(f"{EUTILS}/esearch.fcgi").mock(
+            return_value=httpx.Response(
+                200, json={"esearchresult": {"count": "1", "idlist": ["1"]}}
+            )
+        )
+        summary = respx.get(f"{EUTILS}/esummary.fcgi").mock(
+            return_value=httpx.Response(200, json={"result": {"uids": []}})
+        )
+
+        await PubMedAdapter(client, tool="h2h-test", email="dev@example.org").fetch("x")
+
+        # Both endpoints, not just the first: esummary is built by the same helper
+        # today, and this is what stops a future hand-rolled param dict from
+        # regressing the quieter one.
+        assert search.called and summary.called
+        for route in (search, summary):
+            params = route.calls.last.request.url.params
+            assert params["tool"] == "h2h-test"
+            assert params["email"] == "dev@example.org"

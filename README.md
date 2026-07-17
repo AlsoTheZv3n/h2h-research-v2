@@ -134,8 +134,11 @@ that emptying the `fact` table makes it fail, which is the only way to know a te
 ## Data sources & licensing
 
 Built entirely on open data, no API keys required: **ChEMBL** (CC BY-SA), **ClinicalTrials.gov**
-(public domain), **Open Targets**, **PubMed** (metadata only). See [`NOTICE.md`](NOTICE.md). The
-software is MIT-licensed (see [`LICENSE`](LICENSE)).
+(public domain), **Open Targets**, **PubMed** (read locally, never redistributed). See
+[`NOTICE.md`](NOTICE.md) — the PubMed section is worth reading before you fork this, because NLM
+does not own the abstracts it serves and so cannot license them to you either. Literature data
+courtesy of the U.S. National Library of Medicine. The software is MIT-licensed (see
+[`LICENSE`](LICENSE)).
 
 H2H surfaces evidence. It is not an ML predictor and not an investment advisor.
 
