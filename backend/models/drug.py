@@ -62,6 +62,11 @@ class Drug(Base):
     # (drug_type, max_phase, primary_target, maturity) already carry an index; this was
     # the one sortable column without one.
     primary_indication: Mapped[str | None] = mapped_column(String(512), index=True)
+    # The primary target's protein family ("Kinase", "Hydrolase", ...), promoted from
+    # Open Targets. Indexed because the overview facets on it. NULL means no class was
+    # annotated -- the overview reads that as "Unclassified", a state distinct from
+    # "never enriched" (which the whole row's last_enriched_at NULL records).
+    target_class: Mapped[str | None] = mapped_column(String(128), index=True)
 
     maturity: Mapped[DataMaturity] = mapped_column(
         Enum(

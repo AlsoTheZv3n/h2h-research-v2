@@ -24,6 +24,7 @@ from backend.ingestion import (
     build_client,
 )
 from backend.ingestion.chembl import pick_molecule
+from backend.ingestion.opentargets import _pick_target_class
 
 
 def summary_of(record: SourceRecord) -> dict[str, Any]:
@@ -408,12 +409,28 @@ class TestOpenTargets:
                             {
                                 "mechanismOfAction": "ERBB2 binding agent",
                                 "actionType": "BINDING AGENT",
-                                "targets": [{"approvedSymbol": "ERBB2"}],
+                                "targets": [
+                                    {
+                                        "approvedSymbol": "ERBB2",
+                                        "targetClass": [
+                                            {"label": "Enzyme", "level": "l1"},
+                                            {"label": "Kinase", "level": "l2"},
+                                        ],
+                                    }
+                                ],
                             },
                             {
                                 "mechanismOfAction": "TOP1 inhibitor",
                                 "actionType": "INHIBITOR",
-                                "targets": [{"approvedSymbol": "TOP1"}],
+                                "targets": [
+                                    {
+                                        "approvedSymbol": "TOP1",
+                                        "targetClass": [
+                                            {"label": "Enzyme", "level": "l1"},
+                                            {"label": "Isomerase", "level": "l2"},
+                                        ],
+                                    }
+                                ],
                             },
                         ]
                     },
@@ -437,9 +454,69 @@ class TestOpenTargets:
         record = await OpenTargetsAdapter(client).fetch("trastuzumab deruxtecan")
         assert record.facts["all_moas"].value == ["ERBB2 binding agent", "TOP1 inhibitor"]
         assert record.facts["targets"].value == ["ERBB2", "TOP1"]
+        # The class is the PRIMARY target's (ERBB2, sorted first), not TOP1's -- it must
+        # track whichever symbol becomes primary_target, and at the l2 family level.
+        assert record.facts["target_class"].value == "Kinase"
         # The column that makes the ADC honest in the overview.
         assert record.facts["drug_type"].value == "Antibody drug conjugate"
         assert record.facts["max_stage"].value == "APPROVAL"
+
+    def test_class_picking_prefers_l2_falls_back_to_l1_then_none(self) -> None:
+        # l2 is the family a facet means; l1 ("Enzyme") is too coarse to slice by.
+        assert (
+            _pick_target_class(
+                [
+                    {"label": "Enzyme", "level": "l1"},
+                    {"label": "Kinase", "level": "l2"},
+                    {"label": "Protein Kinase", "level": "l3"},
+                ]
+            )
+            == "Kinase"
+        )
+        # Only l1 present: better a coarse class than none.
+        assert (
+            _pick_target_class([{"label": "Membrane receptor", "level": "l1"}])
+            == "Membrane receptor"
+        )
+        # No class at all -> None, which the overview reads as "Unclassified".
+        assert _pick_target_class([]) is None
+        assert _pick_target_class(None) is None
+
+    @respx.mock
+    async def test_a_target_with_no_class_is_empty_not_invented(self, client: Any) -> None:
+        """KRAS carrying no targetClass must leave target_class EMPTY, not fabricated."""
+        payload = {
+            "data": {
+                "drug": {
+                    "id": "CHEMBL4535757",
+                    "name": "SOTORASIB",
+                    "drugType": "Small molecule",
+                    "maximumClinicalStage": "APPROVAL",
+                    "mechanismsOfAction": {
+                        "rows": [
+                            {
+                                "mechanismOfAction": "KRAS inhibitor",
+                                "actionType": "INHIBITOR",
+                                "targets": [{"approvedSymbol": "KRAS", "targetClass": []}],
+                            }
+                        ]
+                    },
+                    "indications": {"count": 1, "rows": [{"disease": {"name": "NSCLC"}}]},
+                }
+            }
+        }
+        respx.post(OT).mock(
+            side_effect=[
+                httpx.Response(200, json={"data": {"search": {"hits": [{"id": "CHEMBL4535757"}]}}}),
+                httpx.Response(200, json=payload),
+            ]
+        )
+        record = await OpenTargetsAdapter(client).fetch("sotorasib")
+        assert record.facts["targets"].value == ["KRAS"]
+        tc = record.facts["target_class"]
+        assert tc.value is None
+        # EMPTY ("measured, no class"), never SOURCE_FAILED -- the source answered.
+        assert tc.status is FactStatus.EMPTY
 
     @respx.mock
     async def test_graphql_errors_are_surfaced_verbatim(self, client: Any) -> None:

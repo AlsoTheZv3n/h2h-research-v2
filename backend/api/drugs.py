@@ -27,7 +27,7 @@ router = APIRouter(prefix="/drugs", tags=["drugs"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-SortField = Literal["data", "name", "phase", "target", "indication"]
+SortField = Literal["data", "name", "phase", "target", "class", "indication"]
 SortOrder = Literal["asc", "desc"]
 
 
@@ -54,6 +54,13 @@ async def list_drugs(
     has_target: Annotated[
         bool | None, Query(description="Only drugs with (or without) an annotated target")
     ] = None,
+    target_class: Annotated[
+        str | None,
+        Query(
+            description="Exact target family, e.g. 'Kinase'. 'unclassified' selects rows "
+            "with no class recorded."
+        ),
+    ] = None,
     sort: Annotated[
         SortField, Query(description="Column to sort by. Default: data completeness.")
     ] = "data",
@@ -69,6 +76,7 @@ async def list_drugs(
         modality=modality,
         maturity=maturity,
         has_target=has_target,
+        target_class=target_class,
         sort=sort,
         order=order,
         limit=limit,
@@ -80,6 +88,21 @@ async def list_drugs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/target-classes",
+    response_model=list[str],
+    summary="The target-class facet's options: families present in the catalog",
+)
+async def list_target_classes(session: SessionDep) -> list[str]:
+    """Distinct target families, most-common first, for the overview's facet dropdown.
+
+    Declared before /{chembl_id} on purpose: a path parameter would otherwise swallow
+    "target-classes" and try to resolve it as a drug. The client appends its own
+    "Unclassified" option; this returns only the classes that actually exist.
+    """
+    return await DrugRepository(session).distinct_target_classes()
 
 
 @router.get(

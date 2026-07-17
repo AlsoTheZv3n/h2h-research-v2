@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { listDrugs } from '../api/client'
+import { listDrugs, listTargetClasses } from '../api/client'
 import type { DataMaturity, DrugList, SortField, SortOrder } from '../api/types'
 import { MaturityPill, PhasePill } from '../components/MaturityPill'
 import { formatCount } from '../format'
@@ -8,6 +8,10 @@ import { formatCount } from '../format'
 const PAGE_SIZE = 25
 // Long enough that typing a drug name is one query, not eight.
 const SEARCH_DEBOUNCE_MS = 250
+
+// The facet value for "no class recorded" (target_class IS NULL). Matches the API's
+// sentinel, so the one token means the same thing on both sides of the wire.
+const UNCLASSIFIED = 'unclassified'
 
 // The drug types the catalog actually holds, most common first. Exact values, so the
 // modality filter (an exact, case-insensitive match) has something to match.
@@ -35,6 +39,7 @@ const DEFAULT_ORDER: Record<SortField, SortOrder> = {
   phase: 'desc',
   name: 'asc',
   target: 'asc',
+  class: 'asc',
   indication: 'asc',
 }
 
@@ -53,6 +58,7 @@ export function OverviewPage() {
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState<DrugList | null>(null)
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
+  const [targetClasses, setTargetClasses] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -62,11 +68,14 @@ export function OverviewPage() {
   const modality = params.get('modality') ?? ''
   const maturity = params.get('maturity') ?? ''
   const hasTarget = params.get('has_target') ?? '' // '', 'true', 'false'
+  const targetClass = params.get('target_class') ?? '' // '', a family, or 'unclassified'
   const sort = (params.get('sort') as SortField | null) ?? 'data'
   const order = (params.get('order') as SortOrder | null) ?? 'desc'
   const offset = Number(params.get('offset') ?? 0)
 
-  const filtersActive = Boolean(q || target || maxPhase || modality || maturity || hasTarget)
+  const filtersActive = Boolean(
+    q || target || maxPhase || modality || maturity || hasTarget || targetClass,
+  )
 
   // The search box updates instantly while the URL (and query) lag by a debounce.
   // Binding it straight to the URL made every keystroke a request against a partial
@@ -103,6 +112,14 @@ export function OverviewPage() {
       .catch(() => setCatalogTotal(null))
   }, [])
 
+  // The target-class facet's options, once. A failure just leaves the facet with its
+  // "Unclassified" option -- a missing dropdown is better than a broken page.
+  useEffect(() => {
+    listTargetClasses()
+      .then(setTargetClasses)
+      .catch(() => setTargetClasses([]))
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -114,6 +131,7 @@ export function OverviewPage() {
       modality: modality || undefined,
       maturity: (maturity || undefined) as DataMaturity | undefined,
       has_target: hasTarget === '' ? undefined : hasTarget === 'true',
+      target_class: targetClass || undefined,
       sort,
       order,
       limit: PAGE_SIZE,
@@ -125,7 +143,7 @@ export function OverviewPage() {
     return () => {
       cancelled = true
     }
-  }, [q, target, maxPhase, modality, maturity, hasTarget, sort, order, offset])
+  }, [q, target, maxPhase, modality, maturity, hasTarget, targetClass, sort, order, offset])
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params)
@@ -161,6 +179,12 @@ export function OverviewPage() {
       key: 'has_target',
       label: hasTarget === 'true' ? 'Has target' : 'No target',
       clear: { has_target: '' },
+    })
+  if (targetClass)
+    chips.push({
+      key: 'target_class',
+      label: targetClass === UNCLASSIFIED ? 'Unclassified' : `Class: ${targetClass}`,
+      clear: { target_class: '' },
     })
 
   return (
@@ -228,6 +252,18 @@ export function OverviewPage() {
           options={[
             ['true', 'Has target'],
             ['false', 'No target'],
+          ]}
+        />
+        <Facet
+          name="Target class"
+          placeholder="Class"
+          value={targetClass}
+          onChange={(v) => update({ target_class: v })}
+          // Families come from the API (data-driven); "Unclassified" is appended here
+          // because "no class" is always a valid choice, present in the data or not.
+          options={[
+            ...targetClasses.map((c): [string, string] => [c, c]),
+            [UNCLASSIFIED, 'Unclassified'],
           ]}
         />
       </div>
@@ -305,7 +341,12 @@ export function OverviewPage() {
                       {drug.chembl_id}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-ink-muted">{drug.primary_target ?? '—'}</td>
+                  <td className="px-3 py-2 text-ink-muted">
+                    {drug.primary_target ?? '—'}
+                    {drug.target_class && (
+                      <span className="block text-[11px] text-ink-faint">{drug.target_class}</span>
+                    )}
+                  </td>
                   <td className="max-w-[16rem] truncate px-3 py-2 text-ink-muted">
                     {drug.primary_indication ?? '—'}
                   </td>

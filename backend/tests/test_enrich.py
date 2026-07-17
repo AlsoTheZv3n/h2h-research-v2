@@ -123,7 +123,15 @@ def _mock_all_sources(*, chembl_ok: bool = True) -> None:
                                     {
                                         "mechanismOfAction": "GTPase KRas inhibitor",
                                         "actionType": "INHIBITOR",
-                                        "targets": [{"approvedSymbol": "KRAS"}],
+                                        "targets": [
+                                            {
+                                                "approvedSymbol": "KRAS",
+                                                "targetClass": [
+                                                    {"label": "Enzyme", "level": "l1"},
+                                                    {"label": "Hydrolase", "level": "l2"},
+                                                ],
+                                            }
+                                        ],
                                     }
                                 ]
                             },
@@ -211,6 +219,10 @@ class TestEnrichment:
         assert drug is not None
         await session.refresh(drug)
         assert drug.primary_target == "KRAS"
+        # Promoted from Open Targets' targetClass, at the l2 family level -- this is what
+        # the overview's target-class facet reads. Without the promotion it stays NULL
+        # and the facet is empty for every enriched drug.
+        assert drug.target_class == "Hydrolase"
         assert drug.primary_indication == "lung carcinoma"
         assert drug.drug_type == "Small molecule"
 

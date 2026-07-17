@@ -32,6 +32,39 @@ test.describe('overview filters', () => {
     await expect(page.getByTestId('total-count')).toContainText(all.total.toLocaleString('en-US'))
   })
 
+  test('a target-class facet narrows the catalog, and its chip removes it', async ({
+    page,
+    request,
+  }) => {
+    // The facet's options come from the API, so the test uses whatever families the
+    // catalog actually holds. An empty list is a real failure -- it means enrichment
+    // stopped promoting target_class -- so this asserts rather than skips.
+    const classes: string[] = await (await request.get('/api/drugs/target-classes')).json()
+    expect(classes.length, 'no target classes present -- enrichment not promoting them').toBeGreaterThan(0)
+    const cls = classes[0]
+
+    const all = await (await request.get('/api/drugs?limit=1')).json()
+    const filtered = await (
+      await request.get(`/api/drugs?limit=1&target_class=${encodeURIComponent(cls)}`)
+    ).json()
+    expect(filtered.total, 'the class filter must remove something').toBeLessThan(all.total)
+
+    await page.goto('/')
+    await page.getByTestId('facet-target-class').selectOption(cls)
+
+    await expect(page).toHaveURL(/target_class=/)
+    // The UI's number is the API's number: the class filter runs in SQL, not the browser.
+    await expect(page.getByTestId('total-count')).toContainText(
+      filtered.total.toLocaleString('en-US'),
+    )
+
+    const chip = page.getByTestId('chip-target_class')
+    await expect(chip).toBeVisible()
+    await chip.click()
+    await expect(page).not.toHaveURL(/target_class=/)
+    await expect(page.getByTestId('total-count')).toContainText(all.total.toLocaleString('en-US'))
+  })
+
   test('clicking a column header sorts, and the URL carries it across a reload', async ({
     page,
   }) => {

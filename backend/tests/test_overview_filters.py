@@ -19,12 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from backend.models import DataMaturity, Drug
 from backend.repositories import DrugRepository
 
-# (chembl_id, name, drug_type, maturity, target, phase)
+# (chembl_id, name, drug_type, maturity, target, phase, target_class)
 _ROWS = [
-    ("CHEMBL_A", "alphamab", "Small molecule", DataMaturity.FULL, "KRAS", 4),
-    ("CHEMBL_B", "betinib", "Small molecule", DataMaturity.PARTIAL, "EGFR", 3),
-    ("CHEMBL_C", "gammamab", "Antibody", DataMaturity.INDEX_ONLY, None, 4),
-    ("CHEMBL_D", "deltinib", "Small molecule", DataMaturity.INDEX_ONLY, "KRAS", 2),
+    ("CHEMBL_A", "alphamab", "Small molecule", DataMaturity.FULL, "KRAS", 4, "Hydrolase"),
+    ("CHEMBL_B", "betinib", "Small molecule", DataMaturity.PARTIAL, "EGFR", 3, "Kinase"),
+    # No target and no class: the antibody is the "Unclassified" case.
+    ("CHEMBL_C", "gammamab", "Antibody", DataMaturity.INDEX_ONLY, None, 4, None),
+    ("CHEMBL_D", "deltinib", "Small molecule", DataMaturity.INDEX_ONLY, "KRAS", 2, "Hydrolase"),
 ]
 
 
@@ -42,7 +43,7 @@ async def catalog(db_engine: AsyncEngine) -> AsyncIterator[None]:
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
     async with maker() as s:
         repo = DrugRepository(s)
-        for cid, name, dt, mat, tgt, phase in _ROWS:
+        for cid, name, dt, mat, tgt, phase, tclass in _ROWS:
             await repo.upsert_drug(
                 cid,
                 pref_name=name,
@@ -50,6 +51,7 @@ async def catalog(db_engine: AsyncEngine) -> AsyncIterator[None]:
                 maturity=mat,
                 primary_target=tgt,
                 max_phase=phase,
+                target_class=tclass,
             )
         await s.commit()
     yield
@@ -106,6 +108,53 @@ class TestFilters:
         # small molecule AND KRAS -> A and D, but not the antibody, not EGFR.
         ids, total, _ = await _page(api, modality="Small molecule", target="KRAS")
         assert ids == {"CHEMBL_A", "CHEMBL_D"} and total == 2
+
+
+class TestTargetClassFacet:
+    async def test_class_filter_narrows_to_that_family(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        ids, total, _ = await _page(api, target_class="Hydrolase")
+        assert ids == {"CHEMBL_A", "CHEMBL_D"} and total == 2
+        # Not a no-op: the Kinase and unclassified rows are really excluded.
+        _, all_total, _ = await _page(api)
+        assert all_total == 4
+        assert {"CHEMBL_B", "CHEMBL_C"}.isdisjoint(ids)
+
+    async def test_class_filter_is_case_insensitive(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        ids, total, _ = await _page(api, target_class="kinase")
+        assert ids == {"CHEMBL_B"} and total == 1
+
+    async def test_unclassified_selects_rows_with_no_class(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # "unclassified" is target_class IS NULL, not a literal match on the string --
+        # the antibody, which carries no class, is the only such row.
+        ids, total, _ = await _page(api, target_class="unclassified")
+        assert ids == {"CHEMBL_C"} and total == 1
+
+    async def test_facet_lists_present_classes_most_common_first(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        r = await api.get("/drugs/target-classes")
+        assert r.status_code == 200, r.text
+        classes = r.json()
+        # Hydrolase (2 rows) outranks Kinase (1); NULL is never listed -- the client
+        # appends "Unclassified" itself. If the endpoint listed NULL or lost the
+        # count-ordering, this fails.
+        assert classes == ["Hydrolase", "Kinase"]
+
+    async def test_facet_route_is_not_swallowed_by_the_id_route(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # /drugs/target-classes must not resolve as /drugs/{chembl_id="target-classes"}.
+        # A 404 here would mean the path-param route captured it -- a declaration-order
+        # regression that a list response quietly hides until you check the shape.
+        r = await api.get("/drugs/target-classes")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
 
 
 class TestSort:

@@ -240,6 +240,12 @@ async def _promote(
         targets = ot.facts.get("targets")
         if targets is not None and targets.status is FactStatus.OK and targets.value:
             columns["primary_target"] = targets.value[0]
+        # Promoted alongside primary_target because it is that target's class -- and
+        # only when present. A missing class leaves the column NULL ("Unclassified"),
+        # never overwriting a good one, exactly as the other index columns behave.
+        target_class = ot.facts.get("target_class")
+        if target_class is not None and target_class.status is FactStatus.OK and target_class.value:
+            columns["target_class"] = target_class.value
         indications = ot.facts.get("indications")
         if indications is not None and indications.status is FactStatus.OK and indications.value:
             columns["primary_indication"] = indications.value[0]

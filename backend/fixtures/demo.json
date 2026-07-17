@@ -15,7 +15,8 @@
       "max_phase": 4,
       "primary_target": "EGFR",
       "primary_indication": "glioblastoma",
-      "maturity": "partial"
+      "maturity": "partial",
+      "target_class": "Kinase"
     },
     {
       "chembl_id": "CHEMBL4297844",
@@ -31,7 +32,8 @@
       "max_phase": 4,
       "primary_target": "ERBB2",
       "primary_indication": "osteosarcoma",
-      "maturity": "index_only"
+      "maturity": "index_only",
+      "target_class": "Kinase"
     },
     {
       "chembl_id": "CHEMBL4535757",
@@ -47,7 +49,8 @@
       "max_phase": 4,
       "primary_target": "KRAS",
       "primary_indication": "ovarian cancer",
-      "maturity": "partial"
+      "maturity": "partial",
+      "target_class": "Hydrolase"
     },
     {
       "chembl_id": "CHEMBL4594350",
@@ -63,7 +66,8 @@
       "max_phase": 4,
       "primary_target": "KRAS",
       "primary_indication": "breast cancer",
-      "maturity": "partial"
+      "maturity": "partial",
+      "target_class": "Hydrolase"
     },
     {
       "chembl_id": "CHEMBL5095236",
@@ -79,7 +83,8 @@
       "max_phase": 2,
       "primary_target": null,
       "primary_indication": "colorectal cancer",
-      "maturity": "partial"
+      "maturity": "partial",
+      "target_class": null
     },
     {
       "chembl_id": "CHEMBL5314518",
@@ -95,7 +100,8 @@
       "max_phase": 2,
       "primary_target": null,
       "primary_indication": "small intestine cancer",
-      "maturity": "partial"
+      "maturity": "partial",
+      "target_class": null
     }
   ],
   "facts": [
@@ -2479,6 +2485,46 @@
       ],
       "status": "ok",
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=GLECIRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "target_class",
+      "source": "opentargets",
+      "value": "Kinase",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "target_class",
+      "source": "opentargets",
+      "value": "Kinase",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "target_class",
+      "source": "opentargets",
+      "value": "Hydrolase",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "target_class",
+      "source": "opentargets",
+      "value": "Hydrolase",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
       "error": null,
       "confidence": null
     }

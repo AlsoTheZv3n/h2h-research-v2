@@ -35,6 +35,11 @@ _MATURITY_RANK = case(
     else_=1,  # index_only
 )
 
+# The facet value that means "no class recorded", mapped to target_class IS NULL. A
+# named sentinel rather than a bare magic string so the API, the repo and the tests
+# all agree on the one token that carries this meaning across the wire.
+UNCLASSIFIED = "unclassified"
+
 # The columns the overview's headers can sort by. Anything not here falls back to the
 # data-completeness rank rather than erroring on a bad ?sort= value.
 _SORT_COLUMNS = {
@@ -42,6 +47,7 @@ _SORT_COLUMNS = {
     "name": Drug.pref_name,
     "phase": Drug.max_phase,
     "target": Drug.primary_target,
+    "class": Drug.target_class,
     "indication": Drug.primary_indication,
 }
 
@@ -120,6 +126,7 @@ class DrugRepository:
         modality: str | None = None,
         maturity: DataMaturity | None = None,
         has_target: bool | None = None,
+        target_class: str | None = None,
         sort: str = "data",
         order: str = "desc",
         limit: int = 50,
@@ -165,6 +172,14 @@ class DrugRepository:
             filters.append(
                 Drug.primary_target.isnot(None) if has_target else Drug.primary_target.is_(None)
             )
+        if target_class:
+            # "unclassified" is the facet's name for target_class IS NULL -- the rows
+            # with no class recorded, which are a real, selectable group. Every other
+            # value is an exact, case-insensitive family match ("Kinase").
+            if target_class.strip().lower() == UNCLASSIFIED:
+                filters.append(Drug.target_class.is_(None))
+            else:
+                filters.append(func.lower(Drug.target_class) == target_class.strip().lower())
 
         total = await self.session.scalar(select(func.count()).select_from(Drug).where(*filters))
 
@@ -183,6 +198,23 @@ class DrugRepository:
             .offset(offset)
         )
         return rows.scalars().all(), int(total or 0)
+
+    async def distinct_target_classes(self) -> list[str]:
+        """The target-class facet's options: classes actually present, most-common first.
+
+        Data-driven, not a hardcoded enum: which classes exist depends on what has been
+        enriched, so a static list would show empty buckets and silently miss any new
+        family. NULL is deliberately excluded here -- the facet appends "Unclassified"
+        as a fixed final option, because "no class" is always a meaningful choice
+        whether or not a given catalog snapshot happens to contain one.
+        """
+        result = await self.session.execute(
+            select(Drug.target_class, func.count())
+            .where(Drug.target_class.isnot(None))
+            .group_by(Drug.target_class)
+            .order_by(func.count().desc(), Drug.target_class)
+        )
+        return [row[0] for row in result.all()]
 
     async def promote_index_columns(self, chembl_id: str, record: SourceRecord) -> None:
         """Copy a ChEMBL record's index columns into the catalog row.
