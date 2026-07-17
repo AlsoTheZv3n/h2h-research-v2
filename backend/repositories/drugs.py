@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,26 @@ _CHEMBL_INDEX_FIELDS = (
     "ro5_violations",
     "max_phase",
 )
+
+# maturity is a native enum, so ordering by the column directly sorts alphabetically
+# (full, index_only, partial) -- which is not the order anyone means. This ranks it so
+# a complete brief comes first, which is the default sort: the drugs a reader can
+# explore right now, and which load instantly, belong at the top.
+_MATURITY_RANK = case(
+    (Drug.maturity == DataMaturity.FULL, 3),
+    (Drug.maturity == DataMaturity.PARTIAL, 2),
+    else_=1,  # index_only
+)
+
+# The columns the overview's headers can sort by. Anything not here falls back to the
+# data-completeness rank rather than erroring on a bad ?sort= value.
+_SORT_COLUMNS = {
+    "data": _MATURITY_RANK,
+    "name": Drug.pref_name,
+    "phase": Drug.max_phase,
+    "target": Drug.primary_target,
+    "indication": Drug.primary_indication,
+}
 
 
 class DrugRepository:
@@ -97,13 +117,22 @@ class DrugRepository:
         q: str | None = None,
         target: str | None = None,
         max_phase: int | None = None,
+        modality: str | None = None,
+        maturity: DataMaturity | None = None,
+        has_target: bool | None = None,
+        sort: str = "data",
+        order: str = "desc",
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[Sequence[Drug], int]:
-        """One page of the overview, plus the unpaginated total.
+        """One page of the overview, filtered and sorted in SQL, plus the total.
 
-        The total is counted, not len()'d: the spike shipped a bug where a page
-        length was reported as a total, and osimertinib's 383 trials read as 100.
+        Filter -> sort -> page, all in Postgres, composed with the count. The catalog
+        is ~3,900 rows; sending them all to the client to filter there would be both
+        slow and a lie about "the DB is the only thing the website reads". The total is
+        counted over the *filtered* set, not len()'d over the page -- the spike shipped
+        the bug where a page length read as the total and osimertinib's 383 trials
+        showed as 100.
         """
         filters = []
         if q:
@@ -125,17 +154,31 @@ class DrugRepository:
             filters.append(func.lower(Drug.primary_target) == target.strip().lower())
         if max_phase is not None:
             filters.append(Drug.max_phase >= max_phase)
+        if modality:
+            filters.append(func.lower(Drug.drug_type) == modality.strip().lower())
+        if maturity is not None:
+            filters.append(Drug.maturity == maturity)
+        if has_target is not None:
+            # "Has an annotated target" vs "does not". A real facet: many catalog rows
+            # have no target resolved yet, and letting the reader exclude them is the
+            # difference between a findable table and a wall.
+            filters.append(
+                Drug.primary_target.isnot(None) if has_target else Drug.primary_target.is_(None)
+            )
 
         total = await self.session.scalar(select(func.count()).select_from(Drug).where(*filters))
+
+        column = _SORT_COLUMNS.get(sort, _MATURITY_RANK)
+        ordered = (column.desc() if order == "desc" else column.asc()).nullslast()
         rows = await self.session.execute(
             select(Drug)
             .where(*filters)
-            # chembl_id last as a tiebreaker: max_phase and pref_name are both
-            # nullable, so without it tied rows have no defined order. Postgres may
+            # chembl_id last as a stable tiebreaker: every other sort key is nullable
+            # or non-unique, so without it tied rows have no defined order. Postgres may
             # then order them differently per query, and since LIMIT/OFFSET is applied
             # per query, a paging client sees one drug twice and never sees another --
             # while `total` stays correct. A trustworthy count over a lossy list.
-            .order_by(Drug.max_phase.desc().nullslast(), Drug.pref_name, Drug.chembl_id)
+            .order_by(ordered, Drug.chembl_id)
             .limit(limit)
             .offset(offset)
         )

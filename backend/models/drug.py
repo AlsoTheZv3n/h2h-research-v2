@@ -58,7 +58,10 @@ class Drug(Base):
     # kept as a fact, never merged into this column -- see the spike's findings.
     max_phase: Mapped[int | None] = mapped_column(Integer, index=True)
     primary_target: Mapped[str | None] = mapped_column(String(64), index=True)
-    primary_indication: Mapped[str | None] = mapped_column(String(512))
+    # Indexed because the overview lets a reader sort by it. The other faceted columns
+    # (drug_type, max_phase, primary_target, maturity) already carry an index; this was
+    # the one sortable column without one.
+    primary_indication: Mapped[str | None] = mapped_column(String(512), index=True)
 
     maturity: Mapped[DataMaturity] = mapped_column(
         Enum(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from backend.config import get_settings
 from backend.db import get_session
 from backend.domain.structure import render_svg
 from backend.ingestion.base import FactStatus
+from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
@@ -24,6 +25,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/drugs", tags=["drugs"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+SortField = Literal["data", "name", "phase", "target", "indication"]
+SortOrder = Literal["asc", "desc"]
 
 
 @router.get("", response_model=DrugList, summary="Overview: a scannable index of drug programs")
@@ -39,12 +44,35 @@ async def list_drugs(
     max_phase: Annotated[
         int | None, Query(ge=0, le=4, description="Minimum clinical phase")
     ] = None,
+    modality: Annotated[
+        str | None, Query(description="Exact drug type, e.g. 'Small molecule', 'Antibody'")
+    ] = None,
+    maturity: Annotated[
+        DataMaturity | None,
+        Query(description="Data completeness: index_only, partial, or full"),
+    ] = None,
+    has_target: Annotated[
+        bool | None, Query(description="Only drugs with (or without) an annotated target")
+    ] = None,
+    sort: Annotated[
+        SortField, Query(description="Column to sort by. Default: data completeness.")
+    ] = "data",
+    order: Annotated[SortOrder, Query(description="Sort direction")] = "desc",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> DrugList:
     repo = DrugRepository(session)
     rows, total = await repo.list_drugs(
-        q=q, target=target, max_phase=max_phase, limit=limit, offset=offset
+        q=q,
+        target=target,
+        max_phase=max_phase,
+        modality=modality,
+        maturity=maturity,
+        has_target=has_target,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
     )
     return DrugList(
         items=[DrugSummary.model_validate(r, from_attributes=True) for r in rows],
