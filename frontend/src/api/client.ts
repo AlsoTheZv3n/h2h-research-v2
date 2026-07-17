@@ -41,6 +41,12 @@ export function listDrugs(params: DrugListParams = {}): Promise<DrugList> {
     q: params.q,
     target: params.target,
     max_phase: params.max_phase,
+    modality: params.modality,
+    maturity: params.maturity,
+    // Only send has_target when set: a bare key would filter to "false".
+    has_target: params.has_target === undefined ? undefined : String(params.has_target),
+    sort: params.sort,
+    order: params.order,
     limit: params.limit ?? 25,
     offset: params.offset ?? 0,
   })

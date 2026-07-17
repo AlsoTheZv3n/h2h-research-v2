@@ -142,12 +142,24 @@ export interface DrugDetail {
   unavailable: string[]
 }
 
+/** Columns the overview can sort by; must match the API's accepted `sort` values. */
+export type SortField = 'data' | 'name' | 'phase' | 'target' | 'indication'
+export type SortOrder = 'asc' | 'desc'
+
 export interface DrugListParams {
   /** Free text: drug name, ChEMBL id or target. Partial, case-insensitive. */
   q?: string
   /** Exact target symbol. A facet, not a search box. */
   target?: string
   max_phase?: number
+  /** Exact drug type, e.g. "Small molecule", "Antibody". */
+  modality?: string
+  /** Data completeness. */
+  maturity?: DataMaturity
+  /** Only drugs with (true) or without (false) an annotated target. */
+  has_target?: boolean
+  sort?: SortField
+  order?: SortOrder
   limit?: number
   offset?: number
 }
