@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backend.repositories import DrugRepository
 from backend.services import briefs
@@ -48,7 +48,7 @@ def cancel_hung_tasks() -> Iterator[None]:
 
 
 @pytest.fixture
-async def cold_drug(db_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker]:
+async def cold_drug(db_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
     async with maker() as s:
         await DrugRepository(s).upsert_drug(CID, pref_name="hanginib", max_phase=2)
@@ -58,7 +58,7 @@ async def cold_drug(db_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker]
 
 async def test_a_cold_read_returns_fast_even_when_every_source_hangs(
     api: httpx.AsyncClient,
-    cold_drug: async_sessionmaker,
+    cold_drug: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The background enrich job builds this client and hangs on it forever.
