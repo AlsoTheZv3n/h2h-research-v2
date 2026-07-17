@@ -86,6 +86,14 @@ class DrugDetail(BaseModel):
     """Whether there is a structure to draw. A separate axis from modality: a small
     molecule can lack one, and that absence is a measurement, not a class of drug."""
 
+    smiles: str | None = None
+    """The canonical SMILES the structure is rendered from -- the catalog column, the
+    same value structure.svg draws. Carried here so the detail page has ONE source of
+    truth for the structure: it was deriving `has_structure` from the server while
+    reading the SMILES text off a separately-fetched ChEMBL fact, which disagree the
+    moment ChEMBL fails on a re-fetch (a drawn structure with no formula beneath it, or
+    the reverse). has_structure is now just `smiles is not None`, one axis, one place."""
+
     state: BriefState = BriefState.READY
     """Where this brief is in its life, which is a different axis from any fact's
     status. `not_analyzed` and `enriching` mean we have not looked yet -- neither is

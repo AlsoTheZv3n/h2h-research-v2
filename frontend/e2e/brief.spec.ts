@@ -180,3 +180,64 @@ test.describe('the biologic case', () => {
     await expect(page.getByTestId('structure-svg')).toHaveCount(0)
   })
 })
+
+test.describe('detail redesign', () => {
+  test('provenance lives behind an info icon, revealed on hover', async ({ page }) => {
+    // The signature interaction, in its redesigned form: the source is a quiet "i", not
+    // its name spelled out on every value, and the provenance is one hover away.
+    await page.goto(`/drugs/${OSIMERTINIB}`)
+    await expect(page.getByText('Binding & potency')).toBeVisible()
+
+    const info = page.getByTestId('source-info').first()
+    await expect(info).toBeVisible()
+    await expect(info).not.toContainText(/chembl|pubmed|open targets/i)
+
+    await info.hover()
+    await expect(page.getByRole('tooltip').first()).toContainText(/Retrieved \d{4}-\d{2}-\d{2}/)
+  })
+
+  test('a source failure reads as a calm advisory, not a red field-name wall', async ({ page }) => {
+    await page.goto(`/drugs/${E2E_FIXTURE}`)
+
+    const advisory = page.getByTestId('source-advisory')
+    await expect(advisory).toBeVisible()
+    // Calm and human: no internal field names anywhere in it.
+    await expect(advisory).toContainText(/couldn.t be reached|gather/i)
+    await expect(advisory).not.toContainText(/\b(moa|ic50|n_ic50|smiles|ic50_summary)\b/i)
+    // The old red wall that listed those field names is gone.
+    await expect(page.getByTestId('unavailable-banner')).toHaveCount(0)
+    // The per-fact honest state still stands: the failed source is still named "unavailable".
+    await expect(page.getByTestId('fact-source-failed').first()).toContainText(/unavailable/i)
+  })
+
+  test('the advisory retries the sources through the real endpoint', async ({ page }) => {
+    await page.goto(`/drugs/${E2E_FIXTURE}`)
+    await expect(page.getByTestId('source-advisory')).toBeVisible()
+
+    const retryPosted = page.waitForRequest(
+      (r) => r.url().includes(`/drugs/${E2E_FIXTURE}/retry`) && r.method() === 'POST',
+    )
+    await page.getByTestId('retry-sources').click()
+    await retryPosted // the button actually calls the retry endpoint, not a no-op
+  })
+
+  test('the ask box sits above the evidence cards', async ({ page }) => {
+    await page.goto(`/drugs/${OSIMERTINIB}`)
+    const ask = page.getByRole('heading', { name: /ask about this drug/i })
+    const firstCard = page.getByText('Structure & chemistry')
+    await expect(ask).toBeVisible()
+    await expect(firstCard).toBeVisible()
+    const askBox = await ask.boundingBox()
+    const cardBox = await firstCard.boundingBox()
+    expect(askBox!.y).toBeLessThan(cardBox!.y) // chat moved up, above the brief
+  })
+
+  test('the four-card merge kept every sourced fact', async ({ page }) => {
+    // Guard against the merge silently dropping a fact -- "Phases seen" and the on-record
+    // IC50 count both lost their card in a first cut and had to be put back.
+    await page.goto(`/drugs/${OSIMERTINIB}`)
+    await expect(page.getByText('Clinical & literature')).toBeVisible()
+    await expect(page.getByText('Phases seen')).toBeVisible()
+    await expect(page.getByText('IC50 activities on record')).toBeVisible()
+  })
+})

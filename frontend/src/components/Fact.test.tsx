@@ -297,4 +297,19 @@ describe('CitationChip', () => {
     await user.hover(screen.getByRole('button', { name: /source: chembl/i }))
     expect(screen.getByRole('tooltip')).not.toHaveTextContent(/confidence/i)
   })
+
+  it('is a quiet info icon, with the source name only in the popover', async () => {
+    // The redesign: the source is no longer spelled out on every value (visual noise
+    // repeated down the whole brief). It is an "i" icon, and the name -- which is the
+    // point -- lives one hover away.
+    const user = userEvent.setup()
+    render(<Fact label="MW" facts={[fact({ value: 560.61 })]} />)
+
+    const icon = screen.getByTestId('source-info')
+    expect(icon).not.toHaveTextContent(/chembl/i)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    await user.hover(icon)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('ChEMBL')
+  })
 })
