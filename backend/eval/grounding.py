@@ -84,7 +84,7 @@ EVIDENCE = Evidence(
     ],
     unavailable=["moa"],
     never_analyzed=False,
-    literature_indexed=True,
+    literature_searched=True,
 )
 
 

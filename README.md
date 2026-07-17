@@ -72,9 +72,11 @@ noticing when it happens. Four things do the work:
 - **Every citation is checked against what was retrieved.** If the answer cites a PMID we never
   supplied, the model invented it and **the whole answer is withheld** — you are told it happened
   rather than shown something nobody can stand behind.
+- **The answer is checked for copied text.** Twelve consecutive words lifted from an abstract also
+  withholds it: accurate or not, that text is not ours to republish (see [`NOTICE.md`](NOTICE.md)).
 
-**What that last check does not do, and it is the bigger half:** it verifies a citation *exists*, not
-that it *supports the sentence attached to it*. A fabricated claim hung on a real retrieved PMID
+**What the citation check does not do, and it is the bigger half:** it verifies a citation *exists*,
+not that it *supports the sentence attached to it*. A fabricated claim hung on a real retrieved PMID
 passes. Catching that needs a second model grading each claim against its source — a real piece of
 work, not done, and stated here rather than left for you to discover.
 

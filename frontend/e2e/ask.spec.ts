@@ -85,6 +85,11 @@ test.describe('ask', () => {
     const probe = await request.post('/api/drugs/CHEMBL_E2E_UNSEEN/ask', {
       data: { question: 'probe' },
     })
+    // Assert before skipping. A 404 or a 500 yields `state === undefined`, which
+    // satisfies `!== 'not_configured'` and skips -- so a broken fixture or a broken
+    // endpoint would report as a green skip forever. A skip has to mean "this
+    // configuration does not apply", never "the probe failed and nobody noticed".
+    expect(probe.status(), 'the probe itself failed').toBe(200)
     const state = (await probe.json()).state
     test.skip(state !== 'not_configured', `a model is configured (state=${state})`)
 

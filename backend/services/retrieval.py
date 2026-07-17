@@ -62,12 +62,19 @@ class Evidence:
     never_analyzed: bool = False
     """Nobody has ever asked the sources about this drug."""
 
-    literature_indexed: bool = False
-    """Whether the abstract index has been built for this drug at all.
+    literature_searched: bool = False
+    """Whether PubMed has ever been asked about this drug.
 
-    Distinct from `abstracts` being empty after a search, which means we looked and
-    nothing was close enough. "No relevant paper" and "no papers fetched" are
-    different answers to give a reader.
+    Three literature states, not two, and this flag plus `abstracts` distinguishes
+    all three:
+
+        not searched              nobody has asked PubMed about this drug
+        searched, none stored     we asked; PubMed has nothing on it
+        searched, none relevant   we asked, it has papers, none answer this question
+
+    The first version had a `literature_indexed` flag derived from whether any link
+    rows existed, which silently merged the first two -- the founding bug again, in
+    the layer whose job is telling the model what it does not know.
     """
 
     @property
@@ -112,10 +119,10 @@ async def gather_evidence(
     )
 
     literature = LiteratureRepository(session)
-    indexed = await literature.has_abstracts(drug.chembl_id)
+    searched = await literature.was_searched(drug.chembl_id)
     abstracts = (
         await literature.search(drug.chembl_id, await embed_query(question), limit=limit)
-        if indexed
+        if searched
         else []
     )
 
@@ -126,7 +133,7 @@ async def gather_evidence(
         abstracts=abstracts,
         unavailable=unavailable,
         never_analyzed=drug.last_enriched_at is None,
-        literature_indexed=indexed,
+        literature_searched=searched,
     )
 
 
@@ -170,10 +177,18 @@ def render_context(evidence: Evidence) -> str:
         ]
 
     parts.append("LITERATURE")
-    if not evidence.literature_indexed:
-        parts += ["(no abstracts have been fetched for this drug yet)", ""]
+    if not evidence.literature_searched:
+        # Three wordings, because there are three states and the model has to be able
+        # to tell the reader which one it is in.
+        parts += ["(PubMed has never been searched for this drug -- nobody has looked)", ""]
     elif not evidence.abstracts:
-        parts += ["(abstracts are indexed, but none were relevant to this question)", ""]
+        parts += [
+            "(PubMed was searched for this drug. Either it has no papers on it, or",
+            "none of the ones it has speak to this question. Do not claim the",
+            "literature is silent on the topic -- say the search returned nothing",
+            "relevant.)",
+            "",
+        ]
     else:
         for a in evidence.abstracts:
             head = f"[PMID {a.pmid}]"

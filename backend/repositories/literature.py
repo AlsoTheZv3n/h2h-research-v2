@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.embeddings import embed_documents
 from backend.ingestion.literature import LiteratureRecord
-from backend.models import Abstract, DrugAbstract
+from backend.models import Abstract, Drug, DrugAbstract
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,25 +41,50 @@ class LiteratureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def has_abstracts(self, chembl_id: str) -> bool:
-        """Whether this drug's literature has been fetched at all.
+    async def was_searched(self, chembl_id: str) -> bool:
+        """Whether anyone has ever asked PubMed about this drug.
 
-        The `not_analyzed` question, one layer down: no rows means nobody looked, and
-        that is different from having looked and found nothing.
+        Reads the drug's `literature_fetched_at`, NOT the presence of links -- and
+        the difference is the whole point. This method used to be `has_abstracts` and
+        answered "are there any rows in drug_abstract", which returns False for two
+        opposite situations: nobody looked, and we looked and PubMed had nothing. One
+        answer, two meanings. That is this project's founding bug, reintroduced by me
+        in the literature layer, and caught in review rather than by any of the
+        twenty-five tests I had written around it.
+
+        "Did we search?" and "did we find anything?" are now two questions with two
+        answers, which is what they always were.
         """
-        stmt = select(DrugAbstract.pmid).where(DrugAbstract.drug_chembl_id == chembl_id).limit(1)
-        return (await self.session.execute(stmt)).first() is not None
+        stmt = select(Drug.literature_fetched_at).where(Drug.chembl_id == chembl_id)
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
 
     async def save(self, chembl_id: str, record: LiteratureRecord) -> int:
         """Store a fetch result. Returns how many abstracts were embedded.
 
-        A failed record writes nothing -- deliberately. Unlike a fact, where an
-        outage is itself worth recording and gets a `source_failed` row, this table
-        is an index rather than a claim: an absent row means "not indexed", the
-        retriever simply finds less, and the next request retries. The drug's *facts*
-        are where the outage is on the record.
+        A *successful* fetch stamps `literature_fetched_at` even when it found
+        nothing, because "we asked and PubMed has nothing on this drug" is a
+        measurement and the reader deserves to be told it rather than left with the
+        same silence as a drug nobody looked at.
+
+        A *failed* fetch stamps nothing and writes nothing -- deliberately. Unlike a
+        fact, where an outage is itself worth recording and gets a `source_failed`
+        row, this table is an index rather than a claim: leaving it unstamped means
+        the next request retries, which is the right behaviour for an index. The
+        drug's *facts* are where the outage goes on the record.
         """
-        if not record.ok or not record.articles:
+        if not record.ok:
+            return 0
+
+        # Stamped before the early return, so a search that legitimately found
+        # nothing is still recorded as a search.
+        await self.session.execute(
+            update(Drug)
+            .where(Drug.chembl_id == chembl_id)
+            .values(literature_fetched_at=record.retrieved_at)
+        )
+
+        if not record.articles:
+            await self.session.commit()
             return 0
 
         with_text = [a for a in record.articles if a.text]
@@ -96,6 +121,24 @@ class LiteratureRepository:
                     },
                 )
             )
+
+        # Replace this drug's link set, do not merely add to it. A re-fetch returns
+        # PubMed's *current* answer, and relevance ranking shifts: a paper that was
+        # in the top 20 last month may not be now. Upserting alone leaves it linked
+        # forever, so the index accumulates every paper the drug was ever associated
+        # with and quietly stops being the answer to "PubMed's top hits for this
+        # drug" -- it becomes a union of every answer it has ever given, which is not
+        # a thing anybody asked for and not something the retriever's ranking
+        # accounts for.
+        #
+        # Scoped to this drug: the abstract rows themselves stay, since another drug
+        # may still link to them.
+        await self.session.execute(
+            delete(DrugAbstract).where(
+                DrugAbstract.drug_chembl_id == chembl_id,
+                DrugAbstract.pmid.notin_([a.pmid for a in record.articles]),
+            )
+        )
 
         link = insert(DrugAbstract).values(
             [{"drug_chembl_id": chembl_id, "pmid": a.pmid, "rank": a.rank} for a in record.articles]

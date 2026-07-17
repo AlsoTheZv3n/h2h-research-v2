@@ -41,11 +41,18 @@ class AnswerState(StrEnum):
     """The model cited a PMID we never gave it. The answer is withheld -- see
     `_fabricated_pmids`. This is the state the whole phase exists to be able to
     reach."""
+    WITHHELD = "withheld"
+    """The answer quoted an abstract verbatim, so it is not ours to publish. Not the
+    model's fault and not a gap in the evidence -- a licensing boundary. See
+    `_copies_source_text` and NOTICE.md."""
 
 
 # "PMID 12345678", "[PMID: 12345678]", "pmid 12345678". PubMed identifiers run to
 # eight digits; four is the shortest that could plausibly be one.
 _PMID_IN_TEXT = re.compile(r"PMID[:\s]*(\d{4,9})", re.IGNORECASE)
+
+# Word characters only: see _copies_source_text.
+_WORD = re.compile(r"\w+")
 
 
 def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
@@ -76,6 +83,53 @@ def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
     cited = set(_PMID_IN_TEXT.findall(answer))
     given = {a.pmid for a in evidence.abstracts}
     return cited - given
+
+
+# Twelve consecutive words from a source document is not paraphrase and not
+# coincidence -- it is copying. Short enough to catch a lifted sentence, long enough
+# that shared technical phrasing ("acquired resistance to osimertinib in patients
+# with EGFR-mutant non-small cell lung cancer") does not trip it.
+_VERBATIM_WORDS = 12
+
+
+def _copies_source_text(evidence: Evidence, answer: str) -> bool:
+    """Whether the answer lifts a run of words straight out of an abstract.
+
+    NOTICE.md promises "no abstract text is ever served". Until this existed, that
+    promise was enforced against the *schema* -- no response model has a field for
+    it -- and not against the model, which can simply quote. `"The paper states:
+    '<200 characters of abstract>'"` passed every check in this file: the PMID is
+    real, the citation is valid, and 200 words of someone's copyrighted abstract
+    went out in the response body.
+
+    Caught in review, and it is the right kind of finding: the guarantee was true
+    about the code I wrote and false about the system I built. The prompt does say
+    not to quote at length -- but a prompt is a request, and NOTICE.md makes a
+    promise. A promise needs a check.
+    """
+
+    def words(text: str) -> list[str]:
+        # Word characters only, so punctuation cannot smuggle a quote past this. A
+        # plain .split() compares `"testinib` against `testinib` and finds them
+        # different -- meaning the check missed every quotation that was *marked as
+        # one*, which is the commonest form by far and the exact case the test was
+        # written around. It failed, correctly, on the first run.
+        return _WORD.findall(text.lower())
+
+    answer_words = words(answer)
+    if len(answer_words) < _VERBATIM_WORDS:
+        return False
+    answer_grams = {
+        " ".join(answer_words[i : i + _VERBATIM_WORDS])
+        for i in range(len(answer_words) - _VERBATIM_WORDS + 1)
+    }
+
+    for abstract in evidence.abstracts:
+        source = words(abstract.text)
+        for i in range(len(source) - _VERBATIM_WORDS + 1):
+            if " ".join(source[i : i + _VERBATIM_WORDS]) in answer_grams:
+                return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,6 +285,27 @@ async def answer_question(
                 f"{'a source' if len(fabricated) == 1 else 'sources'} that was not in "
                 "the retrieved evidence, which means it invented it. Rather than show "
                 "you an answer we cannot stand behind, we are telling you it happened."
+            ),
+        )
+
+    # The output boundary, enforced rather than requested. The prompt asks the model
+    # not to quote at length; NOTICE.md *promises* no abstract text is ever served,
+    # and only this makes the promise true.
+    if _copies_source_text(evidence, text):
+        logger.warning(
+            "provider %s reproduced source text for %s; answer withheld",
+            chat.name,
+            evidence.chembl_id,
+        )
+        return Answer(
+            state=AnswerState.WITHHELD,
+            text="",
+            citations=[],
+            detail=(
+                "The answer quoted a paper's abstract directly, and that text is not "
+                "ours to republish — NLM does not own these abstracts and neither do "
+                "we. Ask again, or follow the citations on this page to read the "
+                "papers at the source."
             ),
         )
 

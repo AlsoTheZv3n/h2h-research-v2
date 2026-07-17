@@ -164,6 +164,66 @@ class TestFabricatedCitations:
         assert answer.state is AnswerState.OK
 
 
+class TestTheOutputBoundary:
+    """NOTICE.md promises no abstract text is ever served. This is what makes it true.
+
+    Every other check in this suite guards against the model saying something *false*.
+    These guard against it saying something *true that is not ours to publish* -- and
+    they were missing until review pointed out that the promise was enforced against
+    the response schema, which has no field for abstract text, and not against the
+    model, which can simply quote.
+    """
+
+    async def test_a_verbatim_quote_withholds_the_answer(
+        self, session: AsyncSession, drug: Drug
+    ) -> None:
+        """The hole review found. Real PMID, valid citation, copied text.
+
+        `The paper states: "<the abstract>" [PMID 40000001]` passed every guard:
+        nothing is fabricated, the citation is real, the claim is accurate. And
+        someone else's copyrighted abstract went out in the response body.
+        """
+        plagiarist = Spy(
+            'The paper states: "Testinib produced a response rate of 41% in the phase 2 '
+            f'cohort." [PMID {REAL_PMID}]'
+        )
+
+        answer = await answer_question(session, drug, "What did it show?", provider=plagiarist)
+
+        assert answer.state is AnswerState.WITHHELD
+        assert answer.text == ""
+        assert answer.detail is not None and "republish" in answer.detail
+
+    async def test_a_paraphrase_passes(self, session: AsyncSession, drug: Drug) -> None:
+        """The guard must not eat the thing the feature is for.
+
+        Same facts, same citation, the model's own words. This is exactly what a
+        grounded answer looks like and it has to survive.
+        """
+        honest = Spy(f"Four in ten patients responded during the phase 2 study [PMID {REAL_PMID}].")
+
+        answer = await answer_question(session, drug, "What did it show?", provider=honest)
+
+        assert answer.state is AnswerState.OK
+
+    async def test_a_short_shared_phrase_is_not_a_quote(
+        self, session: AsyncSession, drug: Drug
+    ) -> None:
+        """Technical writing shares phrases. Twelve consecutive words does not.
+
+        "response rate of 41%" appears in both because it is the finding, not because
+        anything was copied. A guard that fires on this is one people learn to
+        ignore.
+        """
+        answer = await answer_question(
+            session,
+            drug,
+            "q?",
+            provider=Spy(f"The response rate of 41% is the headline number [PMID {REAL_PMID}]."),
+        )
+        assert answer.state is AnswerState.OK
+
+
 class TestTheStatesReachTheModel:
     async def test_a_failed_source_is_named_in_the_context(
         self, session: AsyncSession, drug: Drug

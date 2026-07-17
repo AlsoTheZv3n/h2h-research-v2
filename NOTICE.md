@@ -75,9 +75,23 @@ abstract is only ~250 words and is already the abridgement of the paper, so a
 "short snippet" is a large fraction of the work and the substantive part of it — the
 intuition that snippets are harmless comes from long-form text and does not carry
 over. The chat model reads abstracts to ground its answer; what leaves the process
-is a synthesis plus citations. `backend/tests/test_output_boundary.py` asserts this
-against every route the API exposes, because a UI that renders 50 words is cosmetic
-if the JSON behind it carried all 250.
+is a synthesis plus citations.
+
+Two checks make that a fact rather than an intention, and it took a review to notice
+the second was missing:
+
+- `backend/tests/test_output_boundary.py` walks every route the API declares — not
+  the ones we remembered — because a UI that renders 50 words is cosmetic if the
+  JSON behind it carried all 250. It fails rather than skips on a route it cannot
+  drive.
+- `_copies_source_text` in `backend/services/chat.py` checks the model's answer for
+  runs of twelve or more consecutive words lifted from a retrieved abstract, and
+  withholds the answer if it finds one. Without it, this section was true about the
+  response *schema* — which has no field for abstract text — and false about the
+  system, because a model can simply quote. `The paper states: "…"` passed every
+  other guard here: real PMID, valid citation, accurate claim, and 200 words of
+  someone else's abstract in the response body. The prompt does ask the model not to
+  quote at length; a prompt is a request, and this page makes a promise.
 
 Per NCBI's usage guidelines every request identifies itself with `tool=` and
 `email=` (configure `NCBI_EMAIL`; see `.env.example`). An API key is optional and

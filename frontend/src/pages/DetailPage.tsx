@@ -264,17 +264,32 @@ export function DetailPage() {
       </div>
 
       {/* This was a disabled input promising "coming in a later phase" since v0.1.0.
-          It now works. The answer is composed only from the facts and abstracts above
-          it -- when it cannot be, the box says which of the five reasons applies
-          rather than shrugging. */}
+          It now works.
+
+          The label said "answered only from the sourced evidence on this page",
+          which was not true and was caught in review: the answer also draws on this
+          drug's PubMed abstracts, and the page shows only their titles and counts.
+          "On this page" is a claim a reader can check by looking, and it would not
+          have survived the check. The wording below says what actually happens.
+
+          `key` is not cosmetic. Without it React keeps this component mounted across
+          a navigation from one drug to another -- so the previous drug's answer stays
+          on screen under the new drug's name, and a request already in flight
+          resolves into the new page. Remounting on chembl_id makes the component's
+          lifetime match the thing it is about. */}
       <div className="mt-4 rounded-lg border border-line bg-card p-4">
         <h2 className="mb-2 text-xs text-ink-faint">
           Ask about this drug
           <span className="ml-2 normal-case">
-            — answered only from the sourced evidence on this page
+            — answered only from this drug's sourced facts and its PubMed abstracts,
+            never from what a model happens to remember
           </span>
         </h2>
-        <Ask chemblId={detail.chembl_id} drugName={detail.pref_name ?? detail.chembl_id} />
+        <Ask
+          key={detail.chembl_id}
+          chemblId={detail.chembl_id}
+          drugName={detail.pref_name ?? detail.chembl_id}
+        />
       </div>
 
       <p className="mt-4 text-[11px] text-ink-faint">

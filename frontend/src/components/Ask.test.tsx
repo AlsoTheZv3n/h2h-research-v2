@@ -5,7 +5,7 @@ import { Ask } from './Ask'
 import type { Answer } from '../api/types'
 
 /**
- * The five states, rendered distinctly. This is Fact.test.tsx's argument one layer
+ * The six states, rendered distinctly. This is Fact.test.tsx's argument one layer
  * up: the backend spends real effort keeping "no model configured" apart from "the
  * model invented a citation", and a UI that renders both as a grey "something went
  * wrong" throws all of that away at the last inch.
@@ -14,8 +14,15 @@ import type { Answer } from '../api/types'
  * about rendering, not transport. The E2E suite asks the real API.
  */
 
-vi.mock('../api/client', () => ({ askDrug: vi.fn() }))
-const { askDrug } = await import('../api/client')
+// Only askDrug is faked. ApiError is imported through to the real class on purpose:
+// the component branches on `e instanceof ApiError` to tell "the server answered
+// 500" from "the request never arrived", and a hand-built stand-in would make that
+// branch pass against a class the app never throws.
+vi.mock('../api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api/client')>()),
+  askDrug: vi.fn(),
+}))
+const { ApiError, askDrug } = await import('../api/client')
 const mockAsk = vi.mocked(askDrug)
 
 afterEach(() => vi.resetAllMocks())
@@ -117,13 +124,13 @@ describe('the states that are not an answer', () => {
     expect(await screen.findByTestId('answer-unavailable')).toHaveTextContent(/try again/i)
   })
 
-  it('the five states never render the same way as each other', async () => {
+  it('the six states never render the same way as each other', async () => {
     // The guard against the whole file's premise quietly eroding: someone
     // consolidates two branches, both still pass their own test, and the
     // distinction is gone. Each state gets its own testid, and they must stay
     // distinct.
     const seen = new Set<string>()
-    for (const state of ['ok', 'ungrounded', 'not_configured', 'no_evidence', 'unavailable'] as const) {
+    for (const state of ['ok', 'ungrounded', 'withheld', 'not_configured', 'no_evidence', 'unavailable'] as const) {
       mockAsk.mockResolvedValue(answer({ state, text: state === 'ok' ? 'An answer.' : '' }))
       const { unmount } = render(<Ask chemblId="CHEMBL123" drugName="t" />)
       await userEvent.type(screen.getByTestId('ask-input'), 'a question')
@@ -134,7 +141,7 @@ describe('the states that are not an answer', () => {
       unmount()
       vi.resetAllMocks()
     }
-    expect(seen.size).toBe(5)
+    expect(seen.size).toBe(6)
   })
 })
 
@@ -168,7 +175,21 @@ describe('the form itself', () => {
 
     await ask()
 
-    expect(await screen.findByTestId('ask-transport-failed')).toBeVisible()
+    const notice = await screen.findByTestId('ask-transport-failed')
+    expect(notice).toHaveTextContent(/did not reach the server/i)
     expect(screen.queryByTestId('answer-unavailable')).not.toBeInTheDocument()
+  })
+
+  it('a 500 is not described as failing to reach the server', async () => {
+    // It reached a server. The server answered. Telling the reader to go check
+    // whether their backend is running sends them to inspect the one thing that is
+    // demonstrably fine — the request got there.
+    mockAsk.mockRejectedValue(new ApiError('500 Internal Server Error', 500))
+
+    await ask()
+
+    const notice = await screen.findByTestId('ask-transport-failed')
+    expect(notice).toHaveTextContent('500')
+    expect(notice).not.toHaveTextContent(/did not reach the server/i)
   })
 })

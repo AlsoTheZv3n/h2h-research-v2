@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { askDrug } from '../api/client'
+import { ApiError, askDrug } from '../api/client'
 import type { Answer, Citation } from '../api/types'
 
 /**
@@ -25,7 +25,7 @@ export function Ask({ chemblId, drugName }: { chemblId: string; drugName: string
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<Answer | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -33,15 +33,21 @@ export function Ask({ chemblId, drugName }: { chemblId: string; drugName: string
     if (asked.length < 3 || asking) return
 
     setAsking(true)
-    setFailed(false)
+    setFailed(null)
     setAnswer(null)
     try {
       setAnswer(await askDrug(chemblId, asked))
-    } catch {
-      // The transport failed, which is different from every state the API models --
-      // it never got to have an opinion. Kept separate rather than faked into an
-      // `unavailable` answer.
-      setFailed(true)
+    } catch (e) {
+      // Something outside the API's five states. Kept separate rather than faked
+      // into `unavailable`, which would be inventing a state the backend never
+      // reported.
+      //
+      // Two different things land here and they need different words. An ApiError is
+      // a non-2xx: the request DID reach a server, and it answered. Anything else is
+      // the request never arriving. The first version called both "did not reach the
+      // server", which sends a reader with a 500 to go check whether their backend
+      // is running -- it is, and that is not the problem.
+      setFailed(e instanceof ApiError ? `The server answered ${e.status}.` : 'unreachable')
     } finally {
       setAsking(false)
     }
@@ -82,8 +88,9 @@ export function Ask({ chemblId, drugName }: { chemblId: string; drugName: string
 
       {failed && (
         <Notice testId="ask-transport-failed" tone="bad">
-          The request did not reach the server. Check that the backend is running, then try
-          again.
+          {failed === 'unreachable'
+            ? 'The request did not reach the server. Check that the backend is running, then try again.'
+            : `${failed} That is not one of the answers this endpoint knows how to give, so something is wrong upstream of the model.`}
         </Notice>
       )}
 
@@ -125,6 +132,18 @@ function AnswerView({ answer }: { answer: Answer }) {
       return (
         <Notice testId="answer-no-evidence" tone="neutral">
           {answer.detail ?? 'Nothing has been gathered about this drug yet.'}
+        </Notice>
+      )
+
+    case 'withheld':
+      // Neutral, not red. Nothing failed: the answer was accurate and the model
+      // behaved. It quoted a paper, and that text is not ours to pass on. Rendering
+      // this like an error would tell the reader something went wrong when what
+      // actually happened is that a promise was kept.
+      return (
+        <Notice testId="answer-withheld" tone="neutral">
+          {answer.detail ??
+            'The answer quoted a paper directly, and that text is not ours to republish.'}
         </Notice>
       )
 

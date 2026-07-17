@@ -47,10 +47,22 @@ ON CONFLICT (drug_chembl_id, key, source) DO UPDATE
 -- The chat must refuse to ask a model about it, because a model handed no context
 -- answers from training. last_enriched_at stays NULL -- that is what "nobody looked"
 -- means, and it is a different row state from "we looked and found nothing".
-INSERT INTO drug (chembl_id, pref_name, drug_type, max_phase, maturity, last_enriched_at)
+--
+-- The evidence is deleted first, because the row persists between runs and "unseen"
+-- is a claim about the whole row, not about one column. Resetting only
+-- last_enriched_at while facts or abstract links survived from an earlier run would
+-- leave a drug that is documented as having no evidence and demonstrably has some --
+-- the test would pass or fail depending on what ran before it, which is the property
+-- a fixture exists to remove.
+DELETE FROM fact WHERE drug_chembl_id = 'CHEMBL_E2E_UNSEEN';
+DELETE FROM drug_abstract WHERE drug_chembl_id = 'CHEMBL_E2E_UNSEEN';
+
+INSERT INTO drug (chembl_id, pref_name, drug_type, max_phase, maturity,
+                  last_enriched_at, literature_fetched_at)
 VALUES ('CHEMBL_E2E_UNSEEN', 'E2E NEVER LOOKED', 'Small molecule', 1,
-        'index_only', NULL)
-ON CONFLICT (chembl_id) DO UPDATE SET last_enriched_at = NULL;
+        'index_only', NULL, NULL)
+ON CONFLICT (chembl_id) DO UPDATE
+   SET last_enriched_at = NULL, literature_fetched_at = NULL;
 `
 
 function psql(sql: string): void {

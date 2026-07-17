@@ -86,23 +86,43 @@ class TestNoAbstractTextIsServed:
         """
         from backend.main import app
 
-        checked = 0
+        # Routes this sweep cannot drive, named individually with a reason. A route
+        # not on this list and not checkable is a FAILURE, not a skip -- the first
+        # version `continue`d past anything with an unknown path param and swallowed
+        # request exceptions, so a future /abstracts/{pmid} would have been silently
+        # ignored while this file went on claiming it covered every route. A guard
+        # that quietly excuses the case it was written for is worse than none.
+        UNCHECKABLE = {
+            "/openapi.json": "the schema, not data",
+            "/docs": "swagger UI",
+            "/docs/oauth2-redirect": "swagger UI",
+            "/redoc": "redoc UI",
+        }
+
+        checked, skipped = 0, []
         for route in app.routes:
             path = getattr(route, "path", "")
             methods: set[str] = getattr(route, "methods", set()) or set()
-            if "GET" not in methods or ("{" in path and "chembl_id" not in path):
+            if "GET" not in methods:
                 continue
+            if path in UNCHECKABLE:
+                continue
+
             url = path.replace("{chembl_id}", CHEMBL_ID)
-            try:
-                r = await api.get(url)
-            except Exception:  # a route needing params we cannot guess
+            if "{" in url:
+                skipped.append(path)
                 continue
+
+            r = await api.get(url)
             checked += 1
             assert SECRET not in r.text, f"{url} served abstract text"
 
-        # Guard the guard: if the loop matched nothing, this file would pass forever
-        # while testing nothing -- the vacuous-test failure this project has already
-        # shipped twice.
+        assert not skipped, (
+            f"these routes take a path param this sweep cannot fill: {skipped}. "
+            "Teach it to fill them, or add them to UNCHECKABLE with a reason -- do "
+            "not let the boundary go unchecked silently."
+        )
+        # And the guard on the guard: a loop that matched nothing would pass forever.
         assert checked >= 2, f"the route sweep only reached {checked} routes"
 
     async def test_the_answer_carries_the_synthesis_and_never_the_source(
@@ -150,16 +170,51 @@ class TestFixturesStayClean:
     def test_no_abstract_text_is_committed(self) -> None:
         """The one clearly-uncleared act: publishing them.
 
-        A demo fixture is the likeliest way abstracts end up in the repository --
+        A demo fixture is the likeliest way abstracts end up in this repository --
         someone captures a real ingest to make CI green and ships 200 abstracts with
         it. The fixture is committed; the abstracts must not be in it.
+
+        Checked structurally, not by table name. The first version looked for the
+        strings "abstract" and "drug_abstract", which is a check on the shape I
+        happened to imagine: a fixture written as `{"articles": [{"text": "..."}]}`
+        carries every abstract and passes cleanly. So this walks the JSON and looks
+        for what actually matters -- a long free-text field sitting next to a PMID,
+        which is what an abstract *is* regardless of what the key is called.
         """
         import json
         from pathlib import Path
+        from typing import Any
+
+        # Long enough that a title, a mechanism string or a drug name cannot trip it;
+        # short enough that no real abstract slips under. Real abstracts run 1000+
+        # characters; the longest legitimate string in the current fixture is a
+        # sample title at ~120.
+        ABSTRACT_LENGTH = 400
+
+        def offenders(node: Any, path: str = "$") -> list[str]:
+            found: list[str] = []
+            if isinstance(node, dict):
+                looks_like_a_record = any(k.lower() in {"pmid", "pmids", "doi"} for k in node)
+                for key, value in node.items():
+                    if isinstance(value, str) and len(value) > ABSTRACT_LENGTH:
+                        found.append(f"{path}.{key} ({len(value)} chars)")
+                    elif looks_like_a_record and key.lower() in {"abstract", "text", "body"}:
+                        found.append(f"{path}.{key} (an abstract-shaped field beside a PMID)")
+                    else:
+                        found += offenders(value, f"{path}.{key}")
+            elif isinstance(node, list):
+                for i, item in enumerate(node):
+                    found += offenders(item, f"{path}[{i}]")
+            return found
 
         root = Path(__file__).resolve().parents[2]
-        for fixture in (root / "backend" / "fixtures").glob("*.json"):
+        fixtures = list((root / "backend" / "fixtures").glob("*.json"))
+        assert fixtures, "no fixtures found -- this test would pass by checking nothing"
+
+        for fixture in fixtures:
             payload = json.loads(fixture.read_text(encoding="utf-8"))
-            blob = json.dumps(payload)
-            assert '"abstract"' not in blob, f"{fixture.name} carries an abstract table"
-            assert '"drug_abstract"' not in blob, f"{fixture.name} carries abstract links"
+            assert not (bad := offenders(payload)), (
+                f"{fixture.name} looks like it carries abstract text: {bad}. "
+                "NOTICE.md says abstracts are never committed; see NLM's position on "
+                "who owns them."
+            )

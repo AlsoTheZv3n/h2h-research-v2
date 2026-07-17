@@ -29,8 +29,19 @@ export type FactStatus = 'ok' | 'empty' | 'source_failed'
  *                   withheld. The rarest and most important one: it means the guard
  *                   fired, and the reader is being told rather than shown a
  *                   confident answer nobody can stand behind
+ *   withheld        the answer was accurate but quoted a paper's abstract verbatim,
+ *                   and that text is not ours to republish. Nothing is wrong with
+ *                   the answer or the evidence — it is a licensing boundary, and
+ *                   telling the reader that is different from telling them the tool
+ *                   failed
  */
-export type AnswerState = 'ok' | 'not_configured' | 'no_evidence' | 'unavailable' | 'ungrounded'
+export type AnswerState =
+  | 'ok'
+  | 'not_configured'
+  | 'no_evidence'
+  | 'unavailable'
+  | 'ungrounded'
+  | 'withheld'
 
 export interface Citation {
   pmid: string

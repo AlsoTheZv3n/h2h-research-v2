@@ -89,12 +89,81 @@ class TestSaving:
             hits = await repo.search(cid, await embed_query("co-mutation"), limit=5)
             assert [h.pmid for h in hits] == ["300"]
 
-    async def test_a_failed_fetch_writes_nothing(self, session: AsyncSession, drugs: None) -> None:
+    async def test_a_failed_fetch_leaves_the_drug_unsearched(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        """An outage must not be recorded as a search, or we would never retry."""
         repo = LiteratureRepository(session)
         failed = LiteratureRecord("q", (), utcnow(), error="NCBI timed out")
 
         assert await repo.save(OSI, failed) == 0
-        assert await repo.has_abstracts(OSI) is False
+        assert await repo.was_searched(OSI) is False
+
+    async def test_a_search_that_found_nothing_is_still_a_search(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        """The bug review caught, pinned so it cannot come back.
+
+        This project exists to keep "nobody looked" apart from "we looked and there
+        is nothing", and the literature layer merged them: both produced zero link
+        rows, and `has_abstracts` -- the only thing anyone asked -- returned False
+        for both. Twenty-five tests around this file, and not one of them asked the
+        question this one asks.
+        """
+        repo = LiteratureRepository(session)
+        assert await repo.was_searched(OSI) is False
+
+        # PubMed answered. It has nothing on this drug. That is a measurement.
+        empty = LiteratureRecord("nothingol", (), utcnow())
+        assert empty.ok
+        assert await repo.save(OSI, empty) == 0
+
+        assert await repo.was_searched(OSI) is True, (
+            "a successful search that found nothing reads as never having searched"
+        )
+        assert await repo.search(OSI, await embed_query("anything")) == []
+
+    async def test_a_refresh_drops_a_paper_pubmed_no_longer_returns(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        """A re-fetch replaces the drug's papers; it does not add to them.
+
+        PubMed's relevance ranking moves. Upserting alone leaves last month's top hit
+        linked forever, so the index slowly becomes the union of every answer PubMed
+        has ever given -- which nothing downstream accounts for, and which the
+        same-PMID update test above cannot see.
+        """
+        repo = LiteratureRepository(session)
+        await repo.save(
+            OSI,
+            _record(
+                _article("500", "Still relevant next month.", rank=0),
+                _article("501", "Drops out of the top hits.", rank=1),
+            ),
+        )
+        assert len(await repo.search(OSI, await embed_query("relevant"), limit=10)) == 2
+
+        # The next fetch no longer returns 501.
+        await repo.save(OSI, _record(_article("500", "Still relevant next month.", rank=0)))
+
+        hits = await repo.search(OSI, await embed_query("relevant"), limit=10)
+        assert [h.pmid for h in hits] == ["500"]
+
+    async def test_a_refresh_does_not_unlink_another_drugs_paper(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        """The delete is scoped to one drug. Sotorasib keeps its shared paper."""
+        repo = LiteratureRepository(session)
+        shared = _article("600", "Co-mutation of EGFR and KRAS.")
+        await repo.save(OSI, _record(shared))
+        await repo.save(SOTO, _record(shared))
+
+        # Osimertinib re-fetches and this paper is gone from its results.
+        await repo.save(OSI, _record(_article("601", "Something else entirely.")))
+
+        assert [h.pmid for h in await repo.search(SOTO, await embed_query("co-mutation"))] == [
+            "600"
+        ]
 
     async def test_the_schema_refuses_a_vector_with_no_text(
         self, session: AsyncSession, drugs: None
@@ -158,7 +227,7 @@ class TestSearch:
         self, session: AsyncSession, drugs: None
     ) -> None:
         repo = LiteratureRepository(session)
-        assert await repo.has_abstracts(OSI) is False
+        assert await repo.was_searched(OSI) is False
         assert await repo.search(OSI, await embed_query("anything")) == []
 
     async def test_hits_carry_what_a_citation_needs(

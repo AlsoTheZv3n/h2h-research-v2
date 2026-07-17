@@ -22,6 +22,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       NCBI_API_KEY: ${NCBI_API_KEY:-}
+      NCBI_TOOL: ${NCBI_TOOL:-}
       NCBI_EMAIL: ${NCBI_EMAIL:-}
       # The chat's model. Both empty is a supported, designed state: the ask box says
       # no model is configured rather than breaking, and everything else works.
