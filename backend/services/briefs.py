@@ -25,6 +25,7 @@ from enum import StrEnum
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from backend.cache import invalidate_detail
 from backend.db import get_sessionmaker
 from backend.ingestion.enrich import EnrichStats, enrich_drug
 from backend.ingestion.http import build_client
@@ -89,6 +90,12 @@ async def _enrich_in_background(chembl_id: str, maker: async_sessionmaker[AsyncS
                     timeout=_ENRICH_DEADLINE,
                 )
                 await session.commit()
+            # Drop any cached brief now that fresh facts have landed. This is what makes
+            # a retry actually change what readers see: without it, a stale READY brief
+            # re-cached by a concurrent read during the fetch would keep being served,
+            # recovered facts and all, until the TTL. Harmless on the lazy path, where
+            # the drug was never READY and so was never cached.
+            await invalidate_detail(chembl_id)
             logger.info(
                 "lazily enriched %s: %d facts, %d source failures",
                 chembl_id,

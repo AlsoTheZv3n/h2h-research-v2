@@ -231,4 +231,13 @@ test.describe('detail redesign', () => {
     const cardBox = await firstCard.boundingBox()
     expect(askBox!.y).toBeLessThan(cardBox!.y) // chat moved up, above the brief
   })
+
+  test('the four-card merge kept every sourced fact', async ({ page }) => {
+    // Guard against the merge silently dropping a fact -- "Phases seen" and the on-record
+    // IC50 count both lost their card in a first cut and had to be put back.
+    await page.goto(`/drugs/${OSIMERTINIB}`)
+    await expect(page.getByText('Clinical & literature')).toBeVisible()
+    await expect(page.getByText('Phases seen')).toBeVisible()
+    await expect(page.getByText('IC50 activities on record')).toBeVisible()
+  })
 })

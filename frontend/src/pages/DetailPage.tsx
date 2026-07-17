@@ -219,6 +219,12 @@ export function DetailPage() {
             <dl>
               <Fact label="Trials" facts={pick(detail, 'n_trials')} emptyLabel="None registered" />
               <Fact label="Highest phase" facts={pick(detail, 'ct_max_phase')} />
+              <Fact
+                label="Phases seen"
+                facts={pick(detail, 'phases')}
+                render={list}
+                emptyLabel="None recorded"
+              />
               <Fact label="Stage (Open Targets)" facts={pick(detail, 'max_stage')} />
               <Fact
                 label="Any terminated/withdrawn"
@@ -231,6 +237,12 @@ export function DetailPage() {
                 facts={pick(detail, 'indications')}
                 render={(v) => (Array.isArray(v) ? v.slice(0, 4).join(', ') : String(v))}
                 emptyLabel="None annotated"
+              />
+              <Fact
+                label="IC50 activities on record"
+                facts={pick(detail, 'n_ic50')}
+                emptyLabel="None"
+                render={(v) => `${v}`}
               />
               <Fact
                 label="PubMed hits"

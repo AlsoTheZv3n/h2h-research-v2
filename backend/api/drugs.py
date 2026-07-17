@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.cache import get_redis
+from backend.cache import detail_cache_key, get_redis, invalidate_detail
 from backend.config import get_settings
 from backend.db import get_session
 from backend.domain.structure import render_svg
@@ -18,7 +18,7 @@ from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
-from backend.services.briefs import BriefState, get_or_start_brief, retry_brief
+from backend.services.briefs import BriefState, get_or_start_brief, is_enriching, retry_brief
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
     after its facts landed.
     """
     settings = get_settings()
-    cache_key = f"drug:detail:{chembl_id}"
+    cache_key = detail_cache_key(chembl_id)
     redis = get_redis()
 
     try:
@@ -218,9 +218,14 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         unavailable=unavailable,
     )
 
-    # Only cache a finished brief. Caching an in-flight one would pin "analyzing" in
-    # front of every reader for the whole TTL, long after the facts had landed.
-    if state is BriefState.READY:
+    # Only cache a finished brief, and not one whose sources are being re-fetched right
+    # now. The second clause closes a retry race: a reader can read this drug as READY
+    # (its facts still the old, failed ones) an instant before a retry starts, then land
+    # here and re-cache that stale brief just after the retry invalidated it. Re-checking
+    # is_enriching immediately before the write means an in-flight retry (which stays
+    # marked until it commits) suppresses the stale write; the retry's own post-commit
+    # invalidation then covers the sliver where even this check could not.
+    if state is BriefState.READY and not is_enriching(chembl_id):
         try:
             await redis.set(cache_key, detail.model_dump_json(), ex=settings.cache_ttl_seconds)
         except Exception as exc:
@@ -245,10 +250,6 @@ async def retry_drug(chembl_id: str, session: SessionDep) -> dict[str, str]:
     if await repo.get(chembl_id) is None:
         raise HTTPException(status_code=404, detail=f"no drug {chembl_id}")
 
-    try:
-        await get_redis().delete(f"drug:detail:{chembl_id}")
-    except Exception as exc:
-        logger.warning("cache invalidation failed for %s: %s", chembl_id, exc)
-
+    await invalidate_detail(chembl_id)
     state = await retry_brief(session, chembl_id)
     return {"state": state.value}
