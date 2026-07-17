@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from backend.cache import close_redis, get_redis
 from backend.config import get_settings
+from backend.db import get_session
 from backend.ingestion.http import build_client
 from backend.main import app
 from backend.models import Base
@@ -136,3 +138,40 @@ async def session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     async with db_engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(sa.text(f'TRUNCATE TABLE "{table.name}" CASCADE'))
+
+
+@pytest.fixture
+async def api(db_engine: AsyncEngine) -> AsyncIterator[httpx.AsyncClient]:
+    """An ASGI client whose sessions point at the test database.
+
+    The distinction from `client` is easy to miss and costs an afternoon when you
+    do: `client` runs the app against whatever DATABASE_URL says, which is the
+    *dev* database. Pair it with the `session` fixture and the two are writing and
+    reading different databases -- rows appear to vanish and every lookup 404s.
+    Anything that seeds through `session` and reads over HTTP wants this fixture.
+
+    Flushes the cache around each test: Redis outlives the database truncation, so
+    without this a cached brief from an earlier test could answer a later one and
+    the suite would be testing its own leftovers.
+
+    And disposes the Redis client afterwards. It is a module singleton whose
+    connection belongs to the loop that opened it, and pytest-asyncio hands each
+    test a fresh loop -- so a client surviving the test poisons the next one.
+    """
+    maker = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def _override() -> AsyncIterator[object]:
+        async with maker() as s:
+            yield s
+
+    await get_redis().flushdb()
+    app.dependency_overrides[get_session] = _override
+    try:
+        async with LifespanManager(app):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+                yield c
+    finally:
+        app.dependency_overrides.clear()
+        await get_redis().flushdb()
+        await close_redis()

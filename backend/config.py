@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     ncbi_tool: str = "h2h-research"
     ncbi_email: str = "noreply@h2h-research.invalid"
 
+    # The chat's synthesis half. Absent means the chat says so plainly rather than
+    # breaking -- see services/chat_providers.py. The retrieval half needs neither of
+    # these: embeddings run locally, so `docker compose up` always has working search.
+    anthropic_api_key: str | None = None
+    chat_model: str = "claude-opus-4-8"
+
+    # Keyless fallback. Empty by default rather than pointing at localhost:11434:
+    # a default that guesses wrong turns "no model configured" -- which the UI states
+    # honestly -- into "connection refused", which reads as a bug in this project.
+    ollama_url: str = ""
+    ollama_model: str = "llama3.1:8b"
+
     @field_validator("ncbi_tool", "ncbi_email")
     @classmethod
     def _blank_means_unset(cls, v: str, info: ValidationInfo) -> str:

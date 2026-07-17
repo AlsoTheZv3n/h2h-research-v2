@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from backend.api.chat import router as chat_router
 from backend.api.drugs import router as drugs_router
 
-__all__ = ["drugs_router"]
+__all__ = ["chat_router", "drugs_router"]
