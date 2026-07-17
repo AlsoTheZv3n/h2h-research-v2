@@ -133,6 +133,10 @@ export interface DrugDetail {
   is_small_molecule: boolean
   /** Whether there is a structure to draw. A separate axis from modality. */
   has_structure: boolean
+  /** The canonical SMILES the structure is drawn from — the single source of truth for
+   *  the structure card, replacing a separately-fetched ChEMBL fact that could disagree
+   *  with has_structure. null when there is no structure. */
+  smiles: string | null
   state: BriefState
   last_enriched_at: string | null
   /**

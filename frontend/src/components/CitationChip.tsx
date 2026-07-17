@@ -46,17 +46,21 @@ export function CitationChip({ fact }: { fact: SourcedFact }) {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={`Source: ${label}`}
+        data-testid="source-info"
         onClick={() => setPinned((v) => !v)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
-        className="ml-1.5 cursor-pointer rounded border border-line px-1.5 py-0.5 align-middle
-                   text-[10px] font-medium tracking-wide text-ink-faint
-                   transition-colors hover:border-accent hover:text-accent
-                   focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        // An "i" icon, not the source's name spelled out on every value. The name was
+        // visual noise repeated down the whole brief; the provenance -- which is the
+        // point -- lives one hover away, in the panel below, where it always did.
+        className="ml-1 inline-flex size-3.5 cursor-pointer items-center justify-center rounded-full
+                   border border-line align-middle font-serif text-[9px] font-semibold italic
+                   leading-none text-ink-faint transition-colors hover:border-accent
+                   hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
-        {label}
+        <span aria-hidden="true">i</span>
       </button>
 
       {open && (

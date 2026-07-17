@@ -18,7 +18,7 @@ from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
-from backend.services.briefs import BriefState, get_or_start_brief
+from backend.services.briefs import BriefState, get_or_start_brief, retry_brief
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,7 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         # drugs that are small molecules ChEMBL has no structure for.
         is_small_molecule=is_small_molecule(drug.drug_type),
         has_structure=bool(drug.smiles),
+        smiles=drug.smiles,
         state=state,
         last_enriched_at=drug.last_enriched_at,
         facts=dict(facts),
@@ -226,3 +227,28 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
             logger.warning("cache write failed for %s: %s", chembl_id, exc)
 
     return detail
+
+
+@router.post(
+    "/{chembl_id}/retry",
+    summary="Re-fetch every source for a drug whose brief has source failures",
+)
+async def retry_drug(chembl_id: str, session: SessionDep) -> dict[str, str]:
+    """Ask the sources again, then let the page poll for the fresh brief.
+
+    Invalidates the cached brief first: a READY brief is cached for the TTL, and a
+    retry that left the cache in place would re-fetch in the background while the reader
+    kept being served the stale, still-failed copy -- the retry would look like it did
+    nothing until the cache expired.
+    """
+    repo = DrugRepository(session)
+    if await repo.get(chembl_id) is None:
+        raise HTTPException(status_code=404, detail=f"no drug {chembl_id}")
+
+    try:
+        await get_redis().delete(f"drug:detail:{chembl_id}")
+    except Exception as exc:
+        logger.warning("cache invalidation failed for %s: %s", chembl_id, exc)
+
+    state = await retry_brief(session, chembl_id)
+    return {"state": state.value}

@@ -140,5 +140,36 @@ async def get_or_start_brief(
     return BriefState.ENRICHING
 
 
+async def retry_brief(
+    session: AsyncSession,
+    chembl_id: str,
+    *,
+    maker: async_sessionmaker[AsyncSession] | None = None,
+) -> BriefState:
+    """Re-fetch every source for a drug, even one already enriched.
+
+    The normal path serves a READY brief from storage and never looks again, which is
+    right for the common case. Retry is for the other one: a source was down when we
+    last looked, the brief carries its source_failed rows, and the reader is asking us
+    to look again. Facts upsert on (drug, key, source), so a source that has recovered
+    overwrites its failed rows with real values, and one still down just rewrites the
+    same source_failed -- honest either way, and never worse than before.
+
+    Collapses onto the in-flight run if one is already going, so a double-click is one
+    fetch, not two.
+    """
+    if chembl_id in _in_flight:
+        return BriefState.ENRICHING
+
+    drug = await DrugRepository(session).get(chembl_id)
+    if drug is None:
+        return BriefState.NOT_ANALYZED  # caller 404s
+
+    task = asyncio.create_task(_enrich_in_background(chembl_id, maker or get_sessionmaker()))
+    _in_flight[chembl_id] = task
+    logger.info("retry enrichment started for %s", chembl_id)
+    return BriefState.ENRICHING
+
+
 def is_enriching(chembl_id: str) -> bool:
     return chembl_id in _in_flight

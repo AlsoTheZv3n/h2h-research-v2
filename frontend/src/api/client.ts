@@ -1,4 +1,4 @@
-import type { Answer, DrugDetail, DrugList, DrugListParams } from './types'
+import type { Answer, BriefState, DrugDetail, DrugList, DrugListParams } from './types'
 
 /**
  * Same-origin /api by default, which Vite's proxy forwards to the backend with the
@@ -71,6 +71,22 @@ export function getDrug(chemblId: string): Promise<DrugDetail> {
 /** The structure SVG is rendered server-side by RDKit; the browser just shows it. */
 export function structureUrl(chemblId: string): string {
   return `${BASE}/drugs/${encodeURIComponent(chemblId)}/structure.svg`
+}
+
+/**
+ * Ask the sources again for a drug whose brief has failures. Returns the new brief
+ * state; the caller then polls getDrug as usual until it is `ready`. The server
+ * invalidates its cache, so the poll sees the fresh attempt, not the stale one.
+ */
+export async function retryDrug(chemblId: string): Promise<{ state: BriefState }> {
+  const response = await fetch(`${BASE}/drugs/${encodeURIComponent(chemblId)}/retry`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    throw new ApiError(`${response.status} ${response.statusText}`, response.status)
+  }
+  return response.json() as Promise<{ state: BriefState }>
 }
 
 /**
