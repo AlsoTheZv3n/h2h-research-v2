@@ -191,13 +191,15 @@ export function OverviewPage() {
                      placeholder:text-ink-faint focus:border-accent focus:outline-none"
         />
         <Facet
-          label="Modality"
+          name="Modality"
+          placeholder="Modality"
           value={modality}
           onChange={(v) => update({ modality: v })}
           options={MODALITIES.map((m) => [m, m])}
         />
         <Facet
-          label="Data"
+          name="Data completeness"
+          placeholder="Data"
           value={maturity}
           onChange={(v) => update({ maturity: v })}
           options={[
@@ -207,7 +209,8 @@ export function OverviewPage() {
           ]}
         />
         <Facet
-          label="Any phase"
+          name="Minimum phase"
+          placeholder="Any phase"
           value={maxPhase}
           onChange={(v) => update({ max_phase: v })}
           options={[
@@ -218,7 +221,8 @@ export function OverviewPage() {
           ]}
         />
         <Facet
-          label="Target"
+          name="Target presence"
+          placeholder="Target"
           value={hasTarget}
           onChange={(v) => update({ has_target: v })}
           options={[
@@ -354,14 +358,23 @@ export function OverviewPage() {
   )
 }
 
-/** A facet dropdown whose first option clears it. */
+/**
+ * A facet dropdown whose first option clears it.
+ *
+ * `name` is the accessible name and the testid basis; `placeholder` is the empty
+ * option's text. They are separate on purpose: the phase facet reads "Any phase" but
+ * is named "Minimum phase" (what it does), and conflating the two renamed the
+ * accessible label out from under an existing E2E.
+ */
 function Facet({
-  label,
+  name,
+  placeholder,
   value,
   onChange,
   options,
 }: {
-  label: string
+  name: string
+  placeholder: string
   value: string
   onChange: (v: string) => void
   options: [string, string][]
@@ -370,12 +383,12 @@ function Facet({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
-      data-testid={`facet-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      aria-label={name}
+      data-testid={`facet-${name.toLowerCase().replace(/\s+/g, '-')}`}
       className="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-ink
                  focus:border-accent focus:outline-none"
     >
-      <option value="">{label}</option>
+      <option value="">{placeholder}</option>
       {options.map(([v, l]) => (
         <option key={v} value={v}>
           {l}
