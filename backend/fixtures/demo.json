@@ -16,7 +16,8 @@
       "primary_target": "EGFR",
       "primary_indication": "glioblastoma",
       "maturity": "partial",
-      "target_class": "Kinase"
+      "target_class": "Kinase",
+      "in_scope": null
     },
     {
       "chembl_id": "CHEMBL4297844",
@@ -33,7 +34,8 @@
       "primary_target": "ERBB2",
       "primary_indication": "osteosarcoma",
       "maturity": "index_only",
-      "target_class": "Kinase"
+      "target_class": "Kinase",
+      "in_scope": null
     },
     {
       "chembl_id": "CHEMBL4535757",
@@ -50,7 +52,8 @@
       "primary_target": "KRAS",
       "primary_indication": "ovarian cancer",
       "maturity": "partial",
-      "target_class": "Hydrolase"
+      "target_class": "Hydrolase",
+      "in_scope": null
     },
     {
       "chembl_id": "CHEMBL4594350",
@@ -67,7 +70,8 @@
       "primary_target": "KRAS",
       "primary_indication": "breast cancer",
       "maturity": "partial",
-      "target_class": "Hydrolase"
+      "target_class": "Hydrolase",
+      "in_scope": null
     },
     {
       "chembl_id": "CHEMBL5095236",
@@ -84,7 +88,8 @@
       "primary_target": null,
       "primary_indication": "colorectal cancer",
       "maturity": "partial",
-      "target_class": null
+      "target_class": null,
+      "in_scope": null
     },
     {
       "chembl_id": "CHEMBL5314518",
@@ -101,7 +106,26 @@
       "primary_target": null,
       "primary_indication": "small intestine cancer",
       "maturity": "partial",
-      "target_class": null
+      "target_class": null,
+      "in_scope": null
+    },
+    {
+      "chembl_id": "CHEMBL393220",
+      "pref_name": "ATORVASTATIN CALCIUM",
+      "smiles": null,
+      "mw": null,
+      "alogp": null,
+      "hbd": null,
+      "hba": null,
+      "psa": null,
+      "ro5_violations": null,
+      "drug_type": "Small molecule",
+      "max_phase": 4,
+      "primary_target": null,
+      "primary_indication": null,
+      "maturity": "index_only",
+      "target_class": null,
+      "in_scope": false
     }
   ],
   "facts": [

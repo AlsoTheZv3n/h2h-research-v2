@@ -65,6 +65,38 @@ test.describe('overview filters', () => {
     await expect(page.getByTestId('total-count')).toContainText(all.total.toLocaleString('en-US'))
   })
 
+  test('the non-oncology toggle reveals out-of-scope drugs', async ({ page, request }) => {
+    // The premise: there must be drugs scoped out for the toggle to reveal. An empty
+    // gap is a real failure -- scoping was never applied -- so this asserts, not skips.
+    const inScope = await (await request.get('/api/drugs?limit=1')).json()
+    const full = await (await request.get('/api/drugs?limit=1&include_out_of_scope=true')).json()
+    expect(full.total, 'no out-of-scope drugs -- scoping not applied').toBeGreaterThan(
+      inScope.total,
+    )
+
+    await page.goto('/')
+    const count = page.getByTestId('total-count')
+    const toggle = page.getByTestId('toggle-out-of-scope')
+    // Default: a subset of the whole catalog, because the non-oncology tail is hidden.
+    await expect(count).toContainText('shown')
+    await expect(count).toContainText(inScope.total.toLocaleString('en-US'))
+
+    // click(), not check(): the checkbox is controlled by URL state, so its DOM
+    // `checked` settles a tick after the click -- and the real proof is the outcome,
+    // not the box. The URL carries the param and the count widens to the whole catalog.
+    await toggle.click()
+    await expect(page).toHaveURL(/include_out_of_scope=true/)
+    await expect(toggle).toBeChecked()
+    // Now the whole catalog: the count reads "N in catalog", not "of N shown". That
+    // transition is the proof the toggle widened the base set, not just added a param.
+    await expect(count).toContainText(full.total.toLocaleString('en-US'))
+    await expect(count).toContainText('in catalog')
+
+    await toggle.click()
+    await expect(page).not.toHaveURL(/include_out_of_scope/)
+    await expect(toggle).not.toBeChecked()
+  })
+
   test('clicking a column header sorts, and the URL carries it across a reload', async ({
     page,
   }) => {

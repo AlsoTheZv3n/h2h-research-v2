@@ -46,16 +46,19 @@ async def seed(session: AsyncSession, *, fixture: Path = FIXTURE) -> tuple[int, 
                 """
                 INSERT INTO drug (chembl_id, pref_name, smiles, mw, alogp, hbd, hba, psa,
                                   ro5_violations, drug_type, max_phase, primary_target,
-                                  target_class, primary_indication, maturity, last_enriched_at)
+                                  target_class, primary_indication, maturity, in_scope,
+                                  last_enriched_at)
                 VALUES (:chembl_id, :pref_name, :smiles, :mw, :alogp, :hbd, :hba, :psa,
                         :ro5_violations, :drug_type, :max_phase, :primary_target,
-                        :target_class, :primary_indication, CAST(:maturity AS data_maturity), :now)
+                        :target_class, :primary_indication, CAST(:maturity AS data_maturity),
+                        :in_scope, :now)
                 ON CONFLICT (chembl_id) DO UPDATE SET
                     pref_name = excluded.pref_name,
                     smiles = excluded.smiles,
                     maturity = excluded.maturity,
                     primary_target = excluded.primary_target,
                     target_class = excluded.target_class,
+                    in_scope = excluded.in_scope,
                     last_enriched_at = excluded.last_enriched_at
                 """
             ),

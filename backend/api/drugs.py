@@ -61,6 +61,13 @@ async def list_drugs(
             "with no class recorded."
         ),
     ] = None,
+    include_out_of_scope: Annotated[
+        bool,
+        Query(
+            description="Include drugs marked non-oncology by catalog scoping. "
+            "Off by default: the catalog is oncology."
+        ),
+    ] = False,
     sort: Annotated[
         SortField, Query(description="Column to sort by. Default: data completeness.")
     ] = "data",
@@ -77,6 +84,7 @@ async def list_drugs(
         maturity=maturity,
         has_target=has_target,
         target_class=target_class,
+        include_out_of_scope=include_out_of_scope,
         sort=sort,
         order=order,
         limit=limit,

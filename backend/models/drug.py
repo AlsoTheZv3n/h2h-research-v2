@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, Float, Index, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Float, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.base import Base
@@ -67,6 +67,15 @@ class Drug(Base):
     # annotated -- the overview reads that as "Unclassified", a state distinct from
     # "never enriched" (which the whole row's last_enriched_at NULL records).
     target_class: Mapped[str | None] = mapped_column(String(128), index=True)
+
+    # Whether this drug belongs in an oncology catalog. Three states, on purpose:
+    #   NULL   not yet evaluated -- shown, because ignorance must not hide a drug
+    #   True   evaluated, in scope
+    #   False  evaluated, out of scope -- a blunt substring match pulled in a non-cancer
+    #          drug (a statin, a contrast agent); the overview hides it by default
+    # Reversible by construction: the scoping pass only ever sets this, and re-running
+    # with a tuned rule (or clearing it) restores a drug. Indexed for the default filter.
+    in_scope: Mapped[bool | None] = mapped_column(Boolean, index=True)
 
     maturity: Mapped[DataMaturity] = mapped_column(
         Enum(

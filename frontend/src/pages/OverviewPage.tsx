@@ -69,13 +69,10 @@ export function OverviewPage() {
   const maturity = params.get('maturity') ?? ''
   const hasTarget = params.get('has_target') ?? '' // '', 'true', 'false'
   const targetClass = params.get('target_class') ?? '' // '', a family, or 'unclassified'
+  const includeOutOfScope = params.get('include_out_of_scope') === 'true'
   const sort = (params.get('sort') as SortField | null) ?? 'data'
   const order = (params.get('order') as SortOrder | null) ?? 'desc'
   const offset = Number(params.get('offset') ?? 0)
-
-  const filtersActive = Boolean(
-    q || target || maxPhase || modality || maturity || hasTarget || targetClass,
-  )
 
   // The search box updates instantly while the URL (and query) lag by a debounce.
   // Binding it straight to the URL made every keystroke a request against a partial
@@ -105,9 +102,10 @@ export function OverviewPage() {
   }, [draft])
 
   // The catalog total, once, so the count can read "612 of 3,923 shown" -- the second
-  // number is the whole corpus, not this filtered slice.
+  // number is the WHOLE corpus, out-of-scope drugs included, so the default view can
+  // say "3,892 of 3,922 shown" and surface that scoping is hiding the rest.
   useEffect(() => {
-    listDrugs({ limit: 1 })
+    listDrugs({ limit: 1, include_out_of_scope: true })
       .then((r) => setCatalogTotal(r.total))
       .catch(() => setCatalogTotal(null))
   }, [])
@@ -132,6 +130,7 @@ export function OverviewPage() {
       maturity: (maturity || undefined) as DataMaturity | undefined,
       has_target: hasTarget === '' ? undefined : hasTarget === 'true',
       target_class: targetClass || undefined,
+      include_out_of_scope: includeOutOfScope || undefined,
       sort,
       order,
       limit: PAGE_SIZE,
@@ -143,7 +142,19 @@ export function OverviewPage() {
     return () => {
       cancelled = true
     }
-  }, [q, target, maxPhase, modality, maturity, hasTarget, targetClass, sort, order, offset])
+  }, [
+    q,
+    target,
+    maxPhase,
+    modality,
+    maturity,
+    hasTarget,
+    targetClass,
+    includeOutOfScope,
+    sort,
+    order,
+    offset,
+  ])
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params)
@@ -193,7 +204,9 @@ export function OverviewPage() {
         <h1 className="text-lg font-semibold tracking-tight text-ink">Drug programs</h1>
         {data && (
           <p className="text-xs text-ink-faint" data-testid="total-count">
-            {filtersActive && catalogTotal !== null ? (
+            {catalogTotal !== null && data.total < catalogTotal ? (
+              // A subset is showing -- whether a filter narrowed it or scoping hid the
+              // non-oncology tail. Y is the whole catalog, so the gap is visible.
               <>
                 {formatCount(data.total)} of {formatCount(catalogTotal)} shown
               </>
@@ -266,6 +279,16 @@ export function OverviewPage() {
             [UNCLASSIFIED, 'Unclassified'],
           ]}
         />
+        <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <input
+            type="checkbox"
+            checked={includeOutOfScope}
+            onChange={(e) => update({ include_out_of_scope: e.target.checked ? 'true' : '' })}
+            data-testid="toggle-out-of-scope"
+            className="accent-accent"
+          />
+          Show non-oncology
+        </label>
       </div>
 
       {chips.length > 0 && (

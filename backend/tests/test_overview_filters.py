@@ -19,13 +19,26 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from backend.models import DataMaturity, Drug
 from backend.repositories import DrugRepository
 
-# (chembl_id, name, drug_type, maturity, target, phase, target_class)
+# (chembl_id, name, drug_type, maturity, target, phase, target_class, in_scope)
+# in_scope None means "not yet judged" -- shown by default, like the bulk of the catalog.
 _ROWS = [
-    ("CHEMBL_A", "alphamab", "Small molecule", DataMaturity.FULL, "KRAS", 4, "Hydrolase"),
-    ("CHEMBL_B", "betinib", "Small molecule", DataMaturity.PARTIAL, "EGFR", 3, "Kinase"),
+    ("CHEMBL_A", "alphamab", "Small molecule", DataMaturity.FULL, "KRAS", 4, "Hydrolase", None),
+    ("CHEMBL_B", "betinib", "Small molecule", DataMaturity.PARTIAL, "EGFR", 3, "Kinase", None),
     # No target and no class: the antibody is the "Unclassified" case.
-    ("CHEMBL_C", "gammamab", "Antibody", DataMaturity.INDEX_ONLY, None, 4, None),
-    ("CHEMBL_D", "deltinib", "Small molecule", DataMaturity.INDEX_ONLY, "KRAS", 2, "Hydrolase"),
+    ("CHEMBL_C", "gammamab", "Antibody", DataMaturity.INDEX_ONLY, None, 4, None, None),
+    (
+        "CHEMBL_D",
+        "deltinib",
+        "Small molecule",
+        DataMaturity.INDEX_ONLY,
+        "KRAS",
+        2,
+        "Hydrolase",
+        None,
+    ),
+    # Out of scope: a non-oncology false positive. Hidden by default, so every existing
+    # count here still reads 4 -- and revealed only with include_out_of_scope.
+    ("CHEMBL_E", "epsilonstat", "Small molecule", DataMaturity.INDEX_ONLY, None, 4, None, False),
 ]
 
 
@@ -43,7 +56,7 @@ async def catalog(db_engine: AsyncEngine) -> AsyncIterator[None]:
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
     async with maker() as s:
         repo = DrugRepository(s)
-        for cid, name, dt, mat, tgt, phase, tclass in _ROWS:
+        for cid, name, dt, mat, tgt, phase, tclass, in_scope in _ROWS:
             await repo.upsert_drug(
                 cid,
                 pref_name=name,
@@ -52,6 +65,7 @@ async def catalog(db_engine: AsyncEngine) -> AsyncIterator[None]:
                 primary_target=tgt,
                 max_phase=phase,
                 target_class=tclass,
+                in_scope=in_scope,
             )
         await s.commit()
     yield
@@ -155,6 +169,35 @@ class TestTargetClassFacet:
         r = await api.get("/drugs/target-classes")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+
+class TestScopeFilter:
+    async def test_out_of_scope_is_hidden_by_default(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # The catalog is oncology: the non-oncology row is absent unless asked for.
+        ids, total, _ = await _page(api)
+        assert "CHEMBL_E" not in ids
+        assert total == 4
+
+    async def test_include_out_of_scope_reveals_them(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        ids, total, _ = await _page(api, include_out_of_scope="true")
+        assert "CHEMBL_E" in ids
+        assert total == 5
+        # Not a no-op the other way: the default really did hide exactly this one.
+        default_ids, default_total, _ = await _page(api)
+        assert ids - default_ids == {"CHEMBL_E"}
+        assert total - default_total == 1
+
+    async def test_null_scope_is_shown_not_hidden(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # in_scope NULL means "not yet judged", and must never be hidden -- an
+        # unfinished scoping pass would otherwise blank most of the catalog.
+        ids, _, _ = await _page(api)
+        assert {"CHEMBL_A", "CHEMBL_B", "CHEMBL_C", "CHEMBL_D"} <= ids
 
 
 class TestSort:

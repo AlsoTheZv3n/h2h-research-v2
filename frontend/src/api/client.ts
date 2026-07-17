@@ -46,6 +46,8 @@ export function listDrugs(params: DrugListParams = {}): Promise<DrugList> {
     // Only send has_target when set: a bare key would filter to "false".
     has_target: params.has_target === undefined ? undefined : String(params.has_target),
     target_class: params.target_class,
+    // Only send when opting in; the default (oncology-only) needs no param.
+    include_out_of_scope: params.include_out_of_scope ? 'true' : undefined,
     sort: params.sort,
     order: params.order,
     limit: params.limit ?? 25,

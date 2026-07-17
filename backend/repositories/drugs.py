@@ -127,6 +127,7 @@ class DrugRepository:
         maturity: DataMaturity | None = None,
         has_target: bool | None = None,
         target_class: str | None = None,
+        include_out_of_scope: bool = False,
         sort: str = "data",
         order: str = "desc",
         limit: int = 50,
@@ -180,6 +181,11 @@ class DrugRepository:
                 filters.append(Drug.target_class.is_(None))
             else:
                 filters.append(func.lower(Drug.target_class) == target_class.strip().lower())
+        if not include_out_of_scope:
+            # The default catalog is oncology. `IS NOT FALSE` keeps NULL (not yet judged)
+            # and True, hiding only drugs positively marked out of scope -- so an
+            # unfinished scoping pass hides nothing it has not actually ruled on.
+            filters.append(Drug.in_scope.isnot(False))
 
         total = await self.session.scalar(select(func.count()).select_from(Drug).where(*filters))
 
@@ -210,7 +216,9 @@ class DrugRepository:
         """
         result = await self.session.execute(
             select(Drug.target_class, func.count())
-            .where(Drug.target_class.isnot(None))
+            # In-scope only, to match the overview's default view: a facet option that
+            # returned nothing under the default filter would be a dead end.
+            .where(Drug.target_class.isnot(None), Drug.in_scope.isnot(False))
             .group_by(Drug.target_class)
             .order_by(func.count().desc(), Drug.target_class)
         )

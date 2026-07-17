@@ -162,6 +162,8 @@ export interface DrugListParams {
   has_target?: boolean
   /** Exact target family, e.g. "Kinase". "unclassified" selects rows with no class. */
   target_class?: string
+  /** Include drugs scoped out as non-oncology. Off by default: the catalog is oncology. */
+  include_out_of_scope?: boolean
   sort?: SortField
   order?: SortOrder
   limit?: number
