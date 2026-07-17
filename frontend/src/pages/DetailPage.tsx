@@ -70,9 +70,9 @@ export function DetailPage() {
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
 
   const smiles = firstOkValue<string>(pick(detail, 'smiles'))
-  // Modality decides what we can show, not the presence of a structure -- the same
-  // rule the backend's maturity classifier applies.
-  const drugType = firstOkValue<string>(pick(detail, 'drug_type'))
+  // maturity already encodes the modality decision -- the backend's classifier reads
+  // drug_type first and structure second, so re-deriving it here would be a second
+  // copy of that rule, free to drift from the real one.
   const isBiologic = detail.maturity === 'index_only' && !smiles
 
   return (

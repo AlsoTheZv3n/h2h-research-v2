@@ -1,4 +1,17 @@
 services:
+  # The one people open. `docker compose up` has to bring up the actual product,
+  # not the half of it that has no UI.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5173}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
   api:
     build:
       context: .

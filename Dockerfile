@@ -51,6 +51,8 @@ COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser backend/ ./backend/
 COPY --chown=appuser:appuser alembic.ini ./
 
+RUN chmod +x backend/entrypoint.sh
+
 USER appuser
 
 EXPOSE 8000
@@ -62,4 +64,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status == 200 else 1)"]
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migrations then uvicorn: `docker compose up` has to produce a working app, not one
+# that needs a second command nobody read about.
+CMD ["./backend/entrypoint.sh"]

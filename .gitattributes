@@ -1,0 +1,17 @@
+# Normalize to LF in the repository; let git decide the working copy.
+* text=auto
+
+# These must be LF wherever they are checked out. A shell script with CRLF dies in
+# Linux with "bad interpreter: no such file or directory" -- so a Windows clone would
+# produce an image whose entrypoint cannot run, and `docker compose up` (the whole
+# README quickstart) would fail for everyone who cloned on Windows and nobody who
+# cloned on Linux.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf
+
+# Binary: never touch these.
+*.gif binary
+*.png binary
+*.svg text
+*.webm binary

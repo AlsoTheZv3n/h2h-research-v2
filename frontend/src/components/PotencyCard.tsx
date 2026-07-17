@@ -1,7 +1,7 @@
 import type { PotencySummary, SourcedFact } from '../api/types'
 import { CitationChip } from './CitationChip'
 import { Card, NotApplicable } from './Card'
-import { formatCount, formatNm } from '../format'
+import { formatNm } from '../format'
 
 /**
  * Binding & potency.

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { SourcedFact } from '../api/types'
+import type { BriefState, SourcedFact } from '../api/types'
 import { BriefStateProvider, Fact } from './Fact'
 
 /**
@@ -160,13 +160,15 @@ describe('the four states', () => {
   it('all four render distinctly', () => {
     const rendered = new Set<string>()
 
-    for (const [state, facts] of [
+    const cases: Array<[BriefState, SourcedFact[] | undefined]> = [
       ['enriching', undefined],
       ['ready', undefined],
       ['ready', [fact({ value: 0, status: 'empty' })]],
       ['ready', [fact({ value: null, status: 'source_failed' })]],
       ['ready', [fact({ value: 42 })]],
-    ] as const) {
+    ]
+
+    for (const [state, facts] of cases) {
       const { container, unmount } = render(
         <BriefStateProvider value={state}>
           <Fact label="X" facts={facts} emptyLabel="None found" />

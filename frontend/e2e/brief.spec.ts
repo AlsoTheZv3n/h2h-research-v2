@@ -13,6 +13,8 @@ import { expect, test } from '@playwright/test'
 const SOTORASIB = 'CHEMBL4535757'
 const OSIMERTINIB = 'CHEMBL3353410'
 const ADC = 'CHEMBL4297844' // trastuzumab deruxtecan -- a biologic, no SMILES
+// Seeded by global-setup.ts: a drug whose ChEMBL mechanism fetch failed.
+const E2E_FIXTURE = 'CHEMBL_E2E_FAILURE'
 
 test.describe('overview', () => {
   test('lists real catalog rows from the API', async ({ page }) => {
@@ -108,30 +110,24 @@ test.describe('detail brief', () => {
   })
 
   test('a failed source reads as unavailable, never as empty', async ({ page }) => {
-    // ChEMBL fails often enough that some field on some drug is source_failed. Which
-    // drug carries one varies between ingests, so look across the subset -- but wait
-    // for each page to actually render before counting. count() does not retry, so
-    // counting straight after goto() reads an empty DOM, finds nothing, and skips:
-    // a green run that asserted nothing, which is the failure mode this project
-    // keeps having to root out.
-    for (const id of [SOTORASIB, 'CHEMBL4594350', ADC]) {
-      await page.goto(`/drugs/${id}`)
-      await expect(page.locator('h1')).toBeVisible()
+    // Against a seeded fixture (see global-setup.ts), not against whatever ChEMBL
+    // happens to be doing. Looking for an organic failure made this a coin flip:
+    // green while the source was sick, red while it was healthy, and neither reading
+    // said anything about our code. The row is real, in the real database, served by
+    // the real API -- only *which* drug is broken is controlled.
+    await page.goto(`/drugs/${E2E_FIXTURE}`)
+    await expect(page.locator('h1')).toBeVisible()
 
-      const failed = page.getByTestId('fact-source-failed')
-      if ((await failed.count()) > 0) {
-        await expect(failed.first()).toBeVisible()
-        await expect(failed.first()).toContainText(/unavailable/i)
-        // The distinction that matters: an outage must not be worded as a finding.
-        await expect(failed.first()).not.toContainText(/none found|no .* annotated/i)
-        return
-      }
-    }
-    throw new Error(
-      'No source_failed fact anywhere in the enriched subset. Either every source ' +
-        'was healthy during the ingest (re-run enrich to reproduce), or the status ' +
-        'is being lost between the adapter and the UI -- which is the bug this test exists for.',
-    )
+    const failed = page.getByTestId('fact-source-failed')
+    await expect(failed.first()).toBeVisible()
+    await expect(failed.first()).toContainText(/unavailable/i)
+    // The distinction that matters: an outage must never be worded as a finding.
+    await expect(failed.first()).not.toContainText(/none found|no .* annotated/i)
+
+    // And the contrast, on the same page: a measured zero reads differently.
+    const empty = page.getByTestId('fact-empty')
+    await expect(empty.first()).toBeVisible()
+    expect(await failed.first().textContent()).not.toEqual(await empty.first().textContent())
   })
 
   test('a complete drug shows a real on-target potency, not a row count', async ({ page }) => {

@@ -11,12 +11,15 @@ import type { DrugDetail, DrugList, DrugListParams } from './types'
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  // Declared and assigned rather than a constructor parameter property: the app's
+  // tsconfig sets erasableSyntaxOnly, which bans the TS-only shorthand because it
+  // has no meaning once the types are stripped.
+  readonly status: number
+
+  constructor(message: string, status: number) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
