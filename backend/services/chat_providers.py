@@ -97,14 +97,20 @@ class AnthropicProvider:
 
 
 class OllamaProvider:
-    """A local model. Keyless, free, and offline -- and weaker.
+    """A local model. Keyless, free, offline.
 
-    Kept as a fallback rather than the default on purpose. A small local model is
-    measurably more willing to invent a plausible citation, which is the one failure
-    mode this project cannot ship. `backend/tests/test_rag_eval.py` runs the same
-    grounding checks against whichever provider is configured, so if you make this
-    your primary, the eval is what tells you whether your model can be trusted with
-    it.
+    This was written as the fallback on the assumption that a small local model
+    would invent citations -- the one failure this project cannot ship. Then the
+    assumption got measured, and it did not hold: on the five questions in
+    `backend/eval/grounding.py` that are built to tempt exactly that, llama3.1:8b
+    fabricated nothing, correctly reported a failed source as unretrieved rather
+    than absent, and declined to supply a dose it certainly knows. 5/5.
+
+    So the ordering here is not evidence-backed, and the comment that claimed it was
+    has been removed rather than left to sound authoritative. Claude stays the
+    default on general capability grounds; that is a judgement, not a measurement,
+    and five questions on one drug is not a benchmark. If you run this locally, run
+    the eval -- it is the thing that would actually tell you.
     """
 
     name = "ollama"

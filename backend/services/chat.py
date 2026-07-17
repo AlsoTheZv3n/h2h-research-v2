@@ -15,6 +15,7 @@ entire point of this project.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -36,6 +37,34 @@ class AnswerState(StrEnum):
     memory, which is exactly the thing this project refuses to do."""
     UNAVAILABLE = "unavailable"
     """A model exists but could not answer. Transient; try again."""
+    UNGROUNDED = "ungrounded"
+    """The model cited a PMID we never gave it. The answer is withheld -- see
+    `_fabricated_pmids`. This is the state the whole phase exists to be able to
+    reach."""
+
+
+# "PMID 12345678", "[PMID: 12345678]", "pmid 12345678". PubMed identifiers run to
+# eight digits; four is the shortest that could plausibly be one.
+_PMID_IN_TEXT = re.compile(r"PMID[:\s]*(\d{4,9})", re.IGNORECASE)
+
+
+def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
+    """PMIDs the answer cites that were never in the evidence.
+
+    This is the guard that makes the rest of the pipeline worth building. Everything
+    upstream -- the drug filter, the state-aware prompt, refusing to call the model
+    on empty evidence -- reduces the *chance* of a fabricated citation. None of it
+    can rule one out, because a model under pressure to be helpful will produce a
+    citation-shaped string, and a citation-shaped string is indistinguishable from a
+    citation to every reader who does not click it. Nobody clicks it.
+
+    So: check. Any identifier in the answer that we did not put there is proof the
+    model invented something, and an answer with one invented citation in it has no
+    claim on the reader's trust for the rest.
+    """
+    cited = set(_PMID_IN_TEXT.findall(answer))
+    given = {a.pmid for a in evidence.abstracts}
+    return cited - given
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,5 +198,29 @@ async def answer_question(
     except ChatUnavailable as exc:
         logger.warning("chat provider %s failed: %s", chat.name, exc)
         return Answer(state=AnswerState.UNAVAILABLE, text="", citations=[], detail=str(exc))
+
+    # The last gate, and the only one that can catch a fabrication after the fact.
+    # Withholding the whole answer over one bad identifier is the right trade: a
+    # confident answer with an invented source is the worst thing this tool could
+    # hand a reader, and it is worse than no answer precisely because it does not
+    # look like one.
+    if fabricated := _fabricated_pmids(evidence, text):
+        logger.warning(
+            "provider %s cited PMIDs not in evidence for %s: %s",
+            chat.name,
+            evidence.chembl_id,
+            sorted(fabricated),
+        )
+        return Answer(
+            state=AnswerState.UNGROUNDED,
+            text="",
+            citations=[],
+            detail=(
+                "The answer was withheld: the model cited "
+                f"{'a source' if len(fabricated) == 1 else 'sources'} that was not in "
+                "the retrieved evidence, which means it invented it. Rather than show "
+                "you an answer we cannot stand behind, we are telling you it happened."
+            ),
+        )
 
     return Answer(state=AnswerState.OK, text=text, citations=_citations_for(evidence, text))
