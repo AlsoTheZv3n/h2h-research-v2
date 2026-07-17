@@ -1,5 +1,6 @@
 import type { PotencySummary, SourcedFact } from '../api/types'
 import { CitationChip } from './CitationChip'
+import { useBriefState } from './Fact'
 import { Card, NotApplicable } from './Card'
 import { formatNm } from '../format'
 
@@ -19,6 +20,7 @@ export function PotencyCard({
   facts?: SourcedFact[]
   isBiologic: boolean
 }) {
+  const briefState = useBriefState()
   if (isBiologic) {
     return (
       <Card title="Binding & potency">
@@ -30,9 +32,21 @@ export function PotencyCard({
   const fact = facts?.[0]
 
   if (!fact) {
+    // Absent means two opposite things, and only the brief's state tells them apart.
+    // This card branched on presence alone, so every not-yet-enriched drug -- which
+    // is every catalog drug on first open -- was told "not collected": a measured
+    // absence asserted before anyone had measured.
     return (
       <Card title="Binding & potency">
-        <p className="text-sm text-ink-faint italic">Not collected</p>
+        {briefState !== 'ready' ? (
+          <p data-testid="fact-pending" className="text-sm text-ink-faint italic">
+            Waiting for sources…
+          </p>
+        ) : (
+          <p data-testid="fact-not-collected" className="text-sm text-ink-faint italic">
+            Not collected
+          </p>
+        )}
       </Card>
     )
   }

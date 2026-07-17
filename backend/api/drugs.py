@@ -15,6 +15,7 @@ from backend.db import get_session
 from backend.domain.structure import render_svg
 from backend.ingestion.base import FactStatus
 from backend.repositories import DrugRepository
+from backend.repositories.drugs import is_small_molecule
 from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
 from backend.services.briefs import BriefState, get_or_start_brief
 
@@ -144,6 +145,13 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         chembl_id=drug.chembl_id,
         pref_name=drug.pref_name,
         maturity=drug.maturity,
+        drug_type=drug.drug_type,
+        # Answered here, with the same predicate the maturity classifier uses. Left to
+        # the client it becomes a second copy of the rule, and the obvious guess --
+        # "index_only and no SMILES means biologic" -- is wrong for the 87 catalog
+        # drugs that are small molecules ChEMBL has no structure for.
+        is_small_molecule=is_small_molecule(drug.drug_type),
+        has_structure=bool(drug.smiles),
         state=state,
         last_enriched_at=drug.last_enriched_at,
         facts=dict(facts),

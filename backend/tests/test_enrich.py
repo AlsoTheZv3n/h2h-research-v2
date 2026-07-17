@@ -19,6 +19,7 @@ import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.ingestion.base import FactStatus
 from backend.ingestion.chembl_catalog import to_columns
 from backend.ingestion.enrich import enrich_catalog
 from backend.models import DataMaturity, Drug
@@ -259,8 +260,19 @@ class TestEnrichment:
 
         assert stats.records_failed == 1
         assert stats.drugs_with_a_failure == ["CHEMBL4594350"]
+
         rows = await DrugRepository(session).facts_for("CHEMBL4594350")
-        assert {r.source for r in rows} == {"clinicaltrials", "opentargets", "pubmed"}
+        # The other three answered.
+        assert {r.source for r in rows} >= {"clinicaltrials", "opentargets", "pubmed"}
+
+        # And ChEMBL's outage is written down. The assertion here used to be
+        # `== {"clinicaltrials", "opentargets", "pubmed"}` -- demanding the exact
+        # opposite of this test's own docstring, and pinning a brief that reports
+        # `unavailable: []` while ChEMBL is on the floor.
+        chembl = {r.key: r for r in rows if r.source == "chembl"}
+        assert chembl, "the docstring says the failure must be visible; it left no trace"
+        assert all(r.status is FactStatus.SOURCE_FAILED for r in chembl.values())
+        assert "500" in (chembl["smiles"].error or "")
 
     @respx.mock
     async def test_rerunning_refreshes_rather_than_duplicates(

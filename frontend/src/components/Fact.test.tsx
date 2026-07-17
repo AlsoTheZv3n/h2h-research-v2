@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { BriefState, SourcedFact } from '../api/types'
 import { BriefStateProvider, Fact } from './Fact'
+import { PotencyCard } from './PotencyCard'
 
 /**
  * The three states are the product. These tests are the last guard against the
@@ -181,6 +182,84 @@ describe('the four states', () => {
     // Five renders, five different sentences. A collision here means two different
     // truths look the same to a reader.
     expect(rendered.size).toBe(5)
+  })
+})
+
+describe('PotencyCard', () => {
+  const summary = {
+    target_chembl_ids: ['CHEMBL203'],
+    n_activities: 100,
+    n_on_target: 69,
+    n_censored: 7,
+    n_exact: 62,
+    median_nm: 12.66,
+    min_nm: 0.9,
+    max_nm: 480000,
+    units: 'nM',
+    off_target: { 'A549': 31 },
+    other_units: {},
+  }
+
+  it('leads with the median, not the row count', () => {
+    // The marquee claim of the whole project, and until now its only coverage was
+    // an E2E assertion behind an `if (count > 0)` guard -- which is to say none.
+    render(<PotencyCard facts={[fact({ value: summary })]} isBiologic={false} />)
+
+    expect(screen.getByTestId('median-ic50')).toHaveTextContent('12.66')
+    expect(screen.getByText(/nM median/)).toBeInTheDocument()
+    // en-US, not the viewer's locale: "480.000" reads as 480 to an English reader.
+    expect(screen.getByText(/480,000/)).toBeInTheDocument()
+    expect(screen.getByText(/62 exact on-target measurements/)).toBeInTheDocument()
+  })
+
+  it('shows what it discarded rather than hiding it', () => {
+    render(<PotencyCard facts={[fact({ value: summary })]} isBiologic={false} />)
+    expect(screen.getByText(/38 of 100 rows excluded/)).toBeInTheDocument()
+  })
+
+  it('refuses to quote a potency with no known target', () => {
+    render(
+      <PotencyCard
+        facts={[fact({ value: { ...summary, target_chembl_ids: [], median_nm: null } })]}
+        isBiologic={false}
+      />,
+    )
+
+    expect(screen.queryByTestId('median-ic50')).not.toBeInTheDocument()
+    expect(screen.getByText(/No on-target potency can be quoted/)).toBeInTheDocument()
+  })
+
+  it('says "waiting" while enriching, never "not collected"', () => {
+    // This card branched on fact presence alone, so every catalog drug on first open
+    // -- before anything had been measured -- was told a measurement had come back
+    // empty.
+    render(
+      <BriefStateProvider value="enriching">
+        <PotencyCard facts={undefined} isBiologic={false} />
+      </BriefStateProvider>,
+    )
+
+    expect(screen.getByTestId('fact-pending')).toBeInTheDocument()
+    expect(screen.queryByTestId('fact-not-collected')).not.toBeInTheDocument()
+  })
+
+  it('says "not collected" once the brief is ready', () => {
+    render(
+      <BriefStateProvider value="ready">
+        <PotencyCard facts={undefined} isBiologic={false} />
+      </BriefStateProvider>,
+    )
+    expect(screen.getByTestId('fact-not-collected')).toBeInTheDocument()
+  })
+
+  it('renders a failed source as unavailable', () => {
+    render(
+      <PotencyCard
+        facts={[fact({ value: null, status: 'source_failed', error: 'activity: 500' })]}
+        isBiologic={false}
+      />,
+    )
+    expect(screen.getByTestId('fact-source-failed')).toHaveTextContent(/unavailable/i)
   })
 })
 

@@ -16,7 +16,7 @@ import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backend.ingestion.base import SourceRecord, fact
+from backend.ingestion.base import FactStatus, SourceRecord, fact
 from backend.models import Drug
 from backend.repositories import DrugRepository
 from backend.services import briefs
@@ -198,8 +198,47 @@ class TestLazyFetch:
             assert drug is not None
             assert drug.last_enriched_at is not None, "a failed look is still a look"
             rows = await DrugRepository(fresh).facts_for("CHEMBL_NEW")
+
             # The other three sources still answered: one dead source is not a dead brief.
-            assert {r.source for r in rows} == {"clinicaltrials", "opentargets", "pubmed"}
+            assert {r.source for r in rows} >= {"clinicaltrials", "opentargets", "pubmed"}
+
+            # And ChEMBL's outage is *recorded*. This assertion used to read
+            # `== {"clinicaltrials", "opentargets", "pubmed"}` -- pinning, as correct,
+            # a brief that carried no ChEMBL rows at all. With none, `unavailable`
+            # comes back empty and the API positively states that nothing failed,
+            # while the page says "Not collected" for a mechanism nobody could ask
+            # about. The founding lie, frozen by its own test.
+            chembl_rows = {r.key: r for r in rows if r.source == "chembl"}
+            assert chembl_rows, "a ChEMBL outage left no trace in the brief"
+            assert all(r.status is FactStatus.SOURCE_FAILED for r in chembl_rows.values())
+            assert {"smiles", "moa", "ic50_summary"} <= set(chembl_rows)
+            assert "500" in (chembl_rows["smiles"].error or "")
+
+    @respx.mock
+    async def test_a_source_that_does_not_know_the_drug_is_not_an_outage(
+        self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
+    ) -> None:
+        """ "ChEMBL has no molecule named X" is an answer, not a failure.
+
+        The mirror image of the test above, and the reason `outage` exists as its own
+        flag rather than being inferred from `error`. Writing source_failed rows here
+        would claim the source broke when it simply replied "never heard of it" --
+        the same lie pointed the other way.
+        """
+        _mock_sources()
+        respx.get(f"{CHEMBL}/molecule/search.json").mock(
+            return_value=httpx.Response(200, json={"molecules": []})
+        )
+
+        maker = async_sessionmaker(db_engine, expire_on_commit=False)
+        await get_or_start_brief(session, "CHEMBL_NEW", maker=maker)
+        await briefs._in_flight["CHEMBL_NEW"]
+
+        async with maker() as fresh:
+            rows = await DrugRepository(fresh).facts_for("CHEMBL_NEW")
+            assert not [r for r in rows if r.source == "chembl"], (
+                "a source with no opinion must not be recorded as having failed"
+            )
 
     @respx.mock
     async def test_the_in_flight_marker_is_released(

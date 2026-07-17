@@ -68,6 +68,23 @@ class DrugDetail(BaseModel):
     pref_name: str | None = None
     maturity: DataMaturity
 
+    drug_type: str | None = None
+    """ChEMBL/Open Targets modality, e.g. "Small molecule", "Antibody drug conjugate"."""
+
+    is_small_molecule: bool = True
+    """Whether the small-molecule data model applies.
+
+    Computed here rather than in the UI. index_only has two causes -- a biologic, or
+    a small molecule ChEMBL has no structure for -- and 87 catalog drugs are the
+    second. A client inferring modality from "index_only and no SMILES" tells the
+    reader auranofin is an antibody, which is both false and unsourced. One rule,
+    one place.
+    """
+
+    has_structure: bool = False
+    """Whether there is a structure to draw. A separate axis from modality: a small
+    molecule can lack one, and that absence is a measurement, not a class of drug."""
+
     state: BriefState = BriefState.READY
     """Where this brief is in its life, which is a different axis from any fact's
     status. `not_analyzed` and `enriching` mean we have not looked yet -- neither is

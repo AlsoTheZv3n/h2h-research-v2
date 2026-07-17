@@ -44,7 +44,21 @@ def pick_molecule(molecules: list[dict[str, Any]], drug: str) -> dict[str, Any] 
 
 
 class ChEMBLAdapter:
-    name = "chembl"
+    name: str = "chembl"
+    owned_keys: tuple[str, ...] = (
+        "chembl_id",
+        "pref_name",
+        "smiles",
+        "mw",
+        "alogp",
+        "hbd",
+        "hba",
+        "psa",
+        "ro5_violations",
+        "max_phase",
+        *_MECHANISM_KEYS,
+        *_ACTIVITY_KEYS,
+    )
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self.client = client
@@ -57,7 +71,12 @@ class ChEMBLAdapter:
             r.raise_for_status()
             molecules = r.json().get("molecules", [])
         except Exception as exc:
-            return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(exc))
+            # outage=True: ChEMBL fell over, so we know nothing about this drug. The
+            # caller turns that into a source_failed fact per owned key -- otherwise
+            # the brief carries no ChEMBL rows at all and reports "nothing failed".
+            return SourceRecord(
+                self.name, drug, ok=False, provenance=prov, error=str(exc), outage=True
+            )
 
         if not molecules:
             return SourceRecord(
@@ -168,7 +187,17 @@ class ChEMBLAdapter:
             activities = body.get("activities", [])
             # From page_meta, not len(): the page saturates at `limit` (osimertinib
             # returns 100 of a true 701) and reads as a real measurement.
-            facts["n_ic50"] = ok((body.get("page_meta") or {}).get("total_count"))
+            #
+            # And an absent total_count is not zero activities: ok(None) classifies as
+            # EMPTY, so the brief would state "no IC50s" -- with a citation -- while
+            # n_ic50_scanned sat next to it saying 100. Never default a count.
+            page_meta = body.get("page_meta") or {}
+            if "total_count" in page_meta:
+                facts["n_ic50"] = ok(page_meta["total_count"])
+            else:
+                facts["n_ic50"] = failed(
+                    self.name, "activity response carried no page_meta.total_count", source_url=url
+                )
             facts["n_ic50_scanned"] = ok(len(activities))
             # The count is a row count, not a potency. Measured on adagrasib: 23 of
             # its 30 IC50s are off-target (cell lines, a CDK7 assay, two SARS-CoV-2

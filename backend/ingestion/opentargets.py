@@ -42,7 +42,17 @@ query Drug($id: String!) {
 
 
 class OpenTargetsAdapter:
-    name = "opentargets"
+    name: str = "opentargets"
+    owned_keys: tuple[str, ...] = (
+        "ot_id",
+        "drug_type",
+        "max_stage",
+        "ot_moa",
+        "all_moas",
+        "targets",
+        "n_indications",
+        "indications",
+    )
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self.client = client
@@ -77,7 +87,12 @@ class OpenTargetsAdapter:
             prov["source_url"] = url
             d = (await self._gql(_DRUG, {"id": drug_id})).get("drug") or {}
         except Exception as exc:
-            return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(exc))
+            # outage: the source failed, so its keys are unknown -- not absent. A
+            # schema drift lands here too, which is right: the fields are unknowable
+            # until the query is fixed. See SourceRecord.outage.
+            return SourceRecord(
+                self.name, drug, ok=False, provenance=prov, error=str(exc), outage=True
+            )
 
         def ok(value: Any) -> Any:
             return fact(value, self.name, source_url=url, retrieved_at=retrieved_at)

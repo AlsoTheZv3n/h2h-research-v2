@@ -11,7 +11,10 @@ import { CitationChip } from './CitationChip'
  * enrichment, "no mechanism row" means "not back from ChEMBL". Afterwards it means
  * "no source asserted one". Same absence, opposite readings.
  */
-const BriefStateContext = createContext<BriefState>('ready')
+export const BriefStateContext = createContext<BriefState>('ready')
+
+/** The brief's state, for cards that render outside <Fact>. */
+export const useBriefState = () => useContext(BriefStateContext)
 
 export const BriefStateProvider = BriefStateContext.Provider
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from backend.ingestion.base import SourceRecord, fact, utcnow
+from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 
 BASE = "https://clinicaltrials.gov/api/v2/studies"
 
@@ -20,7 +20,15 @@ _PAGE_SIZE = 1000
 
 
 class ClinicalTrialsAdapter:
-    name = "clinicaltrials"
+    name: str = "clinicaltrials"
+    owned_keys: tuple[str, ...] = (
+        "n_trials",
+        "n_trials_scanned",
+        "phases",
+        "ct_max_phase",
+        "has_completed",
+        "has_terminated",
+    )
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self.client = client
@@ -52,7 +60,11 @@ class ClinicalTrialsAdapter:
             r.raise_for_status()
             body = r.json()
         except Exception as exc:
-            return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(exc))
+            # outage: the source failed, so its keys are unknown -- not zero. See
+            # SourceRecord.outage.
+            return SourceRecord(
+                self.name, drug, ok=False, provenance=prov, error=str(exc), outage=True
+            )
 
         studies = body.get("studies", [])
         phases: list[str] = []
@@ -71,9 +83,19 @@ class ClinicalTrialsAdapter:
         def ok(value: Any) -> Any:
             return fact(value, self.name, source_url=url, retrieved_at=retrieved_at)
 
-        n_total = body.get("totalCount")
+        # An absent totalCount is not zero trials. countTotal=true is a request, not a
+        # promise: if the API stopped honouring it, ok(None) would classify EMPTY and
+        # the brief would read "None registered" -- with a citation -- beside a hundred
+        # scanned studies. Never default a count; the same rule pubmed.py spells out.
+        if "totalCount" in body:
+            n_total = body["totalCount"]
+            n_trials = ok(n_total)
+        else:
+            n_total = None
+            n_trials = failed(self.name, "response carried no totalCount", source_url=url)
+
         facts = {
-            "n_trials": ok(n_total),
+            "n_trials": n_trials,
             "n_trials_scanned": ok(len(studies)),
             "phases": ok(sorted(set(phases))),
             "ct_max_phase": ok(max_phase),

@@ -79,6 +79,13 @@ export interface DrugDetail {
   chembl_id: string
   pref_name: string | null
   maturity: DataMaturity
+  drug_type: string | null
+  /** Whether the small-molecule data model applies. Answered by the server: the
+   *  obvious client-side guess ("index_only and no SMILES = biologic") is wrong for
+   *  the 87 catalog drugs that are small molecules with no structure on record. */
+  is_small_molecule: boolean
+  /** Whether there is a structure to draw. A separate axis from modality. */
+  has_structure: boolean
   state: BriefState
   last_enriched_at: string | null
   /**

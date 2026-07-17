@@ -148,16 +148,19 @@ test.describe('detail brief', () => {
   })
 
   test('a complete drug shows a real on-target potency, not a row count', async ({ page }) => {
+    // Unconditional. This sat behind `if ((await median.count()) > 0)`, which made
+    // both assertions optional -- so the project's marquee claim had no enforced
+    // coverage anywhere, ninety lines below two guards written to kill exactly that.
+    // The fixture pins osimertinib at 12.66 nM over 62 exact rows, so there is
+    // nothing to be defensive about.
     await page.goto(`/drugs/${OSIMERTINIB}`)
     await expect(page.getByText('Binding & potency')).toBeVisible()
 
-    const median = page.getByTestId('median-ic50')
-    if ((await median.count()) > 0) {
-      // The headline is a median in nM over exact on-target rows -- the count of
-      // activities is deliberately demoted to a footnote.
-      await expect(median).toBeVisible()
-      await expect(page.getByText(/nM median/)).toBeVisible()
-    }
+    await expect(page.getByTestId('median-ic50')).toBeVisible()
+    await expect(page.getByText(/nM median/)).toBeVisible()
+    // The count is demoted to a footnote on purpose: 701 activities exist, and the
+    // median over 62 exact on-target rows is the only one of the two that is an answer.
+    await expect(page.getByText(/exact on-target measurements/)).toBeVisible()
   })
 })
 

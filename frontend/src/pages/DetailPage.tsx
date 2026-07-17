@@ -70,10 +70,14 @@ export function DetailPage() {
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
 
   const smiles = firstOkValue<string>(pick(detail, 'smiles'))
-  // maturity already encodes the modality decision -- the backend's classifier reads
-  // drug_type first and structure second, so re-deriving it here would be a second
-  // copy of that rule, free to drift from the real one.
-  const isBiologic = detail.maturity === 'index_only' && !smiles
+  // Straight from the server. Deriving it here as "index_only and no SMILES" looked
+  // right and was wrong for 87 catalog drugs -- auranofin, aroplatin, cisplatin: small
+  // molecules ChEMBL simply has no structure for. The page told the reader they were
+  // biologics, next to a Modality card reading "Small molecule".
+  const isBiologic = !detail.is_small_molecule
+  // A small molecule with nothing to draw. A measured absence, not a class of drug.
+  const structureMissing = detail.is_small_molecule && !detail.has_structure
+  const pending = detail.state !== 'ready'
 
   return (
     <BriefStateProvider value={detail.state}>
@@ -106,10 +110,28 @@ export function DetailPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Structure" note={smiles ? undefined : 'No small-molecule structure'}>
+        {/* Four different sentences, because there are four different reasons this
+            card might be empty. Collapsing them into "no renderable structure" told
+            the reader a lie in three of the four cases. */}
+        <Card title="Structure">
           {isBiologic ? (
-            <NotApplicable reason="Not applicable — this is a biologic. Antibodies and ADCs have no small-molecule structure to draw; their data model is v2." />
-          ) : smiles && !structureFailed ? (
+            <NotApplicable reason={`Not applicable — ${detail.drug_type ?? 'this'} is a biologic. Antibodies and ADCs have no small-molecule structure to draw; their data model is v2.`} />
+          ) : pending && !detail.has_structure ? (
+            <p data-testid="fact-pending" className="py-4 text-center text-xs text-ink-faint italic">
+              Waiting for sources…
+            </p>
+          ) : structureMissing ? (
+            <NotApplicable reason="ChEMBL has no structure on record for this drug. It is a small molecule — the structure is missing, not inapplicable." />
+          ) : structureFailed ? (
+            <p
+              data-testid="fact-source-failed"
+              className="inline-flex items-center gap-1.5 rounded bg-unavailable-bg px-1.5 py-0.5
+                         text-xs font-medium text-unavailable"
+            >
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-unavailable" />
+              structure could not be rendered
+            </p>
+          ) : (
             <>
               <img
                 src={structureUrl(detail.chembl_id)}
@@ -118,12 +140,12 @@ export function DetailPage() {
                 onError={() => setStructureFailed(true)}
                 className="mx-auto block h-auto max-w-full"
               />
-              <p className="mt-2 truncate font-mono text-[10px] text-ink-faint" title={smiles}>
-                {smiles}
-              </p>
+              {smiles && (
+                <p className="mt-2 truncate font-mono text-[10px] text-ink-faint" title={smiles}>
+                  {smiles}
+                </p>
+              )}
             </>
-          ) : (
-            <NotApplicable reason="No renderable structure for this drug." />
           )}
         </Card>
 

@@ -20,8 +20,8 @@ unstructured:
 - **The primary databases** — ChEMBL, ClinicalTrials.gov, Open Targets, PubMed — are authoritative but
   raw and disconnected.
 
-H2H connects them into one sourced brief per drug. **Every fact carries its source, retrieval date and
-confidence**, and gaps are shown honestly instead of papered over.
+H2H connects them into one sourced brief per drug. **Every fact carries its source and retrieval
+date**, and gaps are shown honestly instead of papered over.
 
 ## What it does
 
@@ -87,9 +87,9 @@ load only decides what is *listed*, not what is *viewable*.
 flowchart LR
   UI["React UI — overview + detail brief<br/>citation chips, four honest states"] -->|"/api/drugs and /api/drugs/:id"| API[FastAPI]
   API -->|cached brief| REDIS[(Redis)]
-  API -->|"facts + provenance"| DB[("PostgreSQL + pgvector")]
+  API -->|"facts + provenance"| DB[("PostgreSQL")]
   API -. "enrich on first open" .-> ENR["enrich.py"]
-  CAT["catalog loader"] --> AD
+  CAT["catalog loader"] -->|"index columns only — no provenance"| DB
   ENR --> AD{"source adapters — shared SourceRecord"}
   AD --> CH[ChEMBL]
   AD --> CT[ClinicalTrials.gov]
@@ -124,7 +124,7 @@ it simply isn't done yet.
 
 ## Tech
 
-Backend: Python · FastAPI · PostgreSQL (+ pgvector) · Redis · uv.
+Backend: Python · FastAPI · PostgreSQL · Redis · uv · RDKit (renders the structures).
 Frontend: React · TypeScript · Tailwind v4 · Vite.
 Tests: pytest (+ mypy strict) · Vitest · Playwright. CI: GitHub Actions.
 

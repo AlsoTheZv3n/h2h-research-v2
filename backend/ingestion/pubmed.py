@@ -16,8 +16,30 @@ ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 ESUMMARY = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
 
 
+def _safe_error(exc: Exception) -> str:
+    """An error message with no credentials in it.
+
+    httpx builds its messages from the full request URL, and ours carries
+    `api_key=` when one is configured. That string does not stay in a log: it is
+    stored on the fact, served by the API and rendered into a tooltip -- so the
+    optional NCBI key would be published by the very field whose job is honestly
+    describing the pipeline.
+
+    A status code says everything the reader needs; the URL adds nothing they
+    cannot see on the citation chip.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code} from NCBI"
+    if isinstance(exc, httpx.TimeoutException):
+        return "NCBI timed out"
+    # Anything else: the type, never the message -- we do not know what a stranger's
+    # exception put in its string.
+    return type(exc).__name__
+
+
 class PubMedAdapter:
-    name = "pubmed"
+    name: str = "pubmed"
+    owned_keys: tuple[str, ...] = ("n_pubmed", "sample_titles")
 
     def __init__(self, client: httpx.AsyncClient, api_key: str | None = None) -> None:
         self.client = client
@@ -53,7 +75,10 @@ class PubMedAdapter:
             count = int(result["count"])
             ids = result.get("idlist", []) or []
         except Exception as exc:
-            return SourceRecord(self.name, drug, ok=False, provenance=prov, error=str(exc))
+            # outage: the source failed, so its keys are unknown -- not zero.
+            return SourceRecord(
+                self.name, drug, ok=False, provenance=prov, error=_safe_error(exc), outage=True
+            )
 
         def ok(value: Any) -> Any:
             return fact(value, self.name, source_url=url, retrieved_at=retrieved_at)
@@ -71,6 +96,8 @@ class PubMedAdapter:
                 titles = [docs[i].get("title", "") for i in docs.get("uids", [])]
             facts["sample_titles"] = ok(titles)
         except Exception as exc:
-            facts["sample_titles"] = failed(self.name, f"esummary: {exc}", source_url=url)
+            facts["sample_titles"] = failed(
+                self.name, f"esummary: {_safe_error(exc)}", source_url=url
+            )
 
         return SourceRecord(self.name, drug, ok=count > 0, facts=facts, provenance=prov)

@@ -125,6 +125,21 @@ class SourceRecord:
     # Individual enrichment failures live in their own Fact.error instead.
     error: str | None = None
 
+    outage: bool = False
+    """True when the resolve failed because the *source* did -- a 500, a timeout.
+
+    Distinct from an error with outage=False, which means the source answered and
+    simply does not know this drug. Two different sentences that a bare `error`
+    conflates:
+
+        outage      "we could not ask ChEMBL"      -> the drug's keys are unknown
+        no match    "ChEMBL has no such molecule"  -> a real, if unhelpful, answer
+
+    The caller needs the difference: an outage must become source_failed facts, or a
+    brief with no ChEMBL rows at all reports `unavailable: []` and tells the reader
+    nothing failed.
+    """
+
     @property
     def failed_facts(self) -> dict[str, Fact]:
         return {k: v for k, v in self.facts.items() if v.status is FactStatus.SOURCE_FAILED}
@@ -140,5 +155,15 @@ class SourceAdapter(Protocol):
     """One source, one implementation. The plugin seam."""
 
     name: str
+
+    owned_keys: tuple[str, ...]
+    """Every fact key this adapter is responsible for.
+
+    Declared so an outage can be written down. When the resolve itself fails there
+    are no facts to degrade -- and a source that contributes no rows at all leaves
+    the brief saying `unavailable: []`, which asserts that nothing failed. The caller
+    synthesizes a source_failed fact per key instead, so the outage appears where the
+    reader is looking.
+    """
 
     async def fetch(self, drug: str) -> SourceRecord: ...

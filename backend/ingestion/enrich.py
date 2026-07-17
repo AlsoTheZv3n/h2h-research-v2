@@ -27,13 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.db import get_sessionmaker
-from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, utcnow
+from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, failed, utcnow
 from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
 from backend.ingestion.http import build_client
 from backend.ingestion.opentargets import OpenTargetsAdapter
 from backend.ingestion.pubmed import PubMedAdapter
-from backend.models import Drug
+from backend.models import DataMaturity, Drug
 from backend.repositories.drugs import DrugRepository, classify_maturity
 
 logger = logging.getLogger(__name__)
@@ -100,13 +100,41 @@ async def enrich_drug(
     records: list[SourceRecord] = await asyncio.gather(*(a.fetch(query) for a in adapters))
 
     had_failure = False
-    for record in records:
+    for adapter, record in zip(adapters, records, strict=True):
         if record.error and not record.facts:
-            # Hard failure: the source could not resolve the entity, so there is
-            # nothing to store. Counted, and visible in the run's report.
             stats.records_failed += 1
             had_failure = True
             logger.info("%s: %s could not resolve: %s", drug.chembl_id, record.source, record.error)
+
+            if record.outage:
+                # An outage has to be written down. Storing nothing leaves the brief
+                # with no rows from this source, so `unavailable` comes back empty and
+                # the API states -- positively -- that nothing failed, while the UI
+                # says "Not collected" for a mechanism ChEMBL simply could not be
+                # asked about. That is this project's founding lie, arriving through
+                # the one path built to prevent it.
+                #
+                # A non-outage error means the source answered and does not know this
+                # drug. Nothing to record: it has no opinion, and inventing
+                # source_failed rows would be the same lie mirrored.
+                await repo.save_record(
+                    drug.chembl_id,
+                    SourceRecord(
+                        record.source,
+                        record.query,
+                        ok=False,
+                        provenance=record.provenance,
+                        facts={
+                            key: failed(
+                                record.source,
+                                record.error,
+                                source_url=record.provenance.get("source_url"),
+                            )
+                            for key in adapter.owned_keys
+                        },
+                    ),
+                )
+                stats.facts_source_failed += len(adapter.owned_keys)
             continue
 
         stats.records_ok += 1
@@ -152,15 +180,26 @@ async def _promote(
     # maturity, now with a real answer for has_potency rather than a placeholder.
     resolved_type = columns.get("drug_type") or drug.drug_type
     smiles = None
-    has_potency = False
     if chembl is not None:
         smiles_fact = chembl.facts.get("smiles")
         if smiles_fact is not None and smiles_fact.status is FactStatus.OK:
             smiles = smiles_fact.value
-        summary = chembl.facts.get("ic50_summary")
-        if summary is not None and summary.status is FactStatus.OK and summary.value:
-            has_potency = bool(summary.value.get("n_exact"))
     smiles = smiles or drug.smiles
+
+    # has_potency falls back to what we already knew, exactly as smiles and drug_type
+    # do above -- it was the one field left out of the pattern. Defaulting it to False
+    # meant a ChEMBL outage silently rewrote maturity FULL -> PARTIAL, publishing "some
+    # cards will be empty" as a claim about the molecule when it was a fact about our
+    # afternoon. Worse, the prior potency fact survives, so the brief showed a median
+    # while the pill said the cards were empty.
+    #
+    # The predicate is `is not SOURCE_FAILED`, not `is OK`: an EMPTY summary is a
+    # measured "no potency" and should legitimately drop to PARTIAL.
+    summary = chembl.facts.get("ic50_summary") if chembl is not None else None
+    if summary is not None and summary.status is not FactStatus.SOURCE_FAILED:
+        has_potency = bool(summary.value and summary.value.get("n_exact"))
+    else:
+        has_potency = drug.maturity is DataMaturity.FULL
 
     columns["maturity"] = classify_maturity(
         resolved_type if isinstance(resolved_type, str) else None, smiles, has_potency
