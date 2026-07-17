@@ -3,6 +3,11 @@ import { defineConfig, devices } from '@playwright/test'
 const PORT = Number(process.env.VITE_PORT ?? 5174)
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`
 
+// Setting E2E_BASE_URL means "the app is already running over there" -- CI points at
+// the compose stack. Starting a dev server as well would leave the tests talking to
+// one app while the other one is the point.
+const OWNS_SERVER = !process.env.E2E_BASE_URL
+
 /**
  * E2E runs against the REAL backend serving REAL enriched facts. There is no mock
  * layer, deliberately.
@@ -29,10 +34,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'pnpm dev',
-    url: BASE_URL,
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: OWNS_SERVER
+    ? {
+        command: 'pnpm dev',
+        url: BASE_URL,
+        reuseExistingServer: true,
+        timeout: 60_000,
+      }
+    : undefined,
 })

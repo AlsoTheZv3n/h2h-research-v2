@@ -1,0 +1,1706 @@
+{
+  "_note": "Real rows captured from a real ingest on 2026-07-17. Lets CI and a new checkout have a working database in seconds instead of an hour of ChEMBL round-trips. Not synthetic: this is what the adapters actually returned.",
+  "drugs": [
+    {
+      "chembl_id": "CHEMBL3353410",
+      "pref_name": "OSIMERTINIB",
+      "smiles": "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C",
+      "mw": 499.62,
+      "alogp": 4.51,
+      "hbd": 2,
+      "hba": 8,
+      "psa": 87.55,
+      "ro5_violations": 0,
+      "drug_type": "Small molecule",
+      "max_phase": 4,
+      "primary_target": "EGFR",
+      "primary_indication": "glioblastoma",
+      "maturity": "partial"
+    },
+    {
+      "chembl_id": "CHEMBL4297844",
+      "pref_name": "TRASTUZUMAB DERUXTECAN",
+      "smiles": null,
+      "mw": null,
+      "alogp": null,
+      "hbd": null,
+      "hba": null,
+      "psa": null,
+      "ro5_violations": null,
+      "drug_type": "Antibody drug conjugate",
+      "max_phase": 4,
+      "primary_target": "ERBB2",
+      "primary_indication": "osteosarcoma",
+      "maturity": "index_only"
+    },
+    {
+      "chembl_id": "CHEMBL4535757",
+      "pref_name": "SOTORASIB",
+      "smiles": "C=CC(=O)N1CCN(c2nc(=O)n(-c3c(C)ccnc3C(C)C)c3nc(-c4c(O)cccc4F)c(F)cc23)[C@@H](C)C1",
+      "mw": 560.61,
+      "alogp": 4.48,
+      "hbd": 1,
+      "hba": 8,
+      "psa": 104.45,
+      "ro5_violations": 1,
+      "drug_type": "Small molecule",
+      "max_phase": 4,
+      "primary_target": "KRAS",
+      "primary_indication": "ovarian cancer",
+      "maturity": "partial"
+    },
+    {
+      "chembl_id": "CHEMBL4594350",
+      "pref_name": "ADAGRASIB",
+      "smiles": "C=C(F)C(=O)N1CCN(c2nc(OC[C@@H]3CCCN3C)nc3c2CCN(c2cccc4cccc(Cl)c24)C3)C[C@@H]1CC#N",
+      "mw": 604.13,
+      "alogp": 4.73,
+      "hbd": 0,
+      "hba": 8,
+      "psa": 88.83,
+      "ro5_violations": 1,
+      "drug_type": "Small molecule",
+      "max_phase": 4,
+      "primary_target": "KRAS",
+      "primary_indication": "breast cancer",
+      "maturity": "partial"
+    }
+  ],
+  "facts": [
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "action_type",
+      "source": "chembl",
+      "value": "INHIBITOR",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [
+        "Epidermal growth factor receptor erbB1 inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "alogp",
+      "source": "chembl",
+      "value": 4.51,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL3353410",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "hba",
+      "source": "chembl",
+      "value": 8,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "hbd",
+      "source": "chembl",
+      "value": 2,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": 480000.0,
+        "min_nm": 0.9,
+        "n_exact": 62,
+        "median_nm": 12.66,
+        "n_censored": 7,
+        "off_target": {
+          "A549": 3,
+          "PC-9": 1,
+          "A-431": 5,
+          "HT-29": 1,
+          "HCC827": 3,
+          "BEAS-2B": 1,
+          "NCI-H460": 1,
+          "NCI-H1975": 9,
+          "Unchecked": 1,
+          "Insulin receptor": 1,
+          "NON-PROTEIN TARGET": 1,
+          "Insulin-like growth factor 1 receptor": 1,
+          "Receptor tyrosine-protein kinase erbB-3": 1,
+          "Voltage-gated inwardly rectifying potassium channel KCNH2": 2
+        },
+        "n_on_target": 69,
+        "other_units": {},
+        "n_activities": 100,
+        "target_chembl_ids": [
+          "CHEMBL203"
+        ]
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "moa",
+      "source": "chembl",
+      "value": "Epidermal growth factor receptor erbB1 inhibitor",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "mw",
+      "source": "chembl",
+      "value": 499.62,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 701,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 100,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "OSIMERTINIB",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "psa",
+      "source": "chembl",
+      "value": 87.55,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": 0,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "smiles",
+      "source": "chembl",
+      "value": "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL203",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [
+        "CHEMBL203"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 383,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 383,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "EARLY_PHASE1",
+        "NA",
+        "PHASE1",
+        "PHASE2",
+        "PHASE3",
+        "PHASE4"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [
+        "Epidermal growth factor receptor erbB1 inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Small molecule",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "glioblastoma",
+        "head and neck squamous cell carcinoma",
+        "non-small cell lung adenocarcinoma",
+        "mesothelioma",
+        "neoplasm",
+        "small cell lung carcinoma",
+        "malignant pancreatic neoplasm",
+        "lung cancer",
+        "lymphoma",
+        "leptomeningeal metastasis",
+        "sarcoma",
+        "melanoma",
+        "ovarian cancer",
+        "plasma cell myeloma",
+        "lung adenocarcinoma",
+        "colorectal cancer",
+        "esophageal squamous cell carcinoma",
+        "prostate cancer",
+        "non-small cell lung carcinoma",
+        "cancer",
+        "breast cancer",
+        "squamous cell lung carcinoma",
+        "gastric cancer"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "APPROVAL",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 23,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL3353410",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": "Epidermal growth factor receptor erbB1 inhibitor",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [
+        "EGFR"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL3353410",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 4483,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Therapeutic strategies for EGFR-mutated non-small cell lung cancer patients with osimertinib resistance.",
+        "Acquired resistance mechanisms to osimertinib: The constant battle.",
+        "A real-world pharmacovigilance study of FDA Adverse Event Reporting System (FAERS) events for osimertinib.",
+        "MUC1-C Is a Common Driver of Acquired Osimertinib Resistance in NSCLC.",
+        "Anlotinib combined with osimertinib reverses acquired osimertinib resistance in NSCLC by targeting the c-MET/MYC/AXL axis."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=OSIMERTINIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "action_type",
+      "source": "chembl",
+      "value": "BINDING AGENT",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [
+        "Receptor protein-tyrosine kinase erbB-2 binding agent",
+        "DNA topoisomerase I inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "alogp",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL4297844",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "hba",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "hbd",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": null,
+        "min_nm": null,
+        "n_exact": 0,
+        "median_nm": null,
+        "n_censored": 0,
+        "off_target": {},
+        "n_on_target": 0,
+        "other_units": {},
+        "n_activities": 0,
+        "target_chembl_ids": [
+          "CHEMBL1781",
+          "CHEMBL1824"
+        ]
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "moa",
+      "source": "chembl",
+      "value": "Receptor protein-tyrosine kinase erbB-2 binding agent",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "mw",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 0,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 0,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "TRASTUZUMAB DERUXTECAN",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "psa",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "smiles",
+      "source": "chembl",
+      "value": null,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL1824",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [
+        "CHEMBL1824",
+        "CHEMBL1781"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 219,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 219,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "EARLY_PHASE1",
+        "NA",
+        "PHASE1",
+        "PHASE2",
+        "PHASE3",
+        "PHASE4"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [
+        "Receptor protein-tyrosine kinase erbB-2 binding agent",
+        "DNA topoisomerase I inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Antibody drug conjugate",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "osteosarcoma",
+        "melanoma",
+        "ovarian cancer",
+        "endometrial cancer",
+        "cervical cancer",
+        "leptomeningeal metastasis",
+        "prostate adenocarcinoma",
+        "HER2 positive breast carcinoma",
+        "prostate cancer",
+        "gastric adenocarcinoma",
+        "fallopian tube cancer",
+        "peritoneum cancer",
+        "esophageal adenocarcinoma",
+        "gastroesophageal junction adenocarcinoma",
+        "salivary gland carcinoma",
+        "salivary gland cancer",
+        "malignant pancreatic neoplasm",
+        "neoplasm",
+        "triple-negative breast carcinoma",
+        "interstitial lung disease",
+        "glioma",
+        "breast neoplasm",
+        "bladder transitional cell carcinoma",
+        "Paget disease",
+        "non-small cell lung carcinoma",
+        "anemia",
+        "cancer",
+        "breast cancer",
+        "gastric cancer",
+        "gastric neoplasm",
+        "biliary tract cancer",
+        "neutropenia",
+        "colorectal cancer",
+        "inflammatory breast carcinoma"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "APPROVAL",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 34,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL4297844",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": "Receptor protein-tyrosine kinase erbB-2 binding agent",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [
+        "ERBB2",
+        "TOP1"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4297844",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 1541,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Trastuzumab Deruxtecan in Previously Treated HER2-Low Advanced Breast Cancer.",
+        "Trastuzumab Deruxtecan after Endocrine Therapy in Metastatic Breast Cancer.",
+        "Trastuzumab Deruxtecan plus Pertuzumab for HER2-Positive Metastatic Breast Cancer.",
+        "Trastuzumab Deruxtecan or Ramucirumab plus Paclitaxel in Gastric Cancer.",
+        "Trastuzumab Deruxtecan in Previously Treated HER2-Positive Breast Cancer."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "action_type",
+      "source": "chembl",
+      "value": "INHIBITOR",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [
+        "GTPase KRas inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "alogp",
+      "source": "chembl",
+      "value": 4.48,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL4535757",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "hba",
+      "source": "chembl",
+      "value": 8,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "hbd",
+      "source": "chembl",
+      "value": 1,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": 7500.0,
+        "min_nm": 9.66,
+        "n_exact": 5,
+        "median_nm": 30.0,
+        "n_censored": 3,
+        "off_target": {
+          "A549": 3,
+          "ASPC1": 1,
+          "HepG2": 1,
+          "SW837": 3,
+          "NCM460": 1,
+          "PANC-1": 2,
+          "NCI-H23": 3,
+          "HEK-293T": 1,
+          "NCI-H358": 13,
+          "NCI-H1373": 2,
+          "NCI-H1792": 2,
+          "NCI-H1975": 1,
+          "NCI-H2122": 2,
+          "SOS1-KRAS": 1,
+          "Unchecked": 2,
+          "MIA PaCa-2": 11
+        },
+        "n_on_target": 8,
+        "other_units": {},
+        "n_activities": 57,
+        "target_chembl_ids": [
+          "CHEMBL2189121"
+        ]
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "moa",
+      "source": "chembl",
+      "value": "GTPase KRas inhibitor",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "mw",
+      "source": "chembl",
+      "value": 560.61,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 57,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 57,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "SOTORASIB",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "psa",
+      "source": "chembl",
+      "value": 104.45,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": 1,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "smiles",
+      "source": "chembl",
+      "value": "C=CC(=O)N1CCN(c2nc(=O)n(-c3c(C)ccnc3C(C)C)c3nc(-c4c(O)cccc4F)c(F)cc23)[C@@H](C)C1",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL2189121",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [
+        "CHEMBL2189121"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 72,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 72,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "EARLY_PHASE1",
+        "NA",
+        "PHASE1",
+        "PHASE2",
+        "PHASE3",
+        "PHASE4"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [
+        "GTPase KRas inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Small molecule",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "ovarian cancer",
+        "non-small cell squamous lung carcinoma",
+        "biliary tract cancer",
+        "colorectal cancer",
+        "brain neoplasm",
+        "breast cancer",
+        "neoplasm of thorax",
+        "pancreatic adenocarcinoma",
+        "colorectal adenocarcinoma",
+        "lung cancer",
+        "non-small cell lung carcinoma",
+        "cancer",
+        "exocrine pancreatic carcinoma",
+        "endometrial cancer",
+        "malignant pancreatic neoplasm",
+        "neoplasm"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "APPROVAL",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 16,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL4535757",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": "GTPase KRas inhibitor",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [
+        "KRAS"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4535757",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 654,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Sotorasib plus Panitumumab in Refractory Colorectal Cancer with Mutated KRAS G12C.",
+        "Sotorasib in KRAS p.G12C-Mutated Advanced Pancreatic Cancer.",
+        "Sotorasib versus docetaxel for previously treated non-small-cell lung cancer with KRAS(G12C) mutation: a randomised, open-label, phase 3 trial.",
+        "Sotorasib for Lung Cancers with KRAS p.G12C Mutation.",
+        "Sotorasib."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=SOTORASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "action_type",
+      "source": "chembl",
+      "value": "INHIBITOR",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "all_moas",
+      "source": "chembl",
+      "value": [
+        "GTPase KRas inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "alogp",
+      "source": "chembl",
+      "value": 4.73,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL4594350",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "hba",
+      "source": "chembl",
+      "value": 8,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "hbd",
+      "source": "chembl",
+      "value": 0,
+      "status": "empty",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "ic50_summary",
+      "source": "chembl",
+      "value": {
+        "units": "nM",
+        "max_nm": 133.0,
+        "min_nm": 5.0,
+        "n_exact": 6,
+        "median_nm": 10.0,
+        "n_censored": 1,
+        "off_target": {
+          "4T1": 1,
+          "AGS": 1,
+          "A549": 1,
+          "PANC-1": 1,
+          "NCI-H358": 6,
+          "NCI-H1975": 1,
+          "SOS1-KRAS": 1,
+          "Unchecked": 1,
+          "MIA PaCa-2": 6,
+          "PaTu 8988t": 1,
+          "SARS-CoV-2": 2,
+          "CDK7/Cyclin H/MNAT1": 1
+        },
+        "n_on_target": 7,
+        "other_units": {},
+        "n_activities": 30,
+        "target_chembl_ids": [
+          "CHEMBL2189121"
+        ]
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "max_phase",
+      "source": "chembl",
+      "value": 4,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "moa",
+      "source": "chembl",
+      "value": "GTPase KRas inhibitor",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "mw",
+      "source": "chembl",
+      "value": 604.13,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_ic50",
+      "source": "chembl",
+      "value": 30,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_ic50_scanned",
+      "source": "chembl",
+      "value": 30,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "pref_name",
+      "source": "chembl",
+      "value": "ADAGRASIB",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "psa",
+      "source": "chembl",
+      "value": 88.83,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "ro5_violations",
+      "source": "chembl",
+      "value": 1,
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "smiles",
+      "source": "chembl",
+      "value": "C=C(F)C(=O)N1CCN(c2nc(OC[C@@H]3CCCN3C)nc3c2CCN(c2cccc4cccc(Cl)c24)C3)C[C@@H]1CC#N",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "target_chembl_id",
+      "source": "chembl",
+      "value": "CHEMBL2189121",
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "target_chembl_ids",
+      "source": "chembl",
+      "value": [
+        "CHEMBL2189121"
+      ],
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "ct_max_phase",
+      "source": "clinicaltrials",
+      "value": 3,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "has_completed",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "has_terminated",
+      "source": "clinicaltrials",
+      "value": true,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_trials",
+      "source": "clinicaltrials",
+      "value": 39,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_trials_scanned",
+      "source": "clinicaltrials",
+      "value": 39,
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "phases",
+      "source": "clinicaltrials",
+      "value": [
+        "EARLY_PHASE1",
+        "NA",
+        "PHASE1",
+        "PHASE2",
+        "PHASE3"
+      ],
+      "status": "ok",
+      "source_url": "https://clinicaltrials.gov/search?intr=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "all_moas",
+      "source": "opentargets",
+      "value": [
+        "GTPase KRas inhibitor"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "drug_type",
+      "source": "opentargets",
+      "value": "Small molecule",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "indications",
+      "source": "opentargets",
+      "value": [
+        "breast cancer",
+        "neoplasm",
+        "cancer",
+        "malignant pancreatic neoplasm",
+        "pancreatic ductal adenocarcinoma",
+        "lung cancer",
+        "biliary tract cancer",
+        "non-small cell lung carcinoma",
+        "colorectal cancer"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "max_stage",
+      "source": "opentargets",
+      "value": "APPROVAL",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_indications",
+      "source": "opentargets",
+      "value": 9,
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "ot_id",
+      "source": "opentargets",
+      "value": "CHEMBL4594350",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "ot_moa",
+      "source": "opentargets",
+      "value": "GTPase KRas inhibitor",
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "targets",
+      "source": "opentargets",
+      "value": [
+        "KRAS"
+      ],
+      "status": "ok",
+      "source_url": "https://platform.opentargets.org/drug/CHEMBL4594350",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "n_pubmed",
+      "source": "pubmed",
+      "value": 354,
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
+      "key": "sample_titles",
+      "source": "pubmed",
+      "value": [
+        "Adagrasib.",
+        "Adagrasib.",
+        "Adagrasib with or without Cetuximab in Colorectal Cancer with Mutated KRAS G12C.",
+        "Adagrasib versus docetaxel in KRAS(G12C)-mutated non-small-cell lung cancer (KRYSTAL-12): a randomised, open-label, phase 3 trial.",
+        "Adagrasib in Advanced Solid Tumors Harboring a KRAS(G12C) Mutation."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=ADAGRASIB",
+      "error": null,
+      "confidence": null
+    }
+  ]
+}

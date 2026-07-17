@@ -17,17 +17,24 @@ const ADC = 'CHEMBL4297844' // trastuzumab deruxtecan -- a biologic, no SMILES
 const E2E_FIXTURE = 'CHEMBL_E2E_FAILURE'
 
 test.describe('overview', () => {
-  test('lists real catalog rows from the API', async ({ page }) => {
-    await page.goto('/')
+  test('lists what the API actually holds', async ({ page, request }) => {
+    // Checked against the API rather than against a row count. "More than 20 drugs"
+    // was a poor proxy for "not mocked": it says nothing about where the rows came
+    // from, and it breaks the moment the catalog is smaller -- as it is on a fresh
+    // checkout. Comparing the table to the API's own answer is the real claim, and
+    // it holds at any size.
+    const api = await (await request.get('/api/drugs?limit=25&offset=0')).json()
 
+    await page.goto('/')
     const rows = page.getByTestId('drug-row')
     await expect(rows.first()).toBeVisible()
-    // A mock would not have hundreds of drugs in it. This number comes from a real
-    // ChEMBL ingest.
-    const total = await page.getByTestId('total-count').textContent()
-    const count = Number((total ?? '').replace(/[^\d]/g, ''))
-    expect(count).toBeGreaterThan(20)
-    await expect(rows).not.toHaveCount(0)
+
+    await expect(rows).toHaveCount(api.items.length)
+    await expect(page.getByTestId('total-count')).toContainText(
+      api.total.toLocaleString('en-US'),
+    )
+    // And the first row is the drug the API put first -- not something invented.
+    await expect(rows.first()).toContainText(api.items[0].chembl_id)
   })
 
   test('search narrows the result set through the API', async ({ page }) => {

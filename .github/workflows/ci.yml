@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -10,7 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-test:
+  backend:
+    name: backend — ruff, mypy, alembic, pytest
     runs-on: ubuntu-latest
 
     services:
@@ -75,29 +77,98 @@ jobs:
         run: uv run alembic check
 
       - name: Pytest
+        # The suite fails rather than skips when Postgres is unreachable: a skip here
+        # would let this job go green having tested none of the persistence guarantees.
         run: uv run pytest -v
 
-  docker:
+  frontend:
+    name: frontend — typecheck, vitest, build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build image
-        uses: docker/build-push-action@v6
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          context: .
-          push: false
-          load: true
-          tags: h2h-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Container must answer /health
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        # `tsc -b`, the same thing the build runs. `tsc --noEmit` reads the root
+        # config -- which is project references only -- and checks almost nothing.
+        run: pnpm run typecheck
+
+      - name: Vitest
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+  e2e:
+    name: e2e — the real stack, via docker compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Bring up the stack
+        # The README's quickstart, run for real. If `docker compose up` stops
+        # producing a working app, this job is what says so.
+        run: docker compose up -d --build
+
+      - name: Wait for the API
         run: |
-          docker run -d --name h2h-ci -p 8000:8000 h2h-api:ci
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/health; then
-              echo "healthy"; docker rm -f h2h-ci; exit 0
-            fi
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/health && exit 0
             sleep 2
           done
-          echo "never became healthy"; docker logs h2h-ci; docker rm -f h2h-ci; exit 1
+          echo "api never became healthy"; docker compose logs; exit 1
+
+      - name: Seed the demo fixture
+        # Committed rows from a real ingest, not synthetic. ChEMBL answers in tens of
+        # seconds and fails about a third of the time; a CI run that depended on its
+        # mood would be a coin flip, and a flaky guard teaches people to ignore red.
+        # The network path is covered by the backend suite (test_enrich.py drives the
+        # real adapters into a real database), so what this job proves is the rest:
+        # DB -> API -> browser.
+        run: docker compose exec -T api python -m backend.ingestion.seed_demo
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Playwright
+        env:
+          E2E_BASE_URL: http://localhost:5173
+        run: pnpm exec playwright test
+        working-directory: frontend
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
