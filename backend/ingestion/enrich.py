@@ -31,10 +31,12 @@ from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, fail
 from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
 from backend.ingestion.http import build_client
+from backend.ingestion.literature import LiteratureFetcher
 from backend.ingestion.opentargets import OpenTargetsAdapter
 from backend.ingestion.pubmed import PubMedAdapter
 from backend.models import DataMaturity, Drug
 from backend.repositories.drugs import DrugRepository, classify_maturity
+from backend.repositories.literature import LiteratureRepository
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,7 @@ class EnrichStats:
     records_failed: int = 0
     facts_written: int = 0
     facts_source_failed: int = 0
+    abstracts_embedded: int = 0
     drugs_with_a_failure: list[str] = field(default_factory=list)
 
     def report(self) -> str:
@@ -59,6 +62,7 @@ class EnrichStats:
             f"  source records failed  : {self.records_failed}",
             f"  facts written          : {self.facts_written}",
             f"  facts marked failed    : {self.facts_source_failed}",
+            f"  abstracts embedded     : {self.abstracts_embedded}",
         ]
         if self.drugs_with_a_failure:
             lines.append(
@@ -87,6 +91,24 @@ def build_adapters(client: httpx.AsyncClient) -> list[SourceAdapter]:
     ]
 
 
+def build_literature_fetcher(client: httpx.AsyncClient) -> LiteratureFetcher:
+    """The abstract fetcher for RAG, built like the adapters and from the same client.
+
+    Separate from build_adapters because it produces documents, not facts: a
+    LiteratureRecord saved via LiteratureRepository, not a SourceRecord of facts. But
+    it is fetched in the same enrich job (see enrich_drug), because it IS a source in
+    this pipeline -- and until it was, no production path fetched an abstract and the
+    RAG chat was inert on every real drug.
+    """
+    settings = get_settings()
+    return LiteratureFetcher(
+        client,
+        api_key=settings.ncbi_api_key,
+        tool=settings.ncbi_tool,
+        email=settings.ncbi_email,
+    )
+
+
 def _query_for(drug: Drug) -> str:
     """What to ask the sources about this drug.
 
@@ -96,10 +118,43 @@ def _query_for(drug: Drug) -> str:
     return drug.pref_name or drug.chembl_id
 
 
-async def enrich_drug(
-    session: AsyncSession, drug: Drug, adapters: list[SourceAdapter], stats: EnrichStats
+async def _enrich_literature(
+    session: AsyncSession, drug: Drug, query: str, fetcher: LiteratureFetcher, stats: EnrichStats
 ) -> None:
-    """Fetch every source for one drug and persist the result."""
+    """Fetch this drug's abstracts and persist them embedded, as part of enrichment.
+
+    This is the link that was missing. LiteratureRepository.save embeds at save time
+    (persist-without-embed leaves abstracts that can never be retrieved -- the hidden
+    other end of the same bug), and stamps literature_fetched_at, so the retriever can
+    tell "searched, nothing found" from "never searched".
+
+    A failed fetch writes nothing and leaves the drug unsearched, which is correct: an
+    index retries rather than recording an outage. The drug's *facts* (the PubMed hit
+    count) are where a PubMed outage lands on the record.
+    """
+    record = await fetcher.fetch(query)
+    embedded = await LiteratureRepository(session).save(drug.chembl_id, record)
+    stats.abstracts_embedded += embedded
+    if not record.ok:
+        logger.info("%s: literature fetch failed: %s", drug.chembl_id, record.error)
+
+
+async def enrich_drug(
+    session: AsyncSession,
+    drug: Drug,
+    adapters: list[SourceAdapter],
+    stats: EnrichStats,
+    literature: LiteratureFetcher | None = None,
+) -> None:
+    """Fetch every source for one drug and persist the result.
+
+    `literature` is a separate parameter rather than another entry in `adapters`
+    because it returns documents, not facts, and takes a different save path. Optional
+    so a test can enrich facts alone -- but the production call sites (enrich_catalog,
+    the lazy brief) always pass it, and the full-loop acceptance test goes through one
+    of those, because a test that omits it proves nothing about whether production
+    wired it.
+    """
     repo = DrugRepository(session)
     query = _query_for(drug)
 
@@ -152,6 +207,12 @@ async def enrich_drug(
 
     if had_failure:
         stats.drugs_with_a_failure.append(drug.chembl_id)
+
+    # Literature is fetched here, in the same job, for the same reason the four fact
+    # adapters are: it is a source this drug's brief needs. Skipping it is what made
+    # the RAG chat inert in production.
+    if literature is not None:
+        await _enrich_literature(session, drug, query, literature, stats)
 
     await _promote(session, repo, drug, records)
     stats.enriched += 1
@@ -231,6 +292,7 @@ async def enrich_catalog(
 
     stats = EnrichStats()
     adapters = build_adapters(client)
+    literature = build_literature_fetcher(client)
 
     query = select(Drug).order_by(Drug.max_phase.desc().nullslast(), Drug.chembl_id)
     if chembl_id:
@@ -248,7 +310,7 @@ async def enrich_catalog(
         # concurrent writers. The fetches are what is slow, and those are batched by
         # asyncio.gather inside enrich_drug.
         for drug in wave:
-            await enrich_drug(session, drug, adapters, stats)
+            await enrich_drug(session, drug, adapters, stats, literature)
         # Commit per wave: a run over thousands of drugs must not be all-or-nothing.
         await session.commit()
         logger.info("committed: %d/%d drugs enriched", stats.enriched, len(drugs))

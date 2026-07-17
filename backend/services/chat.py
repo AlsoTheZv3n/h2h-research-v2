@@ -22,6 +22,7 @@ from enum import StrEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Drug
+from backend.services.briefs import is_enriching
 from backend.services.chat_providers import ChatProvider, ChatUnavailable
 from backend.services.retrieval import Evidence, gather_evidence, render_context
 
@@ -33,8 +34,14 @@ class AnswerState(StrEnum):
     NOT_CONFIGURED = "not_configured"
     """No model available. A stated gap, not an error -- see chat_providers.py."""
     NO_EVIDENCE = "no_evidence"
-    """Nothing retrieved. Answering anyway would be answering from the model's own
-    memory, which is exactly the thing this project refuses to do."""
+    """Nothing retrieved, and enrichment is not running. Answering anyway would be
+    answering from the model's own memory, which is exactly the thing this project
+    refuses to do."""
+    ENRICHING = "enriching"
+    """Nothing retrieved YET -- a background enrich job is in flight. Async empty is
+    not the same as empty: "still gathering" and "we looked and found nothing" are
+    different answers, the same enriching-vs-empty distinction the brief draws, at the
+    chat level."""
     UNAVAILABLE = "unavailable"
     """A model exists but could not answer. Transient; try again."""
     UNGROUNDED = "ungrounded"
@@ -272,6 +279,19 @@ async def answer_question(
     # for the reader to tell it apart from a grounded answer. The prompt forbids it;
     # not making the call is what enforces it.
     if evidence.is_empty:
+        # Async empty is not empty. A drug whose enrich job is in flight has no facts
+        # YET; telling the reader "nothing gathered" would collapse enriching into
+        # empty at the chat level -- the same lie the brief's states exist to prevent.
+        if is_enriching(drug.chembl_id):
+            return Answer(
+                state=AnswerState.ENRICHING,
+                text="",
+                citations=[],
+                detail=(
+                    f"The evidence for {evidence.drug_name} is still being gathered. "
+                    "Give it a moment and ask again."
+                ),
+            )
         return Answer(
             state=AnswerState.NO_EVIDENCE,
             text="",

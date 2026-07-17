@@ -321,6 +321,32 @@ class TestRefusingToAnswer:
         assert spy.calls == [], "the model was asked despite there being no evidence"
         assert answer.text == ""
 
+    async def test_a_drug_still_enriching_says_so_rather_than_no_evidence(
+        self, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Async empty is not empty. A cold drug whose enrich job is in flight has no
+        facts YET; "still gathering" and "we looked and found nothing" are different
+        answers, and rendering the first as the second is the enriching-vs-empty
+        collapse at the chat level. The model is never called either way."""
+        import backend.services.chat as chat_mod
+
+        cold = await DrugRepository(session).upsert_drug("CHEMBL_COLD", pref_name="coldinib")
+        await session.commit()
+        spy = Spy("coldinib is a kinase inhibitor.")
+
+        monkeypatch.setattr(chat_mod, "is_enriching", lambda _cid: True)
+        enriching = await answer_question(session, cold, "what is it?", provider=spy)
+
+        monkeypatch.setattr(chat_mod, "is_enriching", lambda _cid: False)
+        empty = await answer_question(session, cold, "what is it?", provider=spy)
+
+        assert enriching.state is AnswerState.ENRICHING
+        assert empty.state is AnswerState.NO_EVIDENCE
+        # The point: two states, two different sentences. (The states differ by the
+        # asserts above; this pins that the words a reader sees differ too.)
+        assert enriching.detail != empty.detail
+        assert spy.calls == [], "the model was asked despite there being no evidence yet"
+
     async def test_a_dead_model_says_so_rather_than_inventing_an_answer(
         self, session: AsyncSession, drug: Drug
     ) -> None:

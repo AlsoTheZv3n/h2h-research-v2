@@ -23,7 +23,9 @@ export type FactStatus = 'ok' | 'empty' | 'source_failed'
  *
  *   ok              an answer, grounded in retrieved evidence
  *   not_configured  nobody set up a model. A gap the reader can close, not a fault
- *   no_evidence     nothing gathered about this drug yet, so nothing to answer from
+ *   no_evidence     nothing gathered about this drug, and nothing is running to gather it
+ *   enriching       nothing gathered YET -- a background job is fetching it. Async empty
+ *                   is not empty: "still gathering" differs from "we looked, nothing there"
  *   unavailable     a model exists but did not answer. Transient; try again
  *   ungrounded      the model cited a source we never retrieved, so the answer was
  *                   withheld. The rarest and most important one: it means the guard
@@ -39,6 +41,7 @@ export type AnswerState =
   | 'ok'
   | 'not_configured'
   | 'no_evidence'
+  | 'enriching'
   | 'unavailable'
   | 'ungrounded'
   | 'withheld'

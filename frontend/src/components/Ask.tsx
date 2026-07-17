@@ -135,6 +135,15 @@ function AnswerView({ answer }: { answer: Answer }) {
         </Notice>
       )
 
+    case 'enriching':
+      // Async empty, not empty. The evidence is on its way; saying "nothing found"
+      // here would be a lie about a job that is still running. Neutral, not an error.
+      return (
+        <Notice testId="answer-enriching" tone="neutral">
+          {answer.detail ?? 'The evidence for this drug is still being gathered — ask again shortly.'}
+        </Notice>
+      )
+
     case 'withheld':
       // Neutral, not red. Nothing failed: the answer was accurate and the model
       // behaved. It quoted a paper, and that text is not ours to pass on. Rendering

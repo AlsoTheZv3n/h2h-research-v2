@@ -124,13 +124,23 @@ describe('the states that are not an answer', () => {
     expect(await screen.findByTestId('answer-unavailable')).toHaveTextContent(/try again/i)
   })
 
-  it('the six states never render the same way as each other', async () => {
+  it('the seven states never render the same way as each other', async () => {
     // The guard against the whole file's premise quietly eroding: someone
     // consolidates two branches, both still pass their own test, and the
     // distinction is gone. Each state gets its own testid, and they must stay
-    // distinct.
+    // distinct. enriching vs no_evidence is the newest pair at risk -- async empty
+    // is not empty.
+    const states = [
+      'ok',
+      'ungrounded',
+      'withheld',
+      'not_configured',
+      'no_evidence',
+      'enriching',
+      'unavailable',
+    ] as const
     const seen = new Set<string>()
-    for (const state of ['ok', 'ungrounded', 'withheld', 'not_configured', 'no_evidence', 'unavailable'] as const) {
+    for (const state of states) {
       mockAsk.mockResolvedValue(answer({ state, text: state === 'ok' ? 'An answer.' : '' }))
       const { unmount } = render(<Ask chemblId="CHEMBL123" drugName="t" />)
       await userEvent.type(screen.getByTestId('ask-input'), 'a question')
@@ -141,7 +151,21 @@ describe('the states that are not an answer', () => {
       unmount()
       vi.resetAllMocks()
     }
-    expect(seen.size).toBe(6)
+    expect(seen.size).toBe(states.length)
+  })
+
+  it('an enriching drug reads as "still gathering", never as no evidence', async () => {
+    // Async empty != empty. While the enrich job runs the chat must say the evidence
+    // is on its way, not that there is none -- the same distinction the brief draws.
+    mockAsk.mockResolvedValue(
+      answer({ state: 'enriching', detail: 'The evidence for testinib is still being gathered.' }),
+    )
+
+    await ask()
+
+    const notice = await screen.findByTestId('answer-enriching')
+    expect(notice).toHaveTextContent(/still being gathered/i)
+    expect(screen.queryByTestId('answer-no-evidence')).not.toBeInTheDocument()
   })
 })
 

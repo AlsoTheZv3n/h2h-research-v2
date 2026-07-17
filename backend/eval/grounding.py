@@ -24,6 +24,17 @@ Run it:
 Uses whatever provider is configured -- ANTHROPIC_API_KEY if set, otherwise
 OLLAMA_URL. Costs real tokens against a real API; it is not part of the test suite
 and CI does not run it.
+
+WHY THIS IS NOT IN CI, AND WHY THAT MATTERS. Faithfulness -- does a real model
+invent, or stay inside the evidence? -- can only be measured against a real (or
+cassette-recorded) generation. A stub never hallucinates, so a faithfulness check
+run against one is a green light earned by the wrong thing. The unit tests in
+backend/tests/test_chat.py drive a stub on purpose: they prove the GUARDS fire
+(a fabricated citation is caught, a quote is withheld), not that the model behaves.
+CI, which has no key, exercises the guards and never the model. So: a green CI run
+says the guards work. It says NOTHING about whether the model is faithful. That
+question is answered only here, by hand, against something real -- do not read
+CI-green as faithfulness-green.
 """
 
 from __future__ import annotations

@@ -75,11 +75,17 @@ async def _enrich_in_background(chembl_id: str, maker: async_sessionmaker[AsyncS
             async with build_client(
                 timeout=_INTERACTIVE_TIMEOUT, attempts=_INTERACTIVE_ATTEMPTS
             ) as client:
-                from backend.ingestion.enrich import build_adapters
+                from backend.ingestion.enrich import build_adapters, build_literature_fetcher
 
                 stats = EnrichStats()
                 await asyncio.wait_for(
-                    enrich_drug(session, drug, build_adapters(client), stats),
+                    enrich_drug(
+                        session,
+                        drug,
+                        build_adapters(client),
+                        stats,
+                        build_literature_fetcher(client),
+                    ),
                     timeout=_ENRICH_DEADLINE,
                 )
                 await session.commit()
