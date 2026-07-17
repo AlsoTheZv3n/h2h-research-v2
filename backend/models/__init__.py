@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from backend.models.abstract import Abstract, DrugAbstract
 from backend.models.base import Base
 from backend.models.drug import DataMaturity, Drug
 from backend.models.fact import FactRow
 
-__all__ = ["Base", "DataMaturity", "Drug", "FactRow"]
+__all__ = ["Abstract", "Base", "DataMaturity", "Drug", "DrugAbstract", "FactRow"]

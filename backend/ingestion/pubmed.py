@@ -16,7 +16,7 @@ ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 ESUMMARY = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
 
 
-def _safe_error(exc: Exception) -> str:
+def safe_error(exc: Exception) -> str:
     """An error message with no credentials in it.
 
     httpx builds its messages from the full request URL, and ours carries
@@ -95,7 +95,7 @@ class PubMedAdapter:
         except Exception as exc:
             # outage: the source failed, so its keys are unknown -- not zero.
             return SourceRecord(
-                self.name, drug, ok=False, provenance=prov, error=_safe_error(exc), outage=True
+                self.name, drug, ok=False, provenance=prov, error=safe_error(exc), outage=True
             )
 
         def ok(value: Any) -> Any:
@@ -115,7 +115,7 @@ class PubMedAdapter:
             facts["sample_titles"] = ok(titles)
         except Exception as exc:
             facts["sample_titles"] = failed(
-                self.name, f"esummary: {_safe_error(exc)}", source_url=url
+                self.name, f"esummary: {safe_error(exc)}", source_url=url
             )
 
         return SourceRecord(self.name, drug, ok=count > 0, facts=facts, provenance=prov)

@@ -20,6 +20,8 @@ dependencies = [
     # plausible string -- the spike proved that matters. Keeping it here rather than
     # shipping a JS chem library keeps one canonical renderer.
     "rdkit>=2024.3.1",
+    "pgvector>=0.3",
+    "fastembed>=0.4",
 ]
 
 [dependency-groups]

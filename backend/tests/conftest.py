@@ -93,6 +93,13 @@ def db_url() -> str:
         engine = create_async_engine(dsn)
         try:
             async with engine.begin() as conn:
+                # create_all does not know about extensions, so `abstract.embedding`
+                # would fail on an unknown type `vector` -- and it would fail at
+                # schema build, reading as "postgres is broken" rather than "this
+                # database is missing an extension the migration adds". The migration
+                # creates it for real databases; this is the same line for the one
+                # database Alembic never runs against.
+                await conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
                 await conn.run_sync(Base.metadata.drop_all)
                 await conn.run_sync(Base.metadata.create_all)
         finally:
