@@ -119,9 +119,17 @@ class OllamaProvider:
         self._base_url = base_url.rstrip("/")
         self._model = model
 
+    # 120s was not enough, measured against a real cold Ollama: the first request
+    # after a restart pays for loading the weights off disk (llama3.1:8b is ~4.9 GB)
+    # before it generates a token, and it timed out. The reader sees "the model could
+    # not answer", asks again, and it works -- which reads as a flaky tool rather
+    # than a one-off warm-up. Generous here, because the cost of being wrong is a
+    # false failure and the cost of waiting is one slow first question.
+    _TIMEOUT = 300.0
+
     async def complete(self, system: str, question: str) -> str:
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=self._TIMEOUT) as client:
                 r = await client.post(
                     f"{self._base_url}/api/chat",
                     json={

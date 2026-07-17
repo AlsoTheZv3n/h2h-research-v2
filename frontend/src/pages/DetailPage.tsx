@@ -4,6 +4,7 @@ import { getDrug, structureUrl } from '../api/client'
 import type { DrugDetail, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
+import { Ask } from '../components/Ask'
 import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { PotencyCard } from '../components/PotencyCard'
@@ -262,17 +263,18 @@ export function DetailPage() {
         </Card>
       </div>
 
+      {/* This was a disabled input promising "coming in a later phase" since v0.1.0.
+          It now works. The answer is composed only from the facts and abstracts above
+          it -- when it cannot be, the box says which of the five reasons applies
+          rather than shrugging. */}
       <div className="mt-4 rounded-lg border border-line bg-card p-4">
-        <label htmlFor="followup" className="text-xs text-ink-faint">
-          Follow-up
-        </label>
-        <input
-          id="followup"
-          disabled
-          placeholder="Ask a follow-up about this drug — coming in a later phase"
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm
-                     text-ink-faint placeholder:text-ink-faint disabled:cursor-not-allowed"
-        />
+        <h2 className="mb-2 text-xs text-ink-faint">
+          Ask about this drug
+          <span className="ml-2 normal-case">
+            — answered only from the sourced evidence on this page
+          </span>
+        </h2>
+        <Ask chemblId={detail.chembl_id} drugName={detail.pref_name ?? detail.chembl_id} />
       </div>
 
       <p className="mt-4 text-[11px] text-ink-faint">

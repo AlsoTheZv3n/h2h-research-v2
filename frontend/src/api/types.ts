@@ -15,6 +15,37 @@
 
 export type FactStatus = 'ok' | 'empty' | 'source_failed'
 
+/**
+ * Why there is (or is not) an answer. The same discipline as FactStatus, one layer
+ * up -- and for the same reason: every one of these means something different to a
+ * reader, and a UI that renders them all as "sorry, something went wrong" throws
+ * away the only thing that makes this tool worth using.
+ *
+ *   ok              an answer, grounded in retrieved evidence
+ *   not_configured  nobody set up a model. A gap the reader can close, not a fault
+ *   no_evidence     nothing gathered about this drug yet, so nothing to answer from
+ *   unavailable     a model exists but did not answer. Transient; try again
+ *   ungrounded      the model cited a source we never retrieved, so the answer was
+ *                   withheld. The rarest and most important one: it means the guard
+ *                   fired, and the reader is being told rather than shown a
+ *                   confident answer nobody can stand behind
+ */
+export type AnswerState = 'ok' | 'not_configured' | 'no_evidence' | 'unavailable' | 'ungrounded'
+
+export interface Citation {
+  pmid: string
+  title: string | null
+  url: string
+}
+
+export interface Answer {
+  state: AnswerState
+  text: string
+  citations: Citation[]
+  /** Why there is no answer, when state is not ok. Written for the reader. */
+  detail: string | null
+}
+
 export interface SourcedFact<T = unknown> {
   value: T | null
   status: FactStatus

@@ -22,6 +22,13 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       NCBI_API_KEY: ${NCBI_API_KEY:-}
+      NCBI_EMAIL: ${NCBI_EMAIL:-}
+      # The chat's model. Both empty is a supported, designed state: the ask box says
+      # no model is configured rather than breaking, and everything else works.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CHAT_MODEL: ${CHAT_MODEL:-claude-opus-4-8}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
     ports:
       # Host ports are overridable via .env because localhost is shared with whatever
       # else a dev runs -- WSL forwards its own listeners onto Windows' localhost, and

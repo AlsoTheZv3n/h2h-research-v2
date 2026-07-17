@@ -1,19 +1,30 @@
 import { execFileSync } from 'node:child_process'
 
 /**
- * Seeds one drug whose ChEMBL mechanism fetch failed.
+ * Seeds the two drug states the E2E cannot get reliably any other way.
  *
- * The E2E has to prove that a `source_failed` fact survives DB → API → UI and lands
- * as a red "unavailable" chip rather than as "nothing found". That state used to be
- * supplied for free by ChEMBL falling over, which made the test a coin flip: green
- * when the source was sick, red when it was healthy. Both readings were noise.
+ * CHEMBL_E2E_FAILURE -- a drug whose ChEMBL mechanism fetch failed. The suite has to
+ * prove a `source_failed` fact survives DB → API → UI and lands as a red
+ * "unavailable" chip rather than "nothing found". That state used to be supplied for
+ * free by ChEMBL falling over, which made the test a coin flip: green when the source
+ * was sick, red when it was healthy. Both readings were noise.
  *
- * So the row is written directly into the real Postgres. This is not a mock: the API
- * reads it, serves it and the browser renders it through the whole stack. The only
- * thing being controlled is *which* drug is broken, not whether the pipeline works.
+ * CHEMBL_E2E_UNSEEN -- in the catalog, zero facts, last_enriched_at NULL. The
+ * chat must refuse to put a model in front of it: handed no evidence, a model answers
+ * from training. No real drug stays in this state once anyone opens it, so it has to
+ * be seeded.
  *
- * The drug is fictitious (CHEMBL_E2E_FAILURE) so it cannot collide with a real one,
- * and teardown removes it.
+ * The rows are written directly into the real Postgres. This is not a mock: the API
+ * reads them, serves them and the browser renders them through the whole stack. The
+ * only thing controlled is *which* drug is in which state, not whether the pipeline
+ * works.
+ *
+ * Both IDs are fictitious so they cannot collide with a real ChEMBL id. They are NOT
+ * removed afterwards -- this comment claimed a teardown that has never existed, which
+ * is a small lie in a file about not telling them. They persist in the dev database
+ * and show up in the catalog; two synthetic rows beside ~3,900 real ones is a price
+ * worth paying for a deterministic suite, and now it is stated rather than implied
+ * away.
  */
 
 const SQL = `
@@ -31,6 +42,15 @@ VALUES ('CHEMBL_E2E_FAILURE', 'moa', 'chembl', NULL, 'source_failed',
         'https://clinicaltrials.gov/', now(), NULL)
 ON CONFLICT (drug_chembl_id, key, source) DO UPDATE
    SET status = excluded.status, value = excluded.value, error = excluded.error;
+
+-- A drug nobody has ever looked at: in the catalog, zero facts, never enriched.
+-- The chat must refuse to ask a model about it, because a model handed no context
+-- answers from training. last_enriched_at stays NULL -- that is what "nobody looked"
+-- means, and it is a different row state from "we looked and found nothing".
+INSERT INTO drug (chembl_id, pref_name, drug_type, max_phase, maturity, last_enriched_at)
+VALUES ('CHEMBL_E2E_UNSEEN', 'E2E NEVER LOOKED', 'Small molecule', 1,
+        'index_only', NULL)
+ON CONFLICT (chembl_id) DO UPDATE SET last_enriched_at = NULL;
 `
 
 function psql(sql: string): void {
@@ -45,10 +65,17 @@ export default function globalSetup(): void {
   try {
     psql(SQL)
   } catch (e) {
+    // Lead with what psql actually said, and offer the likely cause as a guess
+    // rather than a diagnosis. The first version asserted "the compose stack must be
+    // up" -- and the first time it fired, the stack was up and the real problem was
+    // a chembl_id one character past varchar(20). An error that names the wrong
+    // cause is worse than one that names none: it sends the reader to check
+    // something that was never broken.
     throw new Error(
-      'Could not seed the E2E fixture. The compose stack must be up ' +
-        '(`docker compose up`) before running these tests.\n' +
-        String((e as { stderr?: Buffer }).stderr ?? e),
+      'Seeding the E2E fixtures failed. psql said:\n' +
+        String((e as { stderr?: Buffer }).stderr ?? e) +
+        '\n\nIf that looks like a connection problem, the compose stack needs to be ' +
+        'up (`docker compose up`) before these tests run.',
     )
   }
 }

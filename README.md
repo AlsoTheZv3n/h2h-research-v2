@@ -33,6 +33,8 @@ date**, and gaps are shown honestly instead of papered over.
   measurements — not a raw dump of every activity.
 - Biologics are handled honestly: they appear in the catalog, but structure/binding cards show
   *"not applicable — this is a biologic"* rather than empty panels.
+- **Ask a question about the drug** and get an answer built only from that drug's facts and
+  abstracts, with every source linked — see below.
 
 ### The honest states, and why they are the point
 
@@ -49,6 +51,46 @@ lying:
 ChEMBL returns a 500 often enough that this matters daily. A brief that renders an outage as *"no
 mechanism"* tells you something false about the drug; H2H shows the red chip instead and says which
 source failed.
+
+## Asking questions
+
+Every drug page has an ask box. The answer is composed only from that drug's stored facts and its
+PubMed abstracts — the model is told nothing else and is not permitted to draw on what it knows.
+
+**The distinction the second bullet at the top of this file complains about is the one this has to
+earn.** A chat assistant that hallucinates and cites nothing is easy to build; the hard part is
+noticing when it happens. Four things do the work:
+
+- **Retrieval is filtered by drug before it ranks.** Without that, the best semantic match for a KRAS
+  question is sotorasib's paper — even when you asked about osimertinib. The model would cite it
+  correctly while answering about the wrong molecule.
+- **The honest states go into the prompt.** If ChEMBL was down, the model is told the mechanism is
+  *unretrieved*, not absent, and told to say so. Omitting it would produce "no mechanism is reported"
+  — fluent, grounded in what it was given, and false.
+- **No evidence means no model call.** Handed an empty context a model answers from training, and
+  that answer is indistinguishable from a grounded one.
+- **Every citation is checked against what was retrieved.** If the answer cites a PMID we never
+  supplied, the model invented it and **the whole answer is withheld** — you are told it happened
+  rather than shown something nobody can stand behind.
+
+**What that last check does not do, and it is the bigger half:** it verifies a citation *exists*, not
+that it *supports the sentence attached to it*. A fabricated claim hung on a real retrieved PMID
+passes. Catching that needs a second model grading each claim against its source — a real piece of
+work, not done, and stated here rather than left for you to discover.
+
+The chat needs a model; nothing else here does. Set `ANTHROPIC_API_KEY`, or point `OLLAMA_URL` at a
+local one. With neither, the box says so and names the variable — browsing, briefs and literature
+search are unaffected, because embeddings run locally inside the API container.
+
+```bash
+uv run python -m backend.eval.grounding   # does your model actually stay inside the evidence?
+```
+
+That runs five questions built to tempt a model into answering from memory — a mechanism whose source
+was down, a dose that is on the label but not in the evidence, a trial result that invites citing
+FLAURA from recall. Measured against `llama3.1:8b`: 5/5 clean, no fabricated citations. Claude is the
+default on general capability grounds, which is a judgement rather than a measurement — five
+questions on one drug is not a benchmark.
 
 ## Quickstart
 
@@ -124,7 +166,8 @@ it simply isn't done yet.
 
 ## Tech
 
-Backend: Python · FastAPI · PostgreSQL · Redis · uv · RDKit (renders the structures).
+Backend: Python · FastAPI · PostgreSQL + pgvector · Redis · uv · RDKit (renders the structures) ·
+fastembed (bge-small, runs on CPU inside the container — the reason retrieval needs no key).
 Frontend: React · TypeScript · Tailwind v4 · Vite.
 Tests: pytest (+ mypy strict) · Vitest · Playwright. CI: GitHub Actions.
 

@@ -68,6 +68,17 @@ jobs:
       - name: Mypy
         run: uv run mypy backend
 
+      # The suite embeds for real -- a stubbed embedder would turn "is retrieval
+      # working on meaning?" into "does it call the function I told it to". That
+      # means fetching bge-small (~130 MB) from HuggingFace, so cache it: uncached
+      # it is a download on every run and a third-party outage away from a red
+      # build that has nothing to do with the code.
+      - name: Cache the embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/fastembed
+          key: fastembed-${{ hashFiles('backend/embeddings.py') }}
+
       - name: Alembic migrations
         run: uv run alembic upgrade head
 

@@ -61,6 +61,17 @@ def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
     So: check. Any identifier in the answer that we did not put there is proof the
     model invented something, and an answer with one invented citation in it has no
     claim on the reader's trust for the rest.
+
+    **What this does not catch, and it is the bigger half.** This verifies that a
+    citation *exists* in the evidence, not that it *supports the claim attached to
+    it*. A model that writes "the hazard ratio was 0.46 [PMID 34543864]" against a
+    real retrieved abstract that says nothing about hazard ratios sails straight
+    through -- the PMID is real, so nothing here fires, and the sentence is a
+    fabrication wearing a valid citation. That is a harder problem (it needs a
+    second model checking each claim against its source, which is its own eval and
+    its own failure modes), and it is not solved. It is written down here and in the
+    README rather than left for a reader to discover, because a guard whose limits
+    are not stated is worse than no guard: it buys trust it has not earned.
     """
     cited = set(_PMID_IN_TEXT.findall(answer))
     given = {a.pmid for a in evidence.abstracts}
