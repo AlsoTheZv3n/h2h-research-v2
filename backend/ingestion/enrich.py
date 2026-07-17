@@ -240,12 +240,16 @@ async def _promote(
         targets = ot.facts.get("targets")
         if targets is not None and targets.status is FactStatus.OK and targets.value:
             columns["primary_target"] = targets.value[0]
-        # Promoted alongside primary_target because it is that target's class -- and
-        # only when present. A missing class leaves the column NULL ("Unclassified"),
-        # never overwriting a good one, exactly as the other index columns behave.
-        target_class = ot.facts.get("target_class")
-        if target_class is not None and target_class.status is FactStatus.OK and target_class.value:
-            columns["target_class"] = target_class.value
+            # target_class moves in LOCKSTEP with primary_target, or the two diverge: on
+            # re-enrichment a new primary target with no class would leave the previous
+            # target's class stranded beside it (a transporter filed under "Kinase"). So
+            # promote the class whenever the target changes -- an EMPTY class (Open
+            # Targets answered, this target has no family) clears the column to NULL
+            # ("Unclassified"). Only a SOURCE_FAILED class is left untouched, so an
+            # outage never erases a class we already had.
+            target_class = ot.facts.get("target_class")
+            if target_class is not None and target_class.status is not FactStatus.SOURCE_FAILED:
+                columns["target_class"] = target_class.value
         indications = ot.facts.get("indications")
         if indications is not None and indications.status is FactStatus.OK and indications.value:
             columns["primary_indication"] = indications.value[0]

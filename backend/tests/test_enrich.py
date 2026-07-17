@@ -19,9 +19,9 @@ import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.ingestion.base import FactStatus
+from backend.ingestion.base import Fact, FactStatus, SourceRecord, fact, failed, utcnow
 from backend.ingestion.chembl_catalog import to_columns
-from backend.ingestion.enrich import enrich_catalog
+from backend.ingestion.enrich import _promote, enrich_catalog
 from backend.models import DataMaturity, Drug
 from backend.repositories import DrugRepository
 
@@ -225,6 +225,75 @@ class TestEnrichment:
         assert drug.target_class == "Hydrolase"
         assert drug.primary_indication == "lung carcinoma"
         assert drug.drug_type == "Small molecule"
+
+    async def _seed_classified(self, session: AsyncSession) -> Drug:
+        repo = DrugRepository(session)
+        drug = await repo.upsert_drug(
+            "CHEMBL_REENRICH",
+            pref_name="reenrichamab",
+            primary_target="EGFR",
+            target_class="Kinase",
+            drug_type="Small molecule",
+            smiles="CCO",
+            maturity=DataMaturity.PARTIAL,
+        )
+        await session.commit()
+        return drug
+
+    def _ot_record(self, target_class_fact: Fact) -> SourceRecord:
+        """An Open Targets record whose primary target is now ABCB1 (a transporter)."""
+        return SourceRecord(
+            "opentargets",
+            "reenrichamab",
+            ok=True,
+            provenance={"source_url": "u", "retrieved_at": utcnow()},
+            facts={
+                "drug_type": fact("Small molecule", "opentargets", source_url="u"),
+                "targets": fact(["ABCB1"], "opentargets", source_url="u"),
+                "target_class": target_class_fact,
+            },
+        )
+
+    async def test_reenrichment_clears_a_target_class_the_new_target_lacks(
+        self, session: AsyncSession
+    ) -> None:
+        """target_class must move in lockstep with primary_target.
+
+        First enriched to EGFR/Kinase; Open Targets then drifts so the primary target is
+        ABCB1, which carries no family. The class must clear to NULL, not stay 'Kinase'
+        stranded beside a transporter -- the divergence the facet's promise forbids.
+        """
+        drug = await self._seed_classified(session)
+        repo = DrugRepository(session)
+        # target_class fact EMPTY: Open Targets answered, ABCB1 has no class.
+        ot = self._ot_record(fact(None, "opentargets", source_url="u"))
+
+        await _promote(session, repo, drug, [ot])
+        await session.commit()
+        await session.refresh(drug)
+
+        assert drug.primary_target == "ABCB1"
+        assert drug.target_class is None  # cleared, not the stale 'Kinase'
+
+    async def test_reenrichment_keeps_the_class_when_the_source_failed(
+        self, session: AsyncSession
+    ) -> None:
+        """The mirror image: an outage on the class must not erase a good value.
+
+        A SOURCE_FAILED target_class means Open Targets could not be asked, not that the
+        target has no class -- so the previously stored class is kept, exactly as the
+        other index columns survive an outage.
+        """
+        drug = await self._seed_classified(session)
+        repo = DrugRepository(session)
+        ot = self._ot_record(failed("opentargets", "outage", source_url="u"))
+
+        await _promote(session, repo, drug, [ot])
+        await session.commit()
+        await session.refresh(drug)
+
+        assert drug.primary_target == "ABCB1"
+        assert drug.target_class == "Kinase"  # kept: an outage is not an answer
 
     @respx.mock
     async def test_maturity_reaches_full_once_potency_is_known(

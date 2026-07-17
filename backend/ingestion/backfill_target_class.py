@@ -83,7 +83,15 @@ async def backfill(
             ),
         )
         if tc.status is FactStatus.OK and tc.value:
-            await repo.upsert_drug(drug.chembl_id, target_class=tc.value)
+            # Write primary_target from the SAME fetch, so the class we store is the
+            # class of the target we store -- Open Targets may have drifted since this
+            # row was first enriched, and a class pinned to a stale primary_target would
+            # be the very divergence this backfill must not create.
+            columns: dict[str, object] = {"target_class": tc.value}
+            targets = record.facts.get("targets")
+            if targets is not None and targets.status is FactStatus.OK and targets.value:
+                columns["primary_target"] = targets.value[0]
+            await repo.upsert_drug(drug.chembl_id, **columns)
             written += 1
         await session.commit()
 

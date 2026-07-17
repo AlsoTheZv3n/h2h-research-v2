@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDrugs, listTargetClasses } from '../api/client'
 import type { DataMaturity, DrugList, SortField, SortOrder } from '../api/types'
 import { MaturityPill, PhasePill } from '../components/MaturityPill'
-import { formatCount } from '../format'
+import { countLabel, formatCount } from '../format'
 
 const PAGE_SIZE = 25
 // Long enough that typing a drug name is one query, not eight.
@@ -73,6 +73,11 @@ export function OverviewPage() {
   const sort = (params.get('sort') as SortField | null) ?? 'data'
   const order = (params.get('order') as SortOrder | null) ?? 'desc'
   const offset = Number(params.get('offset') ?? 0)
+
+  // Filters that make the view a strict SUBSET (the scope toggle widens, so it is not
+  // one). Used only to label the count honestly when the catalog-size probe is
+  // unavailable: a filtered subset must not read as "N in catalog".
+  const hasFilter = Boolean(q || target || maxPhase || modality || maturity || hasTarget || targetClass)
 
   // The search box updates instantly while the URL (and query) lag by a debounce.
   // Binding it straight to the URL made every keystroke a request against a partial
@@ -204,15 +209,7 @@ export function OverviewPage() {
         <h1 className="text-lg font-semibold tracking-tight text-ink">Drug programs</h1>
         {data && (
           <p className="text-xs text-ink-faint" data-testid="total-count">
-            {catalogTotal !== null && data.total < catalogTotal ? (
-              // A subset is showing -- whether a filter narrowed it or scoping hid the
-              // non-oncology tail. Y is the whole catalog, so the gap is visible.
-              <>
-                {formatCount(data.total)} of {formatCount(catalogTotal)} shown
-              </>
-            ) : (
-              <>{formatCount(data.total)} in catalog</>
-            )}
+            {countLabel(data.total, catalogTotal, hasFilter)}
           </p>
         )}
       </div>
