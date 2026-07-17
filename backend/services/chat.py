@@ -47,12 +47,38 @@ class AnswerState(StrEnum):
     `_copies_source_text` and NOTICE.md."""
 
 
-# "PMID 12345678", "[PMID: 12345678]", "pmid 12345678". PubMed identifiers run to
-# eight digits; four is the shortest that could plausibly be one.
-_PMID_IN_TEXT = re.compile(r"PMID[:\s]*(\d{4,9})", re.IGNORECASE)
+# Extracting every PMID an answer cites, in every shape a model actually writes it.
+#
+# The first cut was `PMID[:\s]*(\d{4,9})` -- one digit run immediately after the
+# literal "PMID". The audit ran it and it leaked: "PMIDs 12345678, 99999999" matched
+# NOTHING (the plural "s" sits between "PMID" and the space, so `[:\s]*` matches zero
+# and the anchor fails), and "[PMID 12345678, 99999999]" matched only the first id.
+# Either way a fabricated identifier shipped as state=ok -- the one runtime lie the
+# whole phase exists to prevent, defeated by the commonest citation format.
+#
+# So: anchor on PMID or PMIDs, then take EVERY id in the comma/semicolon/space list
+# that follows -- and also catch a bare PubMed URL. Erring toward capturing (a stray
+# year in a list read as a PMID) is the safe direction: a false positive withholds an
+# answer; a false negative serves a fabrication.
+#
+# No `\b` after PMIDs?: it would reject the no-separator form "PMID12345678" (D and 1
+# are both word chars, so there is no boundary between them) -- which the old regex
+# caught and a test pins. `s?` still absorbs the plural.
+_PMID_ANCHOR = re.compile(r"PMIDs?[:\s]*([\d,;\s]*\d{4,9})", re.IGNORECASE)
+_PMID_URL = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d{4,9})", re.IGNORECASE)
+_PMID_DIGITS = re.compile(r"\d{4,9}")
 
 # Word characters only: see _copies_source_text.
 _WORD = re.compile(r"\w+")
+
+
+def _cited_pmids(answer: str) -> set[str]:
+    """Every PMID the answer cites, across list forms, plurals and URLs."""
+    ids: set[str] = set()
+    for match in _PMID_ANCHOR.finditer(answer):
+        ids.update(_PMID_DIGITS.findall(match.group(1)))
+    ids.update(_PMID_URL.findall(answer))
+    return ids
 
 
 def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
@@ -80,9 +106,8 @@ def _fabricated_pmids(evidence: Evidence, answer: str) -> set[str]:
     README rather than left for a reader to discover, because a guard whose limits
     are not stated is worse than no guard: it buys trust it has not earned.
     """
-    cited = set(_PMID_IN_TEXT.findall(answer))
     given = {a.pmid for a in evidence.abstracts}
-    return cited - given
+    return _cited_pmids(answer) - given
 
 
 # Twelve consecutive words from a source document is not paraphrase and not

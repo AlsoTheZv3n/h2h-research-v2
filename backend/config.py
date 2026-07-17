@@ -40,7 +40,13 @@ class Settings(BaseSettings):
     # breaking -- see services/chat_providers.py. The retrieval half needs neither of
     # these: embeddings run locally, so `docker compose up` always has working search.
     anthropic_api_key: str | None = None
-    chat_model: str = "claude-opus-4-8"
+    # Haiku, on the user's call ("should probably suffice"). Grounding an answer in
+    # a handful of abstracts is not a hard reasoning task, and the guards
+    # (_fabricated_pmids, _copies_source_text) catch a weak model's mistakes
+    # regardless -- so the cheap, fast model is the right default. The provider sends
+    # a plain completion (no adaptive thinking, no effort), which is the only shape
+    # Haiku 4.5 accepts, and which also works on Opus if you override this.
+    chat_model: str = "claude-haiku-4-5"
 
     # Keyless fallback. Empty by default rather than pointing at localhost:11434:
     # a default that guesses wrong turns "no model configured" -- which the UI states

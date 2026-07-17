@@ -21,7 +21,7 @@ would rather run it locally.
 from __future__ import annotations
 
 import logging
-from typing import Literal, Protocol
+from typing import Protocol
 
 import httpx
 
@@ -29,19 +29,10 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Thinking tokens count against max_tokens, so this is not "how long may the answer
-# be" -- it is thinking plus answer. Budget for both: too tight and the model
-# reasons its way to a correct answer and then gets cut off mid-sentence, which
-# looks like a bug in the prompt rather than a bug in this constant.
-_MAX_TOKENS = 8000
-
-# Adaptive thinking, medium effort. Grounding an answer in five abstracts is not a
-# hard reasoning problem, but it is one where being careful about what the sources
-# actually say is the entire job -- and that is what the thinking is for.
-#
-# Literal, not str: the SDK types `effort` as a closed set, so a typo here is a type
-# error rather than a 400 discovered on the first real question.
-_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+# A plain answer budget -- a grounded answer is a paragraph or two, and there is no
+# thinking sharing this ceiling (see complete()). Generous, because a ceiling only
+# ever truncates; the model stops at end_turn well before it.
+_MAX_TOKENS = 4000
 
 
 class ChatUnavailable(RuntimeError):
@@ -69,12 +60,18 @@ class AnthropicProvider:
         import anthropic
 
         try:
+            # A plain completion: no `thinking`, no `output_config.effort`. Those are
+            # the shapes the default model (Haiku 4.5) rejects with a 400 -- adaptive
+            # thinking is not offered on Haiku, and effort errors there. Omitting both
+            # is the one call shape that is valid on every current model, Haiku and
+            # Opus alike, and grounding an answer in supplied evidence does not need
+            # extended reasoning. NOTE: this path has no key in dev/CI, so it is not
+            # exercised against the real SDK -- the shape is per the documented model
+            # constraints, and the tests drive a stub provider.
             response = await self._client.messages.create(
                 model=self._model,
                 max_tokens=_MAX_TOKENS,
                 system=system,
-                thinking={"type": "adaptive"},
-                output_config={"effort": _EFFORT},
                 messages=[{"role": "user", "content": question}],
             )
         except anthropic.APIStatusError as exc:
@@ -86,8 +83,8 @@ class AnthropicProvider:
         except anthropic.APIConnectionError as exc:
             raise ChatUnavailable("could not reach the model API") from exc
 
-        # Never index content[0] blind: with thinking on, the first block is a
-        # thinking block, and on a refusal the list can be empty entirely.
+        # On a refusal the content list can be empty, so check stop_reason before
+        # reading blocks.
         if response.stop_reason == "refusal":
             raise ChatUnavailable("the model declined to answer this question")
         text = "".join(b.text for b in response.content if b.type == "text")

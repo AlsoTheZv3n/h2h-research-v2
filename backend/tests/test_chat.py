@@ -154,6 +154,28 @@ class TestFabricatedCitations:
         answer = await answer_question(session, drug, "q?", provider=Spy(reply))
         assert answer.state is AnswerState.UNGROUNDED
 
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            # The exact shapes the pre-release audit found leaking. Each mixes the one
+            # real retrieved PMID with a fabricated one, which is the realistic case: a
+            # model cites the paper it was given AND one it remembers.
+            f"Confirmed in two studies [PMID {REAL_PMID}, 99999999].",
+            f"See PMIDs {REAL_PMID}, 99999999 for the trial data.",
+            f"Reported in [PMID: {REAL_PMID}; 99999999].",
+            "As shown at pubmed.ncbi.nlm.nih.gov/99999999.",
+        ],
+    )
+    async def test_a_fabricated_id_in_a_list_plural_or_url_is_caught(
+        self, session: AsyncSession, drug: Drug, reply: str
+    ) -> None:
+        """The audit's blocker, pinned. The old anchor matched one id right after the
+        literal "PMID": the plural "s" broke it entirely and a comma-listed second id
+        escaped, so a fabricated citation shipped as state=ok -- the one runtime lie
+        the whole phase exists to prevent."""
+        answer = await answer_question(session, drug, "q?", provider=Spy(reply))
+        assert answer.state is AnswerState.UNGROUNDED
+
     async def test_a_number_that_is_not_a_citation_is_left_alone(
         self, session: AsyncSession, drug: Drug
     ) -> None:

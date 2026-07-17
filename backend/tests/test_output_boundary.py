@@ -81,49 +81,49 @@ class TestNoAbstractTextIsServed:
         """Every GET route the app declares, not just the ones I remembered.
 
         The whole risk is a route added later by someone who never read NOTICE.md.
-        Enumerating the app's own router means that route is covered on the day it
-        is written.
+        Enumerating the app's routes means that route is covered on the day it is
+        written.
         """
         from backend.main import app
 
-        # Routes this sweep cannot drive, named individually with a reason. A route
-        # not on this list and not checkable is a FAILURE, not a skip -- the first
-        # version `continue`d past anything with an unknown path param and swallowed
-        # request exceptions, so a future /abstracts/{pmid} would have been silently
-        # ignored while this file went on claiming it covered every route. A guard
-        # that quietly excuses the case it was written for is worse than none.
-        UNCHECKABLE = {
-            "/openapi.json": "the schema, not data",
-            "/docs": "swagger UI",
-            "/docs/oauth2-redirect": "swagger UI",
-            "/redoc": "redoc UI",
-        }
+        # Enumerate from the OpenAPI schema, NOT app.routes. The pre-release audit ran
+        # the old version and caught it walking ZERO data routes: under FastAPI
+        # 0.139.1 the included routers appear in app.routes as `_IncludedRouter`
+        # objects with methods=None, so `if "GET" not in methods: continue` skipped
+        # every /drugs and /ask route, and the two /health routes satisfied the
+        # `checked >= 2` guard. The boundary test -- NOTICE.md's central proof that no
+        # abstract text is served -- passed while checking nothing that could leak.
+        #
+        # app.openapi()["paths"] lists the real declared paths, and by construction
+        # excludes the doc routes (/openapi.json, /docs, /redoc) -- so no allowlist is
+        # needed for them.
+        schema = app.openapi()
 
-        checked, skipped = 0, []
-        for route in app.routes:
-            path = getattr(route, "path", "")
-            methods: set[str] = getattr(route, "methods", set()) or set()
-            if "GET" not in methods:
+        checked, skipped, reached_drugs = 0, [], False
+        for path, operations in schema["paths"].items():
+            if "get" not in operations:
                 continue
-            if path in UNCHECKABLE:
-                continue
-
             url = path.replace("{chembl_id}", CHEMBL_ID)
             if "{" in url:
+                # A path param this sweep cannot fill. A FAILURE, not a silent skip:
+                # a future /abstracts/{pmid} must not slip through unchecked while the
+                # file claims full coverage.
                 skipped.append(path)
                 continue
-
             r = await api.get(url)
             checked += 1
+            if "/drugs" in path:
+                reached_drugs = True
             assert SECRET not in r.text, f"{url} served abstract text"
 
         assert not skipped, (
             f"these routes take a path param this sweep cannot fill: {skipped}. "
-            "Teach it to fill them, or add them to UNCHECKABLE with a reason -- do "
-            "not let the boundary go unchecked silently."
+            "Teach it to fill them -- do not let the boundary go unchecked silently."
         )
-        # And the guard on the guard: a loop that matched nothing would pass forever.
-        assert checked >= 2, f"the route sweep only reached {checked} routes"
+        # The guard the old `checked >= 2` only pretended to be. It reached the two
+        # health routes and passed; this requires the sweep to actually reach a data
+        # route -- the only kind that could carry abstract text.
+        assert reached_drugs, f"the sweep reached no /drugs route -- vacuous ({checked} checked)"
 
     async def test_the_answer_carries_the_synthesis_and_never_the_source(
         self, api: httpx.AsyncClient, indexed_drug: Drug
