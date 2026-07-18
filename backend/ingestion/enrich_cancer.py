@@ -257,9 +257,7 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
             n_strong,
         )
     display = [
-        _target_row(r)
-        for r in rows[:_TOP_TARGETS]
-        if (r.get("target") or {}).get("approvedSymbol")
+        _target_row(r) for r in rows[:_TOP_TARGETS] if (r.get("target") or {}).get("approvedSymbol")
     ]
     # The value carries the threshold beside the count, so the number is never shown
     # without saying what it counts.
