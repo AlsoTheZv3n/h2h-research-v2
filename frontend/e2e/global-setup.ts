@@ -86,8 +86,8 @@ ON CONFLICT (disease_id) DO UPDATE
 INSERT INTO cancer_fact (disease_id, key, source, value, status, source_url, retrieved_at)
 VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
         '{"threshold":0.5,"n_strong":118,
-          "targets":[{"symbol":"EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true},
-                     {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]}'::jsonb,
+          "targets":[{"symbol":"EGFR","ensembl_id":"ENSG_E2E_EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true,"drug_status":"approved"},
+                     {"symbol":"KRAS","ensembl_id":"ENSG_E2E_KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false,"drug_status":"unexploited"}]}'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
        ('MONDO_E2E_NSCLC', 'pipeline', 'opentargets',
         '{"total":3,"by_phase":[{"stage":"APPROVAL","count":2},{"stage":"PHASE_2","count":1}],
@@ -105,6 +105,15 @@ ON CONFLICT (disease_id, key, source) DO UPDATE
 INSERT INTO drug (chembl_id, pref_name, drug_type, max_phase, maturity)
 VALUES ('CHEMBL_E2E_INPIPE', 'E2E APPROVED DRUG', 'Small molecule', 4, 'index_only')
 ON CONFLICT (chembl_id) DO UPDATE SET pref_name = excluded.pref_name;
+
+-- A drug_target row so the landscape's EGFR links to a catalog brief, while KRAS
+-- (unexploited, no drug anywhere) stays plain text -- the R4 drugged flag and its separate,
+-- Ensembl-joined catalog-link, both checked end to end. Fixture-only Ensembl ids (ENSG_E2E_*,
+-- matching the landscape fact above) so a real drug backfilled against the true EGFR id can
+-- never win the link's min() pick and make this assertion flap.
+INSERT INTO drug_target (drug_chembl_id, target_ensembl_id)
+VALUES ('CHEMBL_E2E_INPIPE', 'ENSG_E2E_EGFR')
+ON CONFLICT DO NOTHING;
 `
 
 function psql(sql: string): void {
@@ -115,9 +124,27 @@ function psql(sql: string): void {
   )
 }
 
+function flushCache(): void {
+  // The seed above writes facts straight to Postgres, but the API serves assembled briefs
+  // from a Redis cache -- so a brief cached by an earlier run (a different fixture shape)
+  // would be served instead of what we just seeded, and the suite would assert against
+  // stale data. In CI Redis starts empty and this is a no-op; locally it stops a persistent
+  // cache from flaking the tests. Best-effort: a live cache is a latency concern, never a
+  // correctness one, so a failure here only warns rather than aborting the run.
+  try {
+    execFileSync('docker', ['compose', 'exec', '-T', 'redis', 'redis-cli', 'FLUSHDB'], {
+      cwd: '..',
+      stdio: 'pipe',
+    })
+  } catch (e) {
+    console.warn('E2E: could not flush the Redis cache (continuing):', String(e))
+  }
+}
+
 export default function globalSetup(): void {
   try {
     psql(SQL)
+    flushCache()
   } catch (e) {
     // Lead with what psql actually said, and offer the likely cause as a guess
     // rather than a diagnosis. The first version asserted "the compose stack must be

@@ -76,6 +76,27 @@ test.describe('cancer catalog', () => {
     await expect(stat).toContainText('8,000 with any evidence')
   })
 
+  test('the target landscape shows the drugged flag and the catalog link', async ({ page }) => {
+    // Fixture: EGFR is `approved` and we hold a drug against it (drug_target, by Ensembl
+    // id) -> a badge AND a link; KRAS is `unexploited` with no drug anywhere -> a badge,
+    // no link. This checks the R4 flag and its separate catalog-link end to end.
+    await page.goto('/cancers/MONDO_E2E_NSCLC')
+    await expect(page.getByTestId('drug-status-approved')).toBeVisible()
+    await expect(page.getByTestId('drug-status-unexploited')).toBeVisible()
+    // EGFR links to the catalog brief, matched by Ensembl id.
+    const link = page.getByTestId('landscape-catalog-link')
+    await expect(link).toHaveText('EGFR')
+    await expect(link).toHaveAttribute('href', '/drugs/CHEMBL_E2E_INPIPE')
+    // Exactly one link: KRAS (unexploited, no drug) stays plain text, not a dead link.
+    await expect(link).toHaveCount(1)
+
+    // The status filter narrows to the unexploited finding (KRAS), the decision-useful cell.
+    await page.getByTestId('landscape-filter-status').selectOption('unexploited')
+    const rows = page.getByTestId('landscape-row')
+    await expect(rows).toHaveCount(1)
+    await expect(rows.first()).toContainText('KRAS')
+  })
+
   test('the pipeline shows a distribution + filterable table, linking only catalog drugs', async ({
     page,
   }) => {
