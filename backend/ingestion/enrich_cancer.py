@@ -214,8 +214,13 @@ def _classify_drug_status(dcc: dict[str, Any] | None) -> str:
       clinical     -- candidates exist against it, none approved
       unexploited  -- OT resolved the target and it has NO drugs at all (a real finding)
     """
-    rows = (dcc or {}).get("rows") or []
-    if not rows:
+    dcc = dcc or {}
+    rows = dcc.get("rows") or []
+    # "Unexploited" keys on the authoritative count, not len(rows): Open Targets returns
+    # every candidate today (verified: count == len(rows), APPROVAL always present), so the
+    # two agree -- but keying the "no drugs anywhere" call on count keeps it correct even if
+    # a future release paginates rows. Approved-vs-clinical still reads the rows' stages.
+    if not (dcc.get("count") or rows):
         return "unexploited"
     stages = {r.get("maxClinicalStage") for r in rows}
     if stages & _APPROVED_STAGES:

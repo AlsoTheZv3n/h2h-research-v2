@@ -54,9 +54,14 @@ async def backfill(
             return await backfill(session, client=owned, limit=limit)
 
     repo = DrugRepository(session)
-    # Enriched drugs with no target_ids fact yet -- the fact is the "done" marker, so this
-    # skips anything already backfilled and resumes cleanly after a crash.
-    done = select(FactRow.drug_chembl_id).where(FactRow.key == "target_ids")
+    # Enriched drugs with no *measured* target_ids fact yet -- the fact is the "done" marker,
+    # so this skips anything already backfilled and resumes cleanly after a crash. A
+    # source_failed target_ids (written when the original enrichment hit an OT outage) does
+    # NOT count as done: it is "we could not look", not "no targets", so the drug is retried
+    # once OT is healthy rather than being stranded with zero drug_target rows forever.
+    done = select(FactRow.drug_chembl_id).where(
+        FactRow.key == "target_ids", FactRow.status != FactStatus.SOURCE_FAILED
+    )
     query = (
         select(Drug)
         .where(Drug.last_enriched_at.isnot(None))

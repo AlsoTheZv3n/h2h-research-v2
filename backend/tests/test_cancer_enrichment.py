@@ -9,7 +9,7 @@ never saves, an outage stored as "no targets") fails it rather than passing quie
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import timedelta
 from typing import Any, cast
 
@@ -532,7 +532,9 @@ def _drug_status_response(by_id: dict[str, list[str]]) -> httpx.Response:
     return httpx.Response(200, json={"data": {"targets": targets}})
 
 
-def _ot_router(landscape: httpx.Response, drug_status: httpx.Response):
+def _ot_router(
+    landscape: httpx.Response, drug_status: httpx.Response
+) -> Callable[[httpx.Request], httpx.Response]:
     """Route the two OT POSTs (both to the same endpoint) by which query they carry."""
 
     def route(request: httpx.Request) -> httpx.Response:
