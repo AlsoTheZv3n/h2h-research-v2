@@ -235,7 +235,11 @@ def _group_pipeline(rows: list[dict[str, Any]]) -> dict[str, Any]:
             continue  # already seen at an equal-or-more-advanced stage
         moas = [
             m["mechanismOfAction"]
-            for m in (drug.get("mechanismsOfAction") or {}).get("rows", [])
+            # `.get("rows") or []`, not `.get("rows", [])`: Open Targets returns rows as
+            # JSON null (not absent), and the default only fires on an absent key -- so
+            # the [] default would leave None and `for m in None` would crash out of the
+            # source uncaught, writing no source_failed fact. Same guard as line 204.
+            for m in (drug.get("mechanismsOfAction") or {}).get("rows") or []
             if m.get("mechanismOfAction")
         ]
         best[cid] = {

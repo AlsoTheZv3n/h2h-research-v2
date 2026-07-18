@@ -280,6 +280,11 @@ def _pipeline_response(*drugs: tuple[str, str, str]) -> httpx.Response:
 class TestPipeline:
     def test_group_pipeline_orders_dedupes_and_counts(self) -> None:
         rows = [
+            # CHEMBL1's less-advanced row arrives FIRST; the more-advanced PHASE_2 row
+            # (carrying the modality/mechanism) arrives SECOND -- Open Targets does not
+            # guarantee order, so a first-seen-wins regression would keep the wrong stage,
+            # and these assertions catch it.
+            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_1"},
             {
                 "drug": {
                     "id": "CHEMBL1",
@@ -289,7 +294,6 @@ class TestPipeline:
                 },
                 "maxClinicalStage": "PHASE_2",
             },
-            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_1"},  # lower stage
             {"drug": {"id": "CHEMBL2", "name": "B"}, "maxClinicalStage": "APPROVAL"},
             {"drug": {"id": "CHEMBL3", "name": "C"}, "maxClinicalStage": "PHASE_2"},
         ]
@@ -314,6 +318,24 @@ class TestPipeline:
     def test_group_pipeline_empty_is_empty_dict(self) -> None:
         # An empty dict is what fact() classifies as EMPTY ("resolved, no programmes").
         assert enrich_cancer._group_pipeline([]) == {}
+
+    def test_group_pipeline_survives_null_mechanism_rows(self) -> None:
+        # Open Targets returns mechanismsOfAction.rows as JSON null (not absent) for some
+        # drugs. That must not crash the source out uncaught -- it becomes an honest null
+        # mechanism, so the outage-vs-empty guarantee still holds.
+        rows = [
+            {
+                "drug": {
+                    "id": "C1",
+                    "name": "A",
+                    "drugType": "Small molecule",
+                    "mechanismsOfAction": {"rows": None},
+                },
+                "maxClinicalStage": "PHASE_2",
+            },
+        ]
+        pipe = enrich_cancer._group_pipeline(rows)
+        assert pipe["drugs"][0]["mechanism"] is None
 
     def test_group_pipeline_ranks_preapproval_as_advanced_not_bottom(self) -> None:
         # PREAPPROVAL (submitted, awaiting approval) is a real, advanced Open Targets
