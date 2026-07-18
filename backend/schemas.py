@@ -99,6 +99,12 @@ class DrugDetail(BaseModel):
     status. `not_analyzed` and `enriching` mean we have not looked yet -- neither is
     "we looked and found nothing", and the UI must never render them as such."""
 
+    refreshing: bool = False
+    """A READY brief whose facts aged past the freshness window, so a background refresh
+    is running (stale-while-revalidate). The facts shown are the stored ones, served
+    without waiting; the client may poll and swap in the fresh brief when it lands. This
+    is not `enriching` -- there ARE facts, and the reader is not blocked."""
+
     last_enriched_at: datetime | None = None
 
     facts: dict[str, list[SourcedFact]] = Field(

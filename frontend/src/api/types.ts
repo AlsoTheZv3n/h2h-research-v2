@@ -138,6 +138,9 @@ export interface DrugDetail {
    *  with has_structure. null when there is no structure. */
   smiles: string | null
   state: BriefState
+  /** A READY brief whose facts aged past the freshness window: shown now from storage
+   *  while a background refresh runs (stale-while-revalidate). Poll until it clears. */
+  refreshing: boolean
   last_enriched_at: string | null
   /**
    * Keyed by fact name; a list because sources disagree. ChEMBL and Open Targets

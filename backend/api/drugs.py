@@ -213,6 +213,10 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         has_structure=bool(drug.smiles),
         smiles=drug.smiles,
         state=state,
+        # A READY brief with a refresh in flight is being revalidated (stale-while-
+        # revalidate): the reader sees the stored facts now, and the client can poll for
+        # the fresh ones. Not the same as `enriching`, where there are no facts yet.
+        refreshing=state is BriefState.READY and is_enriching(chembl_id),
         last_enriched_at=drug.last_enriched_at,
         facts=dict(facts),
         unavailable=unavailable,

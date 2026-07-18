@@ -48,7 +48,9 @@ export function DetailPage() {
         const d = await getDrug(chemblId)
         if (cancelled) return
         setDetail(d)
-        if (d.state !== 'ready') timer = setTimeout(load, POLL_MS)
+        // Keep polling while a brief is being built (not ready) OR revalidated in the
+        // background (ready but stale): in both the next poll swaps in fresher facts.
+        if (d.state !== 'ready' || d.refreshing) timer = setTimeout(load, POLL_MS)
       } catch (e) {
         if (!cancelled) setError((e as Error).message)
       }
@@ -107,6 +109,11 @@ export function DetailPage() {
           </h1>
           <span className="font-mono text-xs text-ink-faint">{detail.chembl_id}</span>
           <MaturityPill maturity={detail.maturity} />
+          {detail.refreshing && (
+            <span data-testid="refreshing" className="text-xs text-ink-faint italic">
+              refreshing…
+            </span>
+          )}
         </header>
 
         <AnalyzingNotice state={detail.state} />
