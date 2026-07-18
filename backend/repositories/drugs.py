@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import FactStatus, SourceRecord
-from backend.models import DataMaturity, Drug, FactRow
+from backend.models import DataMaturity, Drug, DrugTarget, FactRow
 
 # Index columns the overview reads, and the source that owns each. ChEMBL owns
 # structure and physchem; Open Targets owns modality and target annotation.
@@ -223,6 +223,19 @@ class DrugRepository:
             .order_by(func.count().desc(), Drug.target_class)
         )
         return [row[0] for row in result.all()]
+
+    async def sync_drug_targets(self, chembl_id: str, ensembl_ids: Sequence[str]) -> None:
+        """Replace a drug's target set with the Ensembl ids it currently acts on.
+
+        Delete-then-insert, so re-enrichment reflects the drug's current mechanisms rather
+        than accreting stale ones. The caller must gate on the target_ids fact NOT being
+        source_failed -- an outage must never reach here, because a cleared set here means
+        the measured truth "these are the targets" (an empty list = "no targets annotated"),
+        never "we could not look". Joining is by Ensembl id only; no symbol ever enters.
+        """
+        await self.session.execute(delete(DrugTarget).where(DrugTarget.drug_chembl_id == chembl_id))
+        for eid in dict.fromkeys(ensembl_ids):  # de-dup, keep first-seen order
+            self.session.add(DrugTarget(drug_chembl_id=chembl_id, target_ensembl_id=eid))
 
     async def promote_index_columns(self, chembl_id: str, record: SourceRecord) -> None:
         """Copy a ChEMBL record's index columns into the catalog row.

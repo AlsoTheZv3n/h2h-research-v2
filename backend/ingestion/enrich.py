@@ -282,6 +282,13 @@ async def _promote(
         indications = ot.facts.get("indications")
         if indications is not None and indications.status is FactStatus.OK and indications.value:
             columns["primary_indication"] = indications.value[0]
+        # Sync the drug->target relation the cancer landscape's catalog-link reads. Gated on
+        # not-source_failed exactly like target_class above: an OT outage must never wipe the
+        # drug's targets, but an EMPTY (measured "no targets annotated") legitimately clears
+        # them. Keyed on Ensembl id -- never the symbol.
+        target_ids = ot.facts.get("target_ids")
+        if target_ids is not None and target_ids.status is not FactStatus.SOURCE_FAILED:
+            await repo.sync_drug_targets(drug.chembl_id, target_ids.value or [])
 
     # maturity, now with a real answer for has_potency rather than a placeholder.
     resolved_type = columns.get("drug_type") or drug.drug_type

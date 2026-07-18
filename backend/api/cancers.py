@@ -145,6 +145,18 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
         ids = [d["chembl_id"] for d in pipeline[0].value.get("drugs", []) if d.get("chembl_id")]
         catalog_drug_ids = sorted(await repo.present_drug_ids(ids))
 
+    # For the target landscape, which displayed targets our catalog holds a drug against --
+    # the drugged flag's separate, weaker catalog-link signal, joined on Ensembl id (never
+    # the symbol). A target missing from the result simply gets no link; it is NOT rendered
+    # "unexploited", which is the world's answer and comes from the fact itself.
+    target_catalog_drug: dict[str, str] = {}
+    landscape = facts.get("target_landscape")
+    if landscape and landscape[0].status is FactStatus.OK and isinstance(landscape[0].value, dict):
+        ensembl_ids = [
+            t["ensembl_id"] for t in landscape[0].value.get("targets", []) if t.get("ensembl_id")
+        ]
+        target_catalog_drug = await repo.catalog_drug_for_targets(ensembl_ids)
+
     detail = CancerDetail(
         disease_id=cancer.disease_id,
         name=cancer.name,
@@ -157,6 +169,7 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
         facts=dict(facts),
         unavailable=unavailable,
         catalog_drug_ids=catalog_drug_ids,
+        target_catalog_drug=target_catalog_drug,
     )
 
     # Cache only a finished brief, and not one being re-fetched right now (the retry-race

@@ -25,6 +25,7 @@ from backend.ingestion.chembl_catalog import to_columns
 from backend.ingestion.enrich import EnrichStats, _promote, enrich_catalog, enrich_drug
 from backend.models import DataMaturity, Drug
 from backend.repositories import DrugRepository
+from backend.repositories.cancers import CancerRepository
 
 CHEMBL = "https://www.ebi.ac.uk/chembl/api/data"
 CT = "https://clinicaltrials.gov/api/v2/studies"
@@ -295,6 +296,54 @@ class TestEnrichment:
 
         assert drug.primary_target == "ABCB1"
         assert drug.target_class == "Kinase"  # kept: an outage is not an answer
+
+    async def test_promote_syncs_drug_target_from_the_target_ids_fact(
+        self, session: AsyncSession
+    ) -> None:
+        # The catalog-link's primary write path: _promote must populate drug_target from the
+        # OT record's target_ids fact, or catalog links only ever appear via the standalone
+        # backfill and never on live enrichment.
+        repo = DrugRepository(session)
+        drug = await repo.upsert_drug("CHEMBL_DT", pref_name="dt", maturity=DataMaturity.INDEX_ONLY)
+        await session.commit()
+        ot = SourceRecord(
+            "opentargets",
+            "dt",
+            ok=True,
+            provenance={"source_url": "u", "retrieved_at": utcnow()},
+            facts={"target_ids": fact(["ENSG_A", "ENSG_B"], "opentargets", source_url="u")},
+        )
+        await _promote(session, repo, drug, [ot])
+        await session.commit()
+        assert await CancerRepository(session).catalog_drug_for_targets(["ENSG_A"]) == {
+            "ENSG_A": "CHEMBL_DT"
+        }
+
+    async def test_promote_keeps_drug_target_when_the_source_failed(
+        self, session: AsyncSession
+    ) -> None:
+        # The outage mirror, the honest-states rule for this table: a SOURCE_FAILED target_ids
+        # (Open Targets was down) must NOT wipe the drug's existing targets -- the catalog
+        # links must survive an outage, exactly as target_class does above.
+        repo = DrugRepository(session)
+        drug = await repo.upsert_drug(
+            "CHEMBL_DT2", pref_name="dt2", maturity=DataMaturity.INDEX_ONLY
+        )
+        await repo.sync_drug_targets("CHEMBL_DT2", ["ENSG_KEEP"])
+        await session.commit()
+        ot = SourceRecord(
+            "opentargets",
+            "dt2",
+            ok=True,
+            provenance={"source_url": "u", "retrieved_at": utcnow()},
+            facts={"target_ids": failed("opentargets", "outage", source_url="u")},
+        )
+        await _promote(session, repo, drug, [ot])
+        await session.commit()
+        # Kept, not wiped: an outage is not "this drug now hits nothing".
+        assert await CancerRepository(session).catalog_drug_for_targets(["ENSG_KEEP"]) == {
+            "ENSG_KEEP": "CHEMBL_DT2"
+        }
 
     @respx.mock
     async def test_maturity_reaches_full_once_potency_is_known(

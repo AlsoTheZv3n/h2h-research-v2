@@ -1,14 +1,16 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { SourcedFact } from '../api/types'
 import { BriefStateProvider } from './Fact'
 import { TargetLandscapeCard } from './TargetLandscapeCard'
 
 /**
- * The one thing this card must never do is render an Open Targets outage as "no
- * associated targets" -- that would tell a reader a cancer has no druggable biology
- * when the truth is the source was down. So the states are tested apart, and the
- * outage case is the load-bearing one.
+ * The card must never render an Open Targets outage as "no associated targets" -- that
+ * would tell a reader a cancer has no druggable biology when the source was merely down.
+ * And the R4 flag adds a second load-bearing distinction: `unknown` (not measured) and
+ * `unexploited` (measured, no drug) must never render alike -- the None-vs-0 lie one level up.
  */
 
 function fact(over: Partial<SourcedFact> = {}): SourcedFact {
@@ -24,14 +26,15 @@ function fact(over: Partial<SourcedFact> = {}): SourcedFact {
   }
 }
 
-// The fact value is the {threshold, n_strong, targets} wrapper -- the card reads
-// value.targets, and the strong count/threshold live beside the displayed rows.
+// One target per drugged state, so a single fixture exercises all four badges + the filter.
 const landscape = {
   threshold: 0.5,
-  n_strong: 2,
+  n_strong: 4,
   targets: [
-    { symbol: 'EGFR', score: 0.89, evidence_types: ['clinical', 'somatic_mutation'], sm_tractable: true, ab_tractable: true },
-    { symbol: 'KRAS', score: 0.83, evidence_types: ['clinical'], sm_tractable: true, ab_tractable: false },
+    { symbol: 'EGFR', ensembl_id: 'ENSG_E', score: 0.89, evidence_types: ['clinical', 'somatic_mutation'], sm_tractable: true, ab_tractable: true, drug_status: 'approved' },
+    { symbol: 'TP53', ensembl_id: 'ENSG_T', score: 0.83, evidence_types: ['clinical'], sm_tractable: true, ab_tractable: false, drug_status: 'clinical' },
+    { symbol: 'STK11', ensembl_id: 'ENSG_S', score: 0.74, evidence_types: ['somatic_mutation'], sm_tractable: false, ab_tractable: false, drug_status: 'unexploited' },
+    { symbol: 'DICER1', ensembl_id: 'ENSG_D', score: 0.72, evidence_types: ['literature'], sm_tractable: false, ab_tractable: false, drug_status: 'unknown' },
   ],
 }
 
@@ -40,32 +43,94 @@ describe('TargetLandscapeCard', () => {
     render(<TargetLandscapeCard facts={[fact({ value: landscape })]} />)
     expect(screen.getByTestId('target-landscape')).toBeInTheDocument()
     expect(screen.getByText('EGFR')).toBeInTheDocument()
-    expect(screen.getByText('KRAS')).toBeInTheDocument()
-    // Provenance behind the info icon, the same chip the drug page uses.
+    expect(screen.getByText('STK11')).toBeInTheDocument()
     expect(screen.getByTestId('source-info')).toBeInTheDocument()
   })
 
+  it('renders each drugged state with its own distinct marker', () => {
+    render(<TargetLandscapeCard facts={[fact({ value: landscape })]} />)
+    const states = ['approved', 'clinical', 'unexploited', 'unknown']
+    for (const s of states) expect(screen.getByTestId(`drug-status-${s}`)).toBeInTheDocument()
+    // Distinct by more than the testid (which is derived from the status, so it can't
+    // collapse): the four must render with four distinct CLASSES (colours) and four distinct
+    // LABELS. Style two alike (e.g. clinical coloured like approved) or label two the same
+    // and this goes red -- the tautology the testid-only check would have missed.
+    const classes = states.map((s) => screen.getByTestId(`drug-status-${s}`).className)
+    expect(new Set(classes).size).toBe(4)
+    const labels = states.map((s) => screen.getByTestId(`drug-status-${s}`).textContent)
+    expect(new Set(labels).size).toBe(4)
+    // And the two whose confusion matters most read as different words.
+    expect(screen.getByTestId('drug-status-unexploited')).toHaveTextContent('unexploited')
+    expect(screen.getByTestId('drug-status-unknown')).toHaveTextContent('unknown')
+  })
+
+  it('a target with no drug_status (pre-flag fact) reads unknown, never unexploited', () => {
+    const preFlag = {
+      threshold: 0.5,
+      n_strong: 1,
+      // No drug_status key at all -- the shape of a fact stored before the flag shipped.
+      targets: [{ symbol: 'FOO', ensembl_id: 'ENSG_F', score: 0.8, evidence_types: [], sm_tractable: false, ab_tractable: false }],
+    }
+    render(<TargetLandscapeCard facts={[fact({ value: preFlag })]} />)
+    expect(screen.getByTestId('drug-status-unknown')).toBeInTheDocument()
+    // The load-bearing line: "we haven't measured it" must not read as "no drug exists".
+    expect(screen.queryByTestId('drug-status-unexploited')).not.toBeInTheDocument()
+  })
+
+  it('the status filter narrows to "unexploited only"', async () => {
+    const user = userEvent.setup()
+    render(<TargetLandscapeCard facts={[fact({ value: landscape })]} />)
+    expect(screen.getAllByTestId('landscape-row')).toHaveLength(4)
+    await user.selectOptions(screen.getByTestId('landscape-filter-status'), 'unexploited')
+    const rows = screen.getAllByTestId('landscape-row')
+    expect(rows).toHaveLength(1)
+    expect(within(rows[0]).getByText('STK11')).toBeInTheDocument()
+  })
+
+  it('links a target to a catalog drug brief when we hold one, by Ensembl id', () => {
+    render(
+      <MemoryRouter>
+        <TargetLandscapeCard
+          facts={[fact({ value: landscape })]}
+          catalogDrugByTarget={{ ENSG_E: 'CHEMBL_EGFR' }}
+        />
+      </MemoryRouter>,
+    )
+    // EGFR (ENSG_E) is the only target we hold a drug for -> its symbol links to that brief.
+    const link = screen.getByTestId('landscape-catalog-link')
+    expect(link).toHaveAttribute('href', '/drugs/CHEMBL_EGFR')
+    expect(link).toHaveTextContent('EGFR')
+    expect(screen.getAllByTestId('landscape-catalog-link')).toHaveLength(1)
+  })
+
+  it('a drugged target with no catalog drug shows its status but no link', () => {
+    // EGFR is `approved` in the fact but absent from our catalog map: it must read
+    // "approved, no link". Catalog absence is a missing link, never the drugged status --
+    // and never "unexploited", the world's answer, which the fact still supplies.
+    render(
+      <MemoryRouter>
+        <TargetLandscapeCard facts={[fact({ value: landscape })]} catalogDrugByTarget={{}} />
+      </MemoryRouter>,
+    )
+    expect(screen.queryByTestId('landscape-catalog-link')).not.toBeInTheDocument()
+    expect(screen.getByTestId('drug-status-approved')).toBeInTheDocument()
+  })
+
   it('still renders targets from a pre-reshape (bare array) fact value', () => {
-    // A fact stored before the {threshold, n_strong, targets} reshape is a bare array.
-    // The card must keep rendering its targets from it -- an already-enriched cancer's
-    // landscape must not collapse to "no targets" between the deploy and revalidation.
     render(<TargetLandscapeCard facts={[fact({ value: landscape.targets })]} />)
     expect(screen.getByTestId('target-landscape')).toBeInTheDocument()
     expect(screen.getByText('EGFR')).toBeInTheDocument()
-    expect(screen.getByText('KRAS')).toBeInTheDocument()
+    expect(screen.getByText('STK11')).toBeInTheDocument()
   })
 
   it('renders an outage as a calm unavailable chip, never "no targets"', () => {
     render(<TargetLandscapeCard facts={[fact({ value: null, status: 'source_failed', error: 'boom' })]} />)
     expect(screen.getByTestId('fact-source-failed')).toBeInTheDocument()
-    // The founding lie, refused: an outage is not an empty landscape.
     expect(screen.queryByTestId('target-landscape')).not.toBeInTheDocument()
     expect(screen.queryByText(/no associated targets/i)).not.toBeInTheDocument()
   })
 
   it('renders a real empty as "no associated targets"', () => {
-    // The backend emits an empty dict for a resolved-but-no-targets landscape (EMPTY),
-    // the same shape the pipeline uses; the card reads no targets out of it.
     render(<TargetLandscapeCard facts={[fact({ value: {}, status: 'empty' })]} />)
     expect(screen.getByText(/no associated targets/i)).toBeInTheDocument()
     expect(screen.queryByTestId('target-landscape')).not.toBeInTheDocument()

@@ -65,12 +65,35 @@ query TargetLandscape($id: String!, $n: Int!) {
       rows {
         score
         datatypeScores { id score }
-        target { approvedSymbol tractability { label modality value } }
+        target { id approvedSymbol tractability { label modality value } }
       }
     }
   }
 }
 """
+
+# The drugged/unexploited status of a target is a property of the target IN THE WORLD, not
+# of our catalog -- so it comes from Open Targets, batched for the whole displayed set in one
+# call via the plural `targets(ensemblIds:)`. NB: `Target.knownDrugs` does NOT exist (the
+# query errors); `drugAndClinicalCandidates` is the field, the same one the disease pipeline
+# uses, and `maxClinicalStage` (not a non-existent `Drug.isApproved`) carries the stage.
+# maxClinicalStage is the drug's OVERALL stage against this target across ALL indications --
+# indication-agnostic, target-level. It is NOT "approved for this cancer"; the UI must say so.
+_TARGET_DRUG_STATUS_QUERY = """
+query TargetDrugStatus($ids: [String!]!) {
+  targets(ensemblIds: $ids) {
+    id
+    drugAndClinicalCandidates {
+      count
+      rows { maxClinicalStage }
+    }
+  }
+}
+"""
+
+# maxClinicalStage values that mean an approved drug exists (APPROVAL, or PHASE_4 = post-
+# marketing, which only happens after approval). Anything else with candidates is "clinical".
+_APPROVED_STAGES = frozenset({"APPROVAL", "PHASE_4"})
 
 _PIPELINE_QUERY = """
 query Pipeline($id: String!) {
@@ -166,6 +189,9 @@ def _target_row(row: dict[str, Any]) -> dict[str, Any]:
     tractability = target.get("tractability") or []
     return {
         "symbol": target.get("approvedSymbol"),
+        # The stable Ensembl gene id (ENSG...), carried so the drugged/unexploited flag and
+        # the catalog link both join on it, never on the alias-prone approvedSymbol.
+        "ensembl_id": target.get("id"),
         "score": round(row.get("score") or 0.0, 3),
         # The typed evidence channels behind the association ("clinical",
         # "somatic_mutation", ...), so a reader sees whether it rests on trials or on
@@ -174,7 +200,60 @@ def _target_row(row: dict[str, Any]) -> dict[str, Any]:
         # The drugged/undrugged story starts here: is there a tractable modality at all?
         "sm_tractable": any(t.get("modality") == "SM" and t.get("value") for t in tractability),
         "ab_tractable": any(t.get("modality") == "AB" and t.get("value") for t in tractability),
+        # Filled in by the drug-status batch below; "unknown" until then, never "unexploited"
+        # -- absence of a measurement is not a measurement of absence.
+        "drug_status": "unknown",
     }
+
+
+def _classify_drug_status(dcc: dict[str, Any] | None) -> str:
+    """A target's drugged status from its drugAndClinicalCandidates, indication-agnostic.
+
+    Three measured states; the caller supplies "unknown" for a target OT never resolved.
+      approved     -- an approved drug hits this target (APPROVAL / PHASE_4)
+      clinical     -- candidates exist against it, none approved
+      unexploited  -- OT resolved the target and it has NO drugs at all (a real finding)
+    """
+    dcc = dcc or {}
+    rows = dcc.get("rows") or []
+    # "Unexploited" keys on the authoritative count, not len(rows): Open Targets returns
+    # every candidate today (verified: count == len(rows), APPROVAL always present), so the
+    # two agree -- but keying the "no drugs anywhere" call on count keeps it correct even if
+    # a future release paginates rows. Approved-vs-clinical still reads the rows' stages.
+    if not (dcc.get("count") or rows):
+        return "unexploited"
+    stages = {r.get("maxClinicalStage") for r in rows}
+    if stages & _APPROVED_STAGES:
+        return "approved"
+    return "clinical"
+
+
+async def _fetch_drug_status(client: httpx.AsyncClient, ensembl_ids: list[str]) -> dict[str, str]:
+    """Batch the drugged status for a set of targets: one OT call, keyed by Ensembl id.
+
+    Returns a status ONLY for targets Open Targets actually resolved. A total failure
+    returns {} (every target falls through to "unknown"); a partial response omits the
+    unresolved targets (they too fall through to "unknown") -- so a fetch that half-worked
+    marks only the missing targets unknown, never contaminating the ones that resolved, and
+    never letting an unresolved target read as "unexploited".
+    """
+    if not ensembl_ids:
+        return {}
+    try:
+        data = await _gql(client, _TARGET_DRUG_STATUS_QUERY, {"ids": ensembl_ids})
+    except Exception as exc:
+        # The flag sub-query is down; the landscape itself still stands. Every target
+        # becomes "unknown", which the card renders distinctly from "unexploited".
+        logger.warning("target drug-status batch failed: %s", exc)
+        return {}
+    status: dict[str, str] = {}
+    for t in data.get("targets") or []:
+        # OT returns a null entry (or omits) an unresolved id; match by the id it echoes
+        # back, not by position, so nulls and reordering cannot misassign a status.
+        if not t or not t.get("id"):
+            continue
+        status[t["id"]] = _classify_drug_status(t.get("drugAndClinicalCandidates"))
+    return status
 
 
 async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
@@ -259,6 +338,15 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
     display = [
         _target_row(r) for r in rows[:_TOP_TARGETS] if (r.get("target") or {}).get("approvedSymbol")
     ]
+    # The drugged/unexploited flag: one batched OT call for the displayed targets, joined
+    # back on Ensembl id. A failed or partial batch leaves the affected targets at their
+    # "unknown" default (set in _target_row) -- never "unexploited".
+    drug_status = await _fetch_drug_status(
+        client, [t["ensembl_id"] for t in display if t["ensembl_id"]]
+    )
+    for t in display:
+        if t["ensembl_id"] in drug_status:
+            t["drug_status"] = drug_status[t["ensembl_id"]]
     # The value carries the threshold beside the count, so the number is never shown
     # without saying what it counts.
     value = {"threshold": _STRONG_SCORE, "n_strong": n_strong, "targets": display}

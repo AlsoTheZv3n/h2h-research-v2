@@ -127,7 +127,10 @@ export function CancerDetailPage() {
             facts={detail.facts['pipeline']}
             catalogDrugIds={detail.catalog_drug_ids}
           />
-          <TargetLandscapeCard facts={detail.facts['target_landscape']} />
+          <TargetLandscapeCard
+            facts={detail.facts['target_landscape']}
+            catalogDrugByTarget={detail.target_catalog_drug}
+          />
         </div>
 
         <p className="mt-4 text-[11px] text-ink-faint">

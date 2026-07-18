@@ -71,3 +71,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 asyncio_mode = "auto"
+# live_ot hits the real Open Targets API, so it is deselected by default -- CI's unit path
+# must not depend on a third party being up. Run it on demand with: pytest -m live_ot
+addopts = "-m 'not live_ot'"
+markers = [
+    "live_ot: hits the live Open Targets GraphQL API; deselected by default (opt in with -m live_ot)",
+]

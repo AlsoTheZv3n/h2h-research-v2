@@ -1,6 +1,7 @@
-# H2H — sourced evidence for cancer drug programs
+# H2H — sourced evidence for oncology drugs and cancers
 
-> Structure, binding, mechanism and clinical status for any oncology drug — every fact linked to its
+> Structure, binding, mechanism and clinical status for any oncology drug; and for any cancer, its drug
+> pipeline, target landscape, and which targets are drugged versus unexploited — every fact linked to its
 > source, and honest about what's missing.
 
 [![CI](https://github.com/AlsoTheZv3n/h2h-research-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/AlsoTheZv3n/h2h-research-v2/actions/workflows/ci.yml)
@@ -40,6 +41,22 @@ date**, and gaps are shown honestly instead of papered over.
   *"not applicable — this is a biologic"* rather than empty panels.
 - **Ask a question about the drug** and get an answer built only from that drug's facts and
   abstracts, with every source linked — see below.
+- **Browse cancers, not just drugs.** Open any cancer → its **drug pipeline** as a phase distribution
+  and a filterable table (linking only the drugs the catalog holds, matched by exact ChEMBL id; the
+  count is an ontology roll-up, and the card says so), and its **target landscape** with Open Targets
+  association scores and tractability. The associated-targets metric is honest about a threshold
+  artifact — it leads with the count of *strong* associations, never the whole-genome total:
+  `117 · score ≥ 0.5 · 12,475 with any evidence`. And per target, the cell this tool exists for:
+  whether it is **drugged (approved), in development, or unexploited** in the world — sourced from Open
+  Targets (not our catalog), joined on stable Ensembl ids, with a separate link to a catalog drug
+  against it where we hold one. A high-association target with no drug anywhere is the finding; one
+  merely absent from *our* catalog is not.
+
+The cancer view is deliberately partial, and says which parts exist. **Known gaps, named not shipped:**
+trial reality, the molecular profile, epidemiology (incidence / age-standardised rates), cost-of-care
+and unmet-need blocks are not built yet. What is shown is sourced; what is missing is stated rather than
+faked — the same discipline as the honest states below. It is a research and drug-intelligence view of
+the evidence, not clinical decision support and not medical advice.
 
 ### The honest states, and why they are the point
 
