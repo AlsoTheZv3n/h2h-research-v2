@@ -1,8 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="H2H">
-  <!-- H2H's mark: a benzene ring (the drug this tool is about) with one atom lit up --
-       the sourced fact pinned to a molecule, which is the whole product in a glyph.
-       #246099 is the app's own accent (oklch 48% 0.11 250); white reads on a light or a
-       dark browser tab alike. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="H2H">
+  <!-- H2H's mark: a benzene ring (the drug this tool is about) with one atom lit up, the
+       sourced fact pinned to a molecule. #246099 is the app accent (oklch 48% 0.11 250);
+       white on the tile reads on a light or a dark browser tab alike. -->
   <rect width="32" height="32" rx="7" fill="#246099"/>
   <polygon points="16,6 24.66,11 24.66,21 16,26 7.34,21 7.34,11"
            fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>
