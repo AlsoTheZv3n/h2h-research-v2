@@ -1,0 +1,67 @@
+======================================================================
+(a) totalCount by condition
+======================================================================
+  NSCLC        (non-small cell lung carcinoma): 8442
+  breast       (breast carcinoma): 16474
+  pancreatic   (pancreatic carcinoma): 4625
+  melanoma     (melanoma): 3734
+  CML          (chronic myeloid leukemia): 1803
+
+======================================================================
+(b) whyStopped fraction among TERMINATED + WITHDRAWN
+======================================================================
+  NSCLC       : 1353 terminated/withdrawn total, 1353 scanned, 1205 with whyStopped (89.1%)
+  breast      : 1918 terminated/withdrawn total, 1918 scanned, 1699 with whyStopped (88.6%)
+  pancreatic  : 662 terminated/withdrawn total, 662 scanned, 610 with whyStopped (92.1%)
+  melanoma    : 687 terminated/withdrawn total, 687 scanned, 625 with whyStopped (91.0%)
+  CML         : 347 terminated/withdrawn total, 347 scanned, 284 with whyStopped (81.8%)
+
+======================================================================
+(c) RECRUITING trials by country (geo/location filter)
+======================================================================
+  NSCLC       : RECRUITING  CH=40  DE=101  AT=38
+  breast      : RECRUITING  CH=40  DE=123  AT=31
+  pancreatic  : RECRUITING  CH=8  DE=28  AT=8
+  melanoma    : RECRUITING  CH=12  DE=34  AT=9
+  CML         : RECRUITING  CH=1  DE=10  AT=3
+
+  -- sample RECRUITING Swiss trials (NSCLC, breast) --
+    NSCLC: NCT06712316  CH cities: Baden, Lausanne
+    NSCLC: NCT04389632  CH cities: Chur, Lausanne
+    NSCLC: NCT06921681  CH cities: Basel
+    breast: NCT05362760  CH cities: Brig, Sankt Gallen
+    breast: NCT05890677  CH cities: Aarau, Basel, Geneva, Lausanne, Winterthur, Zurich
+    breast: NCT06358573  CH cities: Aarau, Basel, Bellinzona, Chur, Liestal, Sankt Gallen, Winterthur, Zurich
+
+======================================================================
+(d) Hazard ratio fraction among COMPLETED trials WITH results
+======================================================================
+  NSCLC       : 1077 completed-with-results, 1000 scanned, 185 carry >=1 HAZARD_RATIO analysis (18.5%)
+      e.g. NCT00107172: HR=1.01 CI[0.51, 1.98]
+      e.g. NCT00107172: HR=1.07 CI[0.71, 1.61]
+      e.g. NCT00377156: HR=1.02 CI[0.75, 1.38]
+  breast      : 1719 completed-with-results, 1000 scanned, 114 carry >=1 HAZARD_RATIO analysis (11.4%)
+      e.g. NCT01310231: HR=1.2 CI[0.63, 2.31]
+      e.g. NCT00377156: HR=1.02 CI[0.75, 1.38]
+      e.g. NCT00274456: HR=0.607 CI[None, None]
+  pancreatic  : 425 completed-with-results, 425 scanned, 34 carry >=1 HAZARD_RATIO analysis (8.0%)
+      e.g. NCT02184195: HR=0.531 CI[0.346, 0.815]
+      e.g. NCT02184195: HR=0.831 CI[0.564, 1.224]
+      e.g. NCT02184195: HR=0.659 CI[0.426, 1.020]
+  melanoma    : 519 completed-with-results, 519 scanned, 62 carry >=1 HAZARD_RATIO analysis (11.9%)
+      e.g. NCT01245062: HR=0.44 CI[0.31, 0.64]
+      e.g. NCT01245062: HR=0.41 CI[0.29, 0.60]
+      e.g. NCT03400332: HR=0.94 CI[0.61, 1.45]
+  CML         : 303 completed-with-results, 303 scanned, 9 carry >=1 HAZARD_RATIO analysis (3.0%)
+      e.g. NCT03268954: HR=0.968 CI[0.757, 1.238]
+      e.g. NCT03268954: HR=0.888 CI[0.709, 1.113]
+      e.g. NCT03268954: HR=1.037 CI[0.660, 1.630]
+
+======================================================================
+SUMMARY
+======================================================================
+  NSCLC       : trials=8442  whyStopped=1205/1353 (89%)  CH_recruiting=40  HR=185/1000 (18.5%)  [POPULATED]
+  breast      : trials=16474  whyStopped=1699/1918 (89%)  CH_recruiting=40  HR=114/1000 (11.4%)  [POPULATED]
+  pancreatic  : trials=4625  whyStopped=610/662 (92%)  CH_recruiting=8  HR=34/425 (8.0%)  [POPULATED]
+  melanoma    : trials=3734  whyStopped=625/687 (91%)  CH_recruiting=12  HR=62/519 (11.9%)  [POPULATED]
+  CML         : trials=1803  whyStopped=284/347 (82%)  CH_recruiting=1  HR=9/303 (3.0%)  [POPULATED]

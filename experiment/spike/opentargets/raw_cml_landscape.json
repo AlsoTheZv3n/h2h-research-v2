@@ -1,0 +1,538 @@
+{
+    "data": {
+        "disease": {
+            "id": "MONDO_0011996",
+            "name": "chronic myelogenous leukemia, BCR-ABL1 positive",
+            "associatedTargets": {
+                "count": 4479,
+                "rows": [
+                    {
+                        "score": 0.836114912178328,
+                        "datatypeScores": [
+                            {
+                                "id": "clinical",
+                                "score": 0.9947981261546803
+                            },
+                            {
+                                "id": "genetic_literature",
+                                "score": 0.607930797611621
+                            },
+                            {
+                                "id": "affected_pathway",
+                                "score": 0.9671529481664186
+                            },
+                            {
+                                "id": "literature",
+                                "score": 0.9956332780115055
+                            },
+                            {
+                                "id": "genetic_association",
+                                "score": 0.8634395684036567
+                            },
+                            {
+                                "id": "somatic_mutation",
+                                "score": 0.7234376491578292
+                            },
+                            {
+                                "id": "animal_model",
+                                "score": 0.5309299788207343
+                            }
+                        ],
+                        "target": {
+                            "id": "ENSG00000097007",
+                            "approvedSymbol": "ABL1",
+                            "tractability": [
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Structure with Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Med-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Druggable Family",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt loc high conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "GO CC high conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt loc med conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt SigP or TMHMM",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "GO CC med conf",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Human Protein Atlas loc",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Literature",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "UniProt Ubiquitination",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Database Ubiquitination",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Half-life Data",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Small Molecule Binder",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "score": 0.8289676373619297,
+                        "datatypeScores": [
+                            {
+                                "id": "genetic_literature",
+                                "score": 0.607930797611621
+                            },
+                            {
+                                "id": "clinical",
+                                "score": 0.9947785553508657
+                            },
+                            {
+                                "id": "affected_pathway",
+                                "score": 0.9190679877429972
+                            },
+                            {
+                                "id": "literature",
+                                "score": 0.9927816051819413
+                            },
+                            {
+                                "id": "genetic_association",
+                                "score": 0.2774325968833834
+                            },
+                            {
+                                "id": "somatic_mutation",
+                                "score": 0.7599134970145264
+                            }
+                        ],
+                        "target": {
+                            "id": "ENSG00000186716",
+                            "approvedSymbol": "BCR",
+                            "tractability": [
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Structure with Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Med-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Druggable Family",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt loc high conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "GO CC high conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt loc med conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt SigP or TMHMM",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "GO CC med conf",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Human Protein Atlas loc",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Literature",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "UniProt Ubiquitination",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Database Ubiquitination",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Half-life Data",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Small Molecule Binder",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "score": 0.7098719942163161,
+                        "datatypeScores": [
+                            {
+                                "id": "clinical",
+                                "score": 0.9876447233213284
+                            },
+                            {
+                                "id": "affected_pathway",
+                                "score": 0.607930797611621
+                            },
+                            {
+                                "id": "literature",
+                                "score": 0.8082803057375497
+                            },
+                            {
+                                "id": "somatic_mutation",
+                                "score": 0.5319394479101685
+                            },
+                            {
+                                "id": "animal_model",
+                                "score": 0.397313172779075
+                            }
+                        ],
+                        "target": {
+                            "id": "ENSG00000157404",
+                            "approvedSymbol": "KIT",
+                            "tractability": [
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Structure with Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Ligand",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "High-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Med-Quality Pocket",
+                                    "modality": "SM",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Druggable Family",
+                                    "modality": "SM",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "UniProt loc high conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "GO CC high conf",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "UniProt loc med conf",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "UniProt SigP or TMHMM",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "GO CC med conf",
+                                    "modality": "AB",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Human Protein Atlas loc",
+                                    "modality": "AB",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "PR",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Literature",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "UniProt Ubiquitination",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Database Ubiquitination",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Half-life Data",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Small Molecule Binder",
+                                    "modality": "PR",
+                                    "value": true
+                                },
+                                {
+                                    "label": "Approved Drug",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Advanced Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                },
+                                {
+                                    "label": "Phase 1 Clinical",
+                                    "modality": "OC",
+                                    "value": false
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
