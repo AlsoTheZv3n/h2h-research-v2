@@ -85,8 +85,9 @@ ON CONFLICT (disease_id) DO UPDATE
 -- enriched cancer would trigger one on open). The other two stay not-analyzed.
 INSERT INTO cancer_fact (disease_id, key, source, value, status, source_url, retrieved_at)
 VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
-        '[{"symbol":"EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true},
-          {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]'::jsonb,
+        '{"threshold":0.5,"n_strong":118,
+          "targets":[{"symbol":"EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true},
+                     {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]}'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
        ('MONDO_E2E_NSCLC', 'pipeline', 'opentargets',
         '{"total":3,"by_phase":[{"stage":"APPROVAL","count":2},{"stage":"PHASE_2","count":1}],

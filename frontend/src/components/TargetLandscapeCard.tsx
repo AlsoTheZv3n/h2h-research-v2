@@ -1,4 +1,4 @@
-import type { SourcedFact, TargetLandscapeEntry } from '../api/types'
+import type { SourcedFact, TargetLandscape, TargetLandscapeEntry } from '../api/types'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { useBriefState } from './Fact'
@@ -46,7 +46,12 @@ export function TargetLandscapeCard({ facts }: { facts?: SourcedFact[] }) {
     )
   }
 
-  const targets = (fact.value ?? []) as TargetLandscapeEntry[]
+  // Tolerate both fact shapes. The current value is {threshold, n_strong, targets}; a fact
+  // stored before that reshape is a bare target array. Reading either keeps an already-
+  // enriched cancer's card rendering its targets until stale-while-revalidate upgrades it --
+  // an old fact just lacks the strong count, which lives on the stat card, not here.
+  const value = fact.value as TargetLandscape | TargetLandscapeEntry[] | null
+  const targets = Array.isArray(value) ? value : (value?.targets ?? [])
   if (fact.status === 'empty' || targets.length === 0) {
     return (
       <Card title="Target landscape">

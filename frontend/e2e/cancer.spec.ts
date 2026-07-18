@@ -68,6 +68,12 @@ test.describe('cancer catalog', () => {
     await expect(card).toContainText('KRAS')
     // Provenance behind the info icon, the same chip the drug page uses.
     await expect(page.getByTestId('source-info').first()).toBeVisible()
+    // The associated-targets stat leads with the STRONG count (118), always beside its
+    // threshold, with the raw total framed as "with any evidence" -- never a bare figure.
+    const stat = page.getByTestId('targets-stat')
+    await expect(stat).toContainText('118')
+    await expect(stat).toContainText('score ≥ 0.5')
+    await expect(stat).toContainText('8,000 with any evidence')
   })
 
   test('the pipeline shows a distribution + filterable table, linking only catalog drugs', async ({

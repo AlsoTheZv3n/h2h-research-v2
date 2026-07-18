@@ -128,12 +128,18 @@ class TestLazyFetch:
             assert tl.source == "opentargets"
             assert tl.status is FactStatus.OK
             assert tl.source_url and DISEASE in tl.source_url
-            landscape = cast(list[dict[str, Any]], tl.value)
-            assert [t["symbol"] for t in landscape] == ["EGFR", "KRAS", "ALK"]
+            landscape = cast(dict[str, Any], tl.value)
+            # The value carries the strong-association count and the threshold beside the
+            # displayed targets -- the number is never stored without what it counts.
+            assert landscape["threshold"] == enrich_cancer._STRONG_SCORE
+            # All three mock scores (0.9, 0.8, 0.7) clear the 0.5 threshold.
+            assert landscape["n_strong"] == 3
+            targets = cast(list[dict[str, Any]], landscape["targets"])
+            assert [t["symbol"] for t in targets] == ["EGFR", "KRAS", "ALK"]
             # Tractability and evidence channels made it through the mapping.
-            assert landscape[0]["sm_tractable"] is True
-            assert landscape[0]["ab_tractable"] is False
-            assert "clinical" in landscape[0]["evidence_types"]
+            assert targets[0]["sm_tractable"] is True
+            assert targets[0]["ab_tractable"] is False
+            assert "clinical" in targets[0]["evidence_types"]
 
             cancer = await fresh.get(Cancer, DISEASE)
             assert cancer is not None
@@ -377,6 +383,85 @@ class TestPipeline:
         cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
         record = await enrich_cancer.opentargets_pipeline(fast_client, cancer)
         assert record.facts["pipeline"].status is FactStatus.SOURCE_FAILED
+
+
+def _scored_landscape(scores: list[float]) -> httpx.Response:
+    """A target-landscape answer with one target (T0, T1, ...) per given score."""
+    rows = [
+        {
+            "score": s,
+            "datatypeScores": [{"id": "clinical", "score": s}],
+            "target": {"approvedSymbol": f"T{i}", "tractability": []},
+        }
+        for i, s in enumerate(scores)
+    ]
+    return httpx.Response(
+        200,
+        json={
+            "data": {
+                "disease": {"id": DISEASE, "associatedTargets": {"count": len(rows), "rows": rows}}
+            }
+        },
+    )
+
+
+class TestTargetLandscape:
+    """The strong-association metric: the whole point of R3 is that the headline count is
+    the strong set, above a documented threshold, never the ~12,000-with-any-evidence total
+    that reads as 'the whole genome'. These go red if the threshold is dropped."""
+
+    @respx.mock
+    async def test_n_strong_counts_only_scores_at_or_above_the_threshold(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # Five targets, three at/above 0.5 (0.9, 0.5, 0.6), two below (0.4, 0.1). n_strong
+        # must be 3, not 5 -- 0.5 itself is strong (>=). Drop the threshold filter and this
+        # reads 5, which is exactly the misleading whole-genome count R3 exists to kill.
+        respx.post(OT).mock(return_value=_scored_landscape([0.9, 0.5, 0.6, 0.4, 0.1]))
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        assert val["n_strong"] == 3
+        # The threshold travels with the count -- the number is never stored bare.
+        assert val["threshold"] == enrich_cancer._STRONG_SCORE
+
+    @respx.mock
+    async def test_n_strong_counts_the_whole_page_not_just_the_displayed_top(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # More strong targets than the display cap: the count is over the full scanned page,
+        # the displayed list is capped at _TOP_TARGETS. Counting only the shown rows would
+        # undercount the headline metric.
+        n = enrich_cancer._TOP_TARGETS + 10
+        respx.post(OT).mock(return_value=_scored_landscape([0.8] * n))
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        assert val["n_strong"] == n
+        assert len(val["targets"]) == enrich_cancer._TOP_TARGETS
+
+    @respx.mock
+    async def test_a_resolved_disease_with_no_targets_is_empty_not_ok(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # Resolved, zero associations -> a measured EMPTY, distinct from the outage and
+        # not-found cases. The dict wrapper must not turn an empty landscape into an OK fact.
+        respx.post(OT).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "disease": {
+                            "id": DISEASE,
+                            "associatedTargets": {"count": 0, "rows": []},
+                        }
+                    }
+                },
+            )
+        )
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        assert record.facts["target_landscape"].status is FactStatus.EMPTY
 
 
 if __name__ == "__main__":  # pragma: no cover
