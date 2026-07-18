@@ -97,14 +97,18 @@ function SingleFact({
   emptyLabel?: string
 }) {
   if (fact.status === 'source_failed') {
+    // Amber, not red. A source we could not reach is a gap in our pipeline, not a fault
+    // in the drug -- the calm tone the advisory already uses, applied per fact. Still
+    // distinct from an empty (muted "none found") and an ok value, so the three states
+    // never blur; it just stops shouting.
     return (
       <span
         data-testid="fact-source-failed"
-        className="inline-flex items-center gap-1.5 rounded bg-unavailable-bg px-1.5 py-0.5
-                   text-xs font-medium text-unavailable"
+        className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
+                   text-xs font-medium text-partial"
         title={fact.error ?? undefined}
       >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-unavailable" />
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
         {fact.source} unavailable
       </span>
     )
