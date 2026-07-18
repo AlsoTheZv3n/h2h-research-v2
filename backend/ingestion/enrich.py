@@ -140,12 +140,64 @@ async def _enrich_literature(
         logger.info("%s: literature fetch failed: %s", drug.chembl_id, record.error)
 
 
+async def _save_source_record(
+    repo: DrugRepository,
+    drug: Drug,
+    adapter: SourceAdapter,
+    record: SourceRecord,
+    stats: EnrichStats,
+) -> bool:
+    """Persist one source's answer. Returns whether it contributed a failure."""
+    if record.error and not record.facts:
+        stats.records_failed += 1
+        logger.info("%s: %s could not resolve: %s", drug.chembl_id, record.source, record.error)
+
+        if record.outage:
+            # An outage has to be written down. Storing nothing leaves the brief with no
+            # rows from this source, so `unavailable` comes back empty and the API states
+            # -- positively -- that nothing failed, while the UI says "Not collected" for
+            # a mechanism ChEMBL simply could not be asked about. That is this project's
+            # founding lie, arriving through the one path built to prevent it.
+            #
+            # A non-outage error means the source answered and does not know this drug.
+            # Nothing to record: it has no opinion, and inventing source_failed rows
+            # would be the same lie mirrored.
+            await repo.save_record(
+                drug.chembl_id,
+                SourceRecord(
+                    record.source,
+                    record.query,
+                    ok=False,
+                    provenance=record.provenance,
+                    facts={
+                        key: failed(
+                            record.source,
+                            record.error,
+                            source_url=record.provenance.get("source_url"),
+                        )
+                        for key in adapter.owned_keys
+                    },
+                ),
+            )
+            stats.facts_source_failed += len(adapter.owned_keys)
+        return True
+
+    stats.records_ok += 1
+    await repo.save_record(drug.chembl_id, record)
+    stats.facts_written += len(record.facts)
+    failed_here = len(record.failed_facts)
+    stats.facts_source_failed += failed_here
+    return bool(failed_here)
+
+
 async def enrich_drug(
     session: AsyncSession,
     drug: Drug,
     adapters: list[SourceAdapter],
     stats: EnrichStats,
     literature: LiteratureFetcher | None = None,
+    *,
+    commit_each: bool = False,
 ) -> None:
     """Fetch every source for one drug and persist the result.
 
@@ -155,56 +207,32 @@ async def enrich_drug(
     the lazy brief) always pass it, and the full-loop acceptance test goes through one
     of those, because a test that omits it proves nothing about whether production
     wired it.
+
+    `commit_each` persists each source as it returns rather than all at the end, so a
+    reader polling a cold brief watches it fill card by card instead of staring at
+    "analyzing" until the slowest source comes back. The interactive path turns it on;
+    the bulk loader leaves it off and commits per wave. last_enriched_at is still set
+    only at the end (in _promote), so the brief stays "enriching" -- not "ready" --
+    until every source has been given its chance.
     """
     repo = DrugRepository(session)
     query = _query_for(drug)
 
-    records: list[SourceRecord] = await asyncio.gather(*(a.fetch(query) for a in adapters))
+    async def fetch(adapter: SourceAdapter) -> tuple[SourceAdapter, SourceRecord]:
+        return adapter, await adapter.fetch(query)
 
+    # as_completed, not gather: process each source the moment it returns, so commit_each
+    # can make it visible without waiting on the others. Order does not matter -- _promote
+    # keys the records by source.
+    records: list[SourceRecord] = []
     had_failure = False
-    for adapter, record in zip(adapters, records, strict=True):
-        if record.error and not record.facts:
-            stats.records_failed += 1
+    for coro in asyncio.as_completed([fetch(a) for a in adapters]):
+        adapter, record = await coro
+        records.append(record)
+        if await _save_source_record(repo, drug, adapter, record, stats):
             had_failure = True
-            logger.info("%s: %s could not resolve: %s", drug.chembl_id, record.source, record.error)
-
-            if record.outage:
-                # An outage has to be written down. Storing nothing leaves the brief
-                # with no rows from this source, so `unavailable` comes back empty and
-                # the API states -- positively -- that nothing failed, while the UI
-                # says "Not collected" for a mechanism ChEMBL simply could not be
-                # asked about. That is this project's founding lie, arriving through
-                # the one path built to prevent it.
-                #
-                # A non-outage error means the source answered and does not know this
-                # drug. Nothing to record: it has no opinion, and inventing
-                # source_failed rows would be the same lie mirrored.
-                await repo.save_record(
-                    drug.chembl_id,
-                    SourceRecord(
-                        record.source,
-                        record.query,
-                        ok=False,
-                        provenance=record.provenance,
-                        facts={
-                            key: failed(
-                                record.source,
-                                record.error,
-                                source_url=record.provenance.get("source_url"),
-                            )
-                            for key in adapter.owned_keys
-                        },
-                    ),
-                )
-                stats.facts_source_failed += len(adapter.owned_keys)
-            continue
-
-        stats.records_ok += 1
-        await repo.save_record(drug.chembl_id, record)
-        stats.facts_written += len(record.facts)
-        failed_here = len(record.failed_facts)
-        stats.facts_source_failed += failed_here
-        had_failure = had_failure or bool(failed_here)
+        if commit_each:
+            await session.commit()
 
     if had_failure:
         stats.drugs_with_a_failure.append(drug.chembl_id)

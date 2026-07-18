@@ -12,16 +12,17 @@ produced.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
 import pytest
 import respx
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backend.ingestion.base import Fact, FactStatus, SourceRecord, fact, failed, utcnow
 from backend.ingestion.chembl_catalog import to_columns
-from backend.ingestion.enrich import _promote, enrich_catalog
+from backend.ingestion.enrich import EnrichStats, _promote, enrich_catalog, enrich_drug
 from backend.models import DataMaturity, Drug
 from backend.repositories import DrugRepository
 
@@ -383,3 +384,79 @@ class TestEnrichment:
         assert drug is not None
         await session.refresh(drug)
         assert drug.ro5_violations == 0, "a measured zero was stored as 'not measured'"
+
+
+class _FakeAdapter:
+    """A source adapter under the test's control: returns a fixed record, optionally
+    only after a gate is opened, so one source can be held back while another lands."""
+
+    def __init__(
+        self,
+        name: str,
+        owned_keys: tuple[str, ...],
+        record: SourceRecord,
+        gate: asyncio.Event | None = None,
+    ) -> None:
+        self.name = name
+        self.owned_keys = owned_keys
+        self._record = record
+        self._gate = gate
+
+    async def fetch(self, query: str) -> SourceRecord:
+        if self._gate is not None:
+            await self._gate.wait()
+        return self._record
+
+
+class TestProgressiveFill:
+    async def test_commit_each_makes_a_source_visible_before_the_others_return(
+        self, session: AsyncSession, db_engine: AsyncEngine
+    ) -> None:
+        """A fast source's facts must land while a slow one is still fetching -- that is
+        what lets the page fill card by card instead of blanking until the slowest
+        source returns. Gate-controlled, so it proves ordering without racing a clock."""
+        repo = DrugRepository(session)
+        await repo.upsert_drug("CHEMBL_PROG", pref_name="prog")
+        await session.commit()
+        drug = await session.get(Drug, "CHEMBL_PROG")
+        assert drug is not None
+
+        gate = asyncio.Event()
+        fast = _FakeAdapter(
+            "clinicaltrials",
+            ("n_trials",),
+            SourceRecord(
+                "clinicaltrials", "prog", ok=True, facts={"n_trials": fact(5, "clinicaltrials")}
+            ),
+        )
+        slow = _FakeAdapter(
+            "chembl",
+            ("smiles",),
+            SourceRecord("chembl", "prog", ok=True, facts={"smiles": fact("CCO", "chembl")}),
+            gate=gate,
+        )
+
+        stats = EnrichStats()
+        task = asyncio.create_task(
+            enrich_drug(session, drug, [fast, slow], stats, commit_each=True)
+        )
+
+        reader = async_sessionmaker(db_engine, expire_on_commit=False)
+
+        async def keys() -> set[str]:
+            async with reader() as s:
+                return {r.key for r in await DrugRepository(s).facts_for("CHEMBL_PROG")}
+
+        # The fast source lands while the slow one is still gated.
+        for _ in range(100):
+            if "n_trials" in await keys():
+                break
+            await asyncio.sleep(0.02)
+        seen = await keys()
+        assert "n_trials" in seen, "the fast source was not committed progressively"
+        assert "smiles" not in seen, "the gated slow source committed before it returned"
+
+        # Release the slow source: the brief finishes with everything.
+        gate.set()
+        await task
+        assert {"n_trials", "smiles"} <= await keys()

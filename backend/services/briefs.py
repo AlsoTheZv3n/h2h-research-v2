@@ -89,6 +89,9 @@ async def _enrich_in_background(chembl_id: str, maker: async_sessionmaker[AsyncS
                         build_adapters(client),
                         stats,
                         build_literature_fetcher(client),
+                        # Interactive: commit each source as it returns, so the polling
+                        # page fills card by card instead of all at once at the end.
+                        commit_each=True,
                     ),
                     timeout=_ENRICH_DEADLINE,
                 )
