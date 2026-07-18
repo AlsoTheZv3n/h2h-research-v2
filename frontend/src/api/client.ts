@@ -1,4 +1,13 @@
-import type { Answer, BriefState, DrugDetail, DrugList, DrugListParams } from './types'
+import type {
+  Answer,
+  BriefState,
+  CancerDetail,
+  CancerList,
+  CancerListParams,
+  DrugDetail,
+  DrugList,
+  DrugListParams,
+} from './types'
 
 /**
  * Same-origin /api by default, which Vite's proxy forwards to the backend with the
@@ -66,6 +75,28 @@ export function listTargetClasses(): Promise<string[]> {
 
 export function getDrug(chemblId: string): Promise<DrugDetail> {
   return get<DrugDetail>(`/drugs/${encodeURIComponent(chemblId)}`)
+}
+
+export function listCancers(params: CancerListParams = {}): Promise<CancerList> {
+  return get<CancerList>('/cancers', {
+    q: params.q,
+    therapeutic_area: params.therapeutic_area,
+    // Only send has_drugs when set: a bare key would filter to "false".
+    has_drugs: params.has_drugs === undefined ? undefined : String(params.has_drugs),
+    sort: params.sort,
+    order: params.order,
+    limit: params.limit ?? 25,
+    offset: params.offset ?? 0,
+  })
+}
+
+/** The therapeutic-area facet's options: areas present in the catalog, most common first. */
+export function listTherapeuticAreas(): Promise<string[]> {
+  return get<string[]>('/cancers/therapeutic-areas')
+}
+
+export function getCancer(diseaseId: string): Promise<CancerDetail> {
+  return get<CancerDetail>(`/cancers/${encodeURIComponent(diseaseId)}`)
 }
 
 /** The structure SVG is rendered server-side by RDKit; the browser just shows it. */
