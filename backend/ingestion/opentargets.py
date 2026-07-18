@@ -38,7 +38,7 @@ query Drug($id: String!) {
       rows {
         mechanismOfAction
         actionType
-        targets { approvedSymbol targetClass { label level } }
+        targets { id approvedSymbol targetClass { label level } }
       }
     }
     indications { count rows { disease { name } } }
@@ -72,6 +72,7 @@ class OpenTargetsAdapter:
         "ot_moa",
         "all_moas",
         "targets",
+        "target_ids",
         "target_class",
         "n_indications",
         "indications",
@@ -132,12 +133,20 @@ class OpenTargetsAdapter:
         # class of the *same* symbol that becomes primary_target -- not a second,
         # separately-sorted answer that could disagree with it.
         class_by_symbol: dict[str, str | None] = {}
+        ensembl_ids: set[str] = set()
         for r in moa_rows:
             for t in r.get("targets") or []:
                 sym = t.get("approvedSymbol")
                 if sym and sym not in class_by_symbol:
                     class_by_symbol[sym] = _pick_target_class(t.get("targetClass"))
+                # The stable Ensembl id, kept beside the symbol so the cancer target
+                # landscape can ask "does our catalog hold a drug against this target"
+                # by id, never by the alias-prone symbol (R4-2).
+                tid = t.get("id")
+                if tid:
+                    ensembl_ids.add(tid)
         targets = sorted(class_by_symbol)
+        target_ids = sorted(ensembl_ids)
         # The class of the primary target -- targets[0], exactly what _promote lifts
         # into primary_target -- so the overview's target and its class always agree.
         primary_target_class = class_by_symbol.get(targets[0]) if targets else None
@@ -154,6 +163,9 @@ class OpenTargetsAdapter:
             # Derived from the MoA rows since linkedTargets is gone, so 0 here means
             # "no targets annotated on the mechanism" -- divarasib's rows carry none.
             "targets": ok(targets),
+            # The same targets by stable Ensembl id -- the join key for the cancer target
+            # landscape's catalog-link, populated into the drug_target relation on promote.
+            "target_ids": ok(target_ids),
             # The primary target's protein family, for the overview's target-class
             # facet. EMPTY (None) when the target carries no class, which the overview
             # reads as "Unclassified" -- distinct from a source_failed outage.

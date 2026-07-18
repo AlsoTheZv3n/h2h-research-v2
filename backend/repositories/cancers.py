@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import SourceRecord
-from backend.models import Cancer, CancerFactRow, Drug
+from backend.models import Cancer, CancerFactRow, Drug, DrugTarget
 
 # The columns the overview's headers can sort by. Anything else falls back to n_drugs
 # rather than erroring on a bad ?sort= value. Default is n_drugs desc: in a drug-
@@ -114,6 +114,26 @@ class CancerRepository:
             select(Drug.chembl_id).where(Drug.chembl_id.in_(chembl_ids))
         )
         return set(result.scalars().all())
+
+    async def catalog_drug_for_targets(self, ensembl_ids: Sequence[str]) -> dict[str, str]:
+        """For each Ensembl target id, one catalog drug that acts on it -- the landscape's
+        catalog-link, read by TARGET (never by symbol).
+
+        Given the displayed targets' Ensembl ids, returns {ensembl_id -> a drug's chembl_id}
+        only for those our catalog can drill into. Picks the lexically-smallest chembl_id per
+        target so the link is stable across requests rather than whatever the planner returns
+        first. A missing key is an honest "no drug in OUR catalog against this target" -- a
+        weaker signal that is NOT "unexploited" (that is the world's answer, from Open
+        Targets), only "no link to offer here".
+        """
+        if not ensembl_ids:
+            return {}
+        rows = await self.session.execute(
+            select(DrugTarget.target_ensembl_id, func.min(DrugTarget.drug_chembl_id))
+            .where(DrugTarget.target_ensembl_id.in_(ensembl_ids))
+            .group_by(DrugTarget.target_ensembl_id)
+        )
+        return {ensembl_id: chembl_id for ensembl_id, chembl_id in rows.all()}
 
     async def list_cancers(
         self,

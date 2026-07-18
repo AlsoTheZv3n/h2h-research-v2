@@ -188,3 +188,11 @@ class CancerDetail(BaseModel):
         description="Of the drugs in the pipeline fact, the ChEMBL ids the catalog holds "
         "-- so the UI links only the ones with a brief and shows the rest as plain text.",
     )
+
+    target_catalog_drug: dict[str, str] = Field(
+        default_factory=dict,
+        description="For each landscape target's Ensembl id, one catalog drug (ChEMBL id) "
+        "that acts on it -- the drugged flag's separate, weaker catalog-link signal. A "
+        "target absent here has no drug in OUR catalog, which is NOT 'unexploited' (the "
+        "world's answer, from Open Targets); it just gets no link. Joined on Ensembl id.",
+    )

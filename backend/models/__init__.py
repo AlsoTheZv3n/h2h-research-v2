@@ -7,6 +7,7 @@ from backend.models.base import Base
 from backend.models.cancer import Cancer
 from backend.models.cancer_fact import CancerFactRow
 from backend.models.drug import DataMaturity, Drug
+from backend.models.drug_target import DrugTarget
 from backend.models.fact import FactRow
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "DataMaturity",
     "Drug",
     "DrugAbstract",
+    "DrugTarget",
     "FactRow",
 ]
