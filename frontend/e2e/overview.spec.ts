@@ -140,32 +140,43 @@ test.describe('overview filters', () => {
   })
 
   test('editing the current-page field jumps straight to that page', async ({ page, request }) => {
-    // Premise: the catalog must span enough pages for a jump to mean anything. With 25
-    // a page over a few thousand drugs it does, but assert it rather than assume it --
-    // an empty catalog would make this test pass by rendering no pager at all.
+    // The pager only exists once there is more than a page to show. The two branches
+    // assert opposite halves of that guard against the real catalog: a single-page
+    // catalog must render no pager at all (the branch CI's 7-drug demo seed takes), and
+    // a many-page one must jump when the current cell is retyped (the branch a real
+    // ~3,600-row catalog takes). Neither branch passes vacuously.
     const total: number = (await (await request.get('/api/drugs?limit=1')).json()).total
     const PAGE_SIZE = 25
-    expect(Math.ceil(total / PAGE_SIZE), 'too few drugs to page through').toBeGreaterThan(10)
+    const totalPages = Math.ceil(total / PAGE_SIZE)
 
     await page.goto('/')
     await expect(page.getByTestId('drug-row').first()).toBeVisible()
+
+    if (totalPages <= 1) {
+      // Nothing to page: the pager, and its editable cell, must be absent.
+      await expect(page.getByTestId('page-input')).toHaveCount(0)
+      return
+    }
+
     const firstOnPageOne = await page.getByTestId('drug-row').first().textContent()
 
-    // The jump itself: retype the current page as 10 and press Enter -- no Next clicks.
+    // The jump itself: retype the current page and press Enter -- no Next clicks. Page
+    // 10 where the catalog is that deep, else the last page.
+    const target = Math.min(10, totalPages)
     const pageInput = page.getByTestId('page-input')
-    await pageInput.fill('10')
+    await pageInput.fill(String(target))
     await pageInput.press('Enter')
 
-    // Proof it actually paged, three independent ways: the URL offset is page 10's
-    // ((10-1)*25 = 225), the field now reads 10, and the data underneath changed.
-    await expect(page).toHaveURL(/offset=225/)
-    await expect(page.getByTestId('page-input')).toHaveValue('10')
+    // Proof it actually paged, three independent ways: the URL offset is that page's
+    // ((target-1)*25), the field now reads it, and the data underneath changed.
+    await expect(page).toHaveURL(new RegExp(`offset=${(target - 1) * PAGE_SIZE}\\b`))
+    await expect(page.getByTestId('page-input')).toHaveValue(String(target))
     await expect
       .poll(async () => (await page.getByTestId('drug-row').first().textContent()) ?? '')
       .not.toBe(firstOnPageOne)
 
     // And the jump survives a reload from the URL alone -- shareable, refresh-proof.
     await page.reload()
-    await expect(page.getByTestId('page-input')).toHaveValue('10')
+    await expect(page.getByTestId('page-input')).toHaveValue(String(target))
   })
 })
