@@ -56,11 +56,11 @@ export function PotencyCard({
       <Card title="Binding & potency">
         <p
           data-testid="fact-source-failed"
-          className="inline-flex items-center gap-1.5 rounded bg-unavailable-bg px-1.5 py-0.5
-                     text-xs font-medium text-unavailable"
+          className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
+                     text-xs font-medium text-partial"
           title={fact.error ?? undefined}
         >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-unavailable" />
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
           {fact.source} unavailable
         </p>
       </Card>

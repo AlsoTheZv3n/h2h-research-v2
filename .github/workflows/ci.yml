@@ -45,7 +45,7 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -100,7 +100,7 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
         with:
@@ -108,7 +108,7 @@ jobs:
           # repo root, and the action looks at the root by default -- so without this
           # it aborts with "No pnpm version is specified".
           package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
         with:
@@ -141,7 +141,7 @@ jobs:
           # repo root, and the action looks at the root by default -- so without this
           # it aborts with "No pnpm version is specified".
           package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
