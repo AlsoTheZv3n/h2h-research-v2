@@ -198,9 +198,22 @@ export interface CancerList {
   offset: number
 }
 
+/**
+ * Whether the world (Open Targets, not our catalog) has a drug against a target.
+ *   approved     an approved drug hits this target (indication-agnostic)
+ *   clinical     candidates exist against it, none approved
+ *   unexploited  Open Targets resolved it and it has no drugs — the finding
+ *   unknown      Open Targets failed or did not resolve it — NOT the same as unexploited
+ * `unknown` and `unexploited` must never render alike: one is "not measured", the other
+ * is "measured, none". Absent on facts stored before the flag shipped -> treat as unknown.
+ */
+export type DrugStatus = 'approved' | 'clinical' | 'unexploited' | 'unknown'
+
 /** One associated target in a cancer's target-landscape fact (Open Targets). */
 export interface TargetLandscapeEntry {
   symbol: string
+  /** Stable Ensembl gene id (ENSG…). The join key for the flag and the catalog link. */
+  ensembl_id: string | null
   /** Open Targets association score, 0–1. */
   score: number
   /** The typed evidence channels behind the association, e.g. "clinical". */
@@ -208,6 +221,8 @@ export interface TargetLandscapeEntry {
   /** Whether a small-molecule / antibody modality is tractable at all. */
   sm_tractable: boolean
   ab_tractable: boolean
+  /** Whether the world has a drug against this target. Optional: pre-flag facts lack it. */
+  drug_status?: DrugStatus
 }
 
 /**
