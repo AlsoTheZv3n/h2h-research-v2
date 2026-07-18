@@ -89,9 +89,11 @@ VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
           {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
        ('MONDO_E2E_NSCLC', 'pipeline', 'opentargets',
-        '{"total":3,"by_phase":[
-           {"stage":"APPROVAL","count":2,"drugs":[{"chembl_id":"CHEMBL_E2E_INPIPE","name":"E2E APPROVED DRUG"},{"chembl_id":"CHEMBL_E2E_EXTERNAL","name":"E2E EXTERNAL DRUG"}]},
-           {"stage":"PHASE_2","count":1,"drugs":[{"chembl_id":"CHEMBL_E2E_CAND","name":"E2E CANDIDATE"}]}]}'::jsonb,
+        '{"total":3,"by_phase":[{"stage":"APPROVAL","count":2},{"stage":"PHASE_2","count":1}],
+          "drugs":[
+            {"chembl_id":"CHEMBL_E2E_INPIPE","name":"E2E APPROVED DRUG","stage":"APPROVAL","modality":"Small molecule","mechanism":"E2E kinase inhibitor"},
+            {"chembl_id":"CHEMBL_E2E_EXTERNAL","name":"E2E EXTERNAL DRUG","stage":"APPROVAL","modality":"Antibody","mechanism":null},
+            {"chembl_id":"CHEMBL_E2E_CAND","name":"E2E CANDIDATE","stage":"PHASE_2","modality":"Small molecule","mechanism":null}]}'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now())
 ON CONFLICT (disease_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;

@@ -35,8 +35,9 @@ def detail_cache_key(chembl_id: str) -> str:
 
 
 # The cancer brief has its own shape and its own version, so a change to one cannot
-# strand entries of the other. v2: added the pipeline fact + catalog_drug_ids.
-_CANCER_DETAIL_SCHEMA_VERSION = "v2"
+# strand entries of the other. v3: pipeline fact reshaped (flat drugs list with modality
+# + mechanism; by_phase is now stage counts only).
+_CANCER_DETAIL_SCHEMA_VERSION = "v3"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

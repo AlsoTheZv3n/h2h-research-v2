@@ -70,20 +70,27 @@ test.describe('cancer catalog', () => {
     await expect(page.getByTestId('source-info').first()).toBeVisible()
   })
 
-  test('the pipeline groups drugs by phase, linking only catalog drugs', async ({ page }) => {
+  test('the pipeline shows a distribution + filterable table, linking only catalog drugs', async ({
+    page,
+  }) => {
     await page.goto('/cancers/MONDO_E2E_NSCLC')
-    const pipeline = page.getByTestId('pipeline')
-    await expect(pipeline).toBeVisible()
-    await expect(pipeline).toContainText('Approved')
-    await expect(pipeline).toContainText('Phase 2')
-    // In the catalog -> a link to its brief (matched by exact ChEMBL id).
+    await expect(page.getByTestId('pipeline-distribution')).toBeVisible()
+    const table = page.getByTestId('pipeline-table')
+    await expect(table).toBeVisible()
+    // Modality + mechanism columns carry values (the spec gap R2 filled).
+    await expect(table).toContainText('Small molecule')
+    await expect(table).toContainText('E2E kinase inhibitor')
+    // In the catalog -> a link by exact ChEMBL id; not in the catalog -> plain, never a dead link.
     await expect(page.getByRole('link', { name: 'E2E APPROVED DRUG' })).toHaveAttribute(
       'href',
       /\/drugs\/CHEMBL_E2E_INPIPE/,
     )
-    // Not in the catalog -> shown, but never a dead link.
-    await expect(pipeline).toContainText('E2E EXTERNAL DRUG')
+    await expect(table).toContainText('E2E EXTERNAL DRUG')
     await expect(page.getByRole('link', { name: 'E2E EXTERNAL DRUG' })).toHaveCount(0)
+    // The modality filter narrows the table to just the Antibody (the external drug).
+    await page.getByTestId('pipeline-filter-modality').selectOption('Antibody')
+    await expect(page.getByTestId('pipeline-row')).toHaveCount(1)
+    await expect(table).toContainText('E2E EXTERNAL DRUG')
   })
 
   test('the drug catalog still works, and its tab is active there', async ({ page }) => {

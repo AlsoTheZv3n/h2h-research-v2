@@ -252,7 +252,18 @@ class TestStaleWhileRevalidate:
 
 def _pipeline_response(*drugs: tuple[str, str, str]) -> httpx.Response:
     """An Open Targets disease->drugs answer: (chembl_id, name, stage) tuples."""
-    rows = [{"drug": {"id": c, "name": n}, "maxClinicalStage": s} for c, n, s in drugs]
+    rows = [
+        {
+            "maxClinicalStage": s,
+            "drug": {
+                "id": c,
+                "name": n,
+                "drugType": "Small molecule",
+                "mechanismsOfAction": {"rows": []},
+            },
+        }
+        for c, n, s in drugs
+    ]
     return httpx.Response(
         200,
         json={
@@ -269,22 +280,62 @@ def _pipeline_response(*drugs: tuple[str, str, str]) -> httpx.Response:
 class TestPipeline:
     def test_group_pipeline_orders_dedupes_and_counts(self) -> None:
         rows = [
-            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_2"},
-            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_2"},  # a dup
+            # CHEMBL1's less-advanced row arrives FIRST; the more-advanced PHASE_2 row
+            # (carrying the modality/mechanism) arrives SECOND -- Open Targets does not
+            # guarantee order, so a first-seen-wins regression would keep the wrong stage,
+            # and these assertions catch it.
+            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_1"},
+            {
+                "drug": {
+                    "id": "CHEMBL1",
+                    "name": "A",
+                    "drugType": "Small molecule",
+                    "mechanismsOfAction": {"rows": [{"mechanismOfAction": "EGFR inhibitor"}]},
+                },
+                "maxClinicalStage": "PHASE_2",
+            },
             {"drug": {"id": "CHEMBL2", "name": "B"}, "maxClinicalStage": "APPROVAL"},
             {"drug": {"id": "CHEMBL3", "name": "C"}, "maxClinicalStage": "PHASE_2"},
         ]
         pipe = enrich_cancer._group_pipeline(rows)
-        # Most advanced first: APPROVAL leads PHASE_2.
+        # Distribution, most advanced first.
         assert [g["stage"] for g in pipe["by_phase"]] == ["APPROVAL", "PHASE_2"]
-        p2 = next(g for g in pipe["by_phase"] if g["stage"] == "PHASE_2")
-        assert p2["count"] == 2  # CHEMBL1 deduped within the stage, plus CHEMBL3
-        assert {d["chembl_id"] for d in p2["drugs"]} == {"CHEMBL1", "CHEMBL3"}
+        assert {g["stage"]: g["count"] for g in pipe["by_phase"]} == {"APPROVAL": 1, "PHASE_2": 2}
         assert pipe["total"] == 3
+        # Flat table, deduped by drug keeping the MORE advanced stage (CHEMBL1 -> PHASE_2,
+        # not the later PHASE_1 row), sorted advanced-first then by name.
+        drugs = {d["chembl_id"]: d for d in pipe["drugs"]}
+        assert set(drugs) == {"CHEMBL1", "CHEMBL2", "CHEMBL3"}
+        assert drugs["CHEMBL1"]["stage"] == "PHASE_2"
+        assert drugs["CHEMBL1"]["modality"] == "Small molecule"
+        assert drugs["CHEMBL1"]["mechanism"] == "EGFR inhibitor"
+        # Missing modality/mechanism -> null, never a guess.
+        assert drugs["CHEMBL2"]["modality"] is None
+        assert drugs["CHEMBL2"]["mechanism"] is None
+        # Table order: APPROVAL (B) first, then PHASE_2 (A, C by name).
+        assert [d["chembl_id"] for d in pipe["drugs"]] == ["CHEMBL2", "CHEMBL1", "CHEMBL3"]
 
     def test_group_pipeline_empty_is_empty_dict(self) -> None:
         # An empty dict is what fact() classifies as EMPTY ("resolved, no programmes").
         assert enrich_cancer._group_pipeline([]) == {}
+
+    def test_group_pipeline_survives_null_mechanism_rows(self) -> None:
+        # Open Targets returns mechanismsOfAction.rows as JSON null (not absent) for some
+        # drugs. That must not crash the source out uncaught -- it becomes an honest null
+        # mechanism, so the outage-vs-empty guarantee still holds.
+        rows = [
+            {
+                "drug": {
+                    "id": "C1",
+                    "name": "A",
+                    "drugType": "Small molecule",
+                    "mechanismsOfAction": {"rows": None},
+                },
+                "maxClinicalStage": "PHASE_2",
+            },
+        ]
+        pipe = enrich_cancer._group_pipeline(rows)
+        assert pipe["drugs"][0]["mechanism"] is None
 
     def test_group_pipeline_ranks_preapproval_as_advanced_not_bottom(self) -> None:
         # PREAPPROVAL (submitted, awaiting approval) is a real, advanced Open Targets

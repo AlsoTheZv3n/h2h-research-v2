@@ -64,7 +64,15 @@ query Pipeline($id: String!) {
     id
     drugAndClinicalCandidates {
       count
-      rows { drug { id name } maxClinicalStage }
+      rows {
+        maxClinicalStage
+        drug {
+          id
+          name
+          drugType
+          mechanismsOfAction { rows { mechanismOfAction } }
+        }
+      }
     }
   }
 }
@@ -75,8 +83,7 @@ query Pipeline($id: String!) {
 # PHASE_4, PREAPPROVAL, PHASE_3, PHASE_2_3, PHASE_2, PHASE_1_2, PHASE_1, EARLY_PHASE_1,
 # PHASE_0, PRECLINICAL all occur). PREAPPROVAL (submitted, awaiting approval) is a genuinely
 # advanced stage and must rank near the top, not fall into the alphabetical tail -- so the
-# enum is listed in full. Only a truly-unknown value sorts to the end. The drugs list per
-# stage is capped for size; the stage count is the true total (a busy cancer has ~1,000).
+# enum is listed in full. Only a truly-unknown value sorts to the end.
 _PHASE_ORDER = (
     "APPROVAL",
     "PHASE_4",
@@ -90,7 +97,13 @@ _PHASE_ORDER = (
     "PHASE_0",
     "PRECLINICAL",
 )
-_PIPELINE_CAP = 40
+_STAGE_RANK = {stage: i for i, stage in enumerate(_PHASE_ORDER)}
+
+
+def _stage_rank(stage: str) -> int:
+    """Advancement rank -- lower is more advanced; unknown stages sort to the end."""
+    return _STAGE_RANK.get(stage, len(_PHASE_ORDER))
+
 
 # A source: one function, one SourceRecord for one cancer.
 CancerSource = Callable[[httpx.AsyncClient, Cancer], Awaitable[SourceRecord]]
@@ -202,33 +215,53 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
 
 
 def _group_pipeline(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Group the disease's drugs/candidates by clinical stage, most advanced first.
+    """Flatten the disease's drugs/candidates for the pipeline card.
 
-    Deduped per stage on the drug's ChEMBL id (Open Targets can list a drug under one
-    stage via several trials). Each stage carries its true `count` and a capped `drugs`
-    list -- the count is the pipeline shape, the list is the drilldown.
+    Deduped globally on the drug's ChEMBL id, keeping its most advanced stage (Open
+    Targets can list a drug under several stages via different indications). Returns the
+    flat drug list -- each with its stage, modality and mechanism -- for the table, plus a
+    per-stage distribution (stage + true count) for the summary bars. No cap: the table
+    pages client-side, so the whole pipeline is stored.
     """
-    by_stage: dict[str, list[dict[str, str]]] = defaultdict(list)
-    seen: dict[str, set[str]] = defaultdict(set)
+    best: dict[str, dict[str, Any]] = {}
     for row in rows:
         drug = row.get("drug") or {}
         cid = drug.get("id")
-        stage = row.get("maxClinicalStage") or "UNKNOWN"
-        if not cid or cid in seen[stage]:
+        if not cid:
             continue
-        seen[stage].add(cid)
-        by_stage[stage].append({"chembl_id": cid, "name": drug.get("name") or cid})
+        stage = row.get("maxClinicalStage") or "UNKNOWN"
+        prior = best.get(cid)
+        if prior is not None and _stage_rank(prior["stage"]) <= _stage_rank(stage):
+            continue  # already seen at an equal-or-more-advanced stage
+        moas = [
+            m["mechanismOfAction"]
+            # `.get("rows") or []`, not `.get("rows", [])`: Open Targets returns rows as
+            # JSON null (not absent), and the default only fires on an absent key -- so
+            # the [] default would leave None and `for m in None` would crash out of the
+            # source uncaught, writing no source_failed fact. Same guard as line 204.
+            for m in (drug.get("mechanismsOfAction") or {}).get("rows") or []
+            if m.get("mechanismOfAction")
+        ]
+        best[cid] = {
+            "chembl_id": cid,
+            "name": drug.get("name") or cid,
+            "stage": stage,
+            # Missing modality/mechanism stay null -> the UI renders an honest "—", never
+            # a guessed value.
+            "modality": drug.get("drugType"),
+            "mechanism": moas[0] if moas else None,
+        }
 
-    order = [*_PHASE_ORDER, *sorted(s for s in by_stage if s not in _PHASE_ORDER)]
-    by_phase = [
-        {"stage": stage, "count": len(by_stage[stage]), "drugs": by_stage[stage][:_PIPELINE_CAP]}
-        for stage in order
-        if stage in by_stage
-    ]
-    if not by_phase:
+    if not best:
         return {}
-    total = sum(len(drugs) for drugs in by_stage.values())
-    return {"total": total, "by_phase": by_phase}
+
+    drugs = sorted(best.values(), key=lambda d: (_stage_rank(d["stage"]), d["name"] or ""))
+    counts: dict[str, int] = defaultdict(int)
+    for d in drugs:
+        counts[d["stage"]] += 1
+    order = [*_PHASE_ORDER, *sorted(s for s in counts if s not in _PHASE_ORDER)]
+    by_phase = [{"stage": stage, "count": counts[stage]} for stage in order if stage in counts]
+    return {"total": len(drugs), "by_phase": by_phase, "drugs": drugs}
 
 
 async def opentargets_pipeline(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
