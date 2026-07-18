@@ -228,10 +228,23 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
             facts={key: fact({}, source, source_url=url, retrieved_at=retrieved_at)},
             provenance=prov,
         )
+    # Open Targets returns associations score-descending, but sort defensively so the "top"
+    # slice and the saturation check below hold on the fetched set even if a future release
+    # changes the within-page ordering (the count itself still assumes OT returned the
+    # top-scored page -- there is no client-side fix for that short of fetching everything).
+    rows.sort(key=lambda r: r.get("score") or 0.0, reverse=True)
     # Count the strong associations across the whole scanned page (not just the 15
     # displayed): this is the headline metric, and it must be over the strong set, not
-    # the ~12,000-with-any-evidence total that would read as "the whole genome".
-    n_strong = sum(1 for r in rows if (r.get("score") or 0.0) >= _STRONG_SCORE)
+    # the ~12,000-with-any-evidence total that would read as "the whole genome". Require an
+    # approvedSymbol -- the same basis the displayed list uses -- so the headline count and
+    # the card can never contradict each other (a strong but un-symboled row would inflate
+    # the number while the card, which needs a symbol to render a target, shows nothing).
+    n_strong = sum(
+        1
+        for r in rows
+        if (r.get("score") or 0.0) >= _STRONG_SCORE
+        and (r.get("target") or {}).get("approvedSymbol")
+    )
     if len(rows) >= _SCAN_TARGETS and (rows[-1].get("score") or 0.0) >= _STRONG_SCORE:
         # The scan filled up and even its weakest (last, since rows are score-descending)
         # row is still strong: the strong set may run past the scanned page, so n_strong is

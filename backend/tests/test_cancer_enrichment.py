@@ -441,6 +441,38 @@ class TestTargetLandscape:
         assert len(val["targets"]) == enrich_cancer._TOP_TARGETS
 
     @respx.mock
+    async def test_n_strong_excludes_strong_rows_without_an_approved_symbol(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # A strong (>= 0.5) association whose target has no approvedSymbol must NOT be
+        # counted: the card needs a symbol to render a target, so counting it would let the
+        # headline ("2 strong") contradict the card ("no associated targets"). The count and
+        # the displayed list share one approvedSymbol basis.
+        rows = [
+            {"score": 0.9, "target": {"approvedSymbol": "EGFR"}},
+            {"score": 0.8, "target": {"approvedSymbol": None}},
+        ]
+        respx.post(OT).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "disease": {
+                            "id": DISEASE,
+                            "associatedTargets": {"count": 2, "rows": rows},
+                        }
+                    }
+                },
+            )
+        )
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        # Only the symboled strong row counts, and it is the only displayed target.
+        assert val["n_strong"] == 1
+        assert [t["symbol"] for t in val["targets"]] == ["EGFR"]
+
+    @respx.mock
     async def test_a_resolved_disease_with_no_targets_is_empty_not_ok(
         self, fast_client: httpx.AsyncClient
     ) -> None:
