@@ -89,6 +89,15 @@ await page.waitForTimeout(2400)
 //    one navigation the loop shows, so the two acts read as one tool, not two.
 await page.getByTestId('nav-cancers').click()
 await page.getByTestId('cancer-row').first().waitFor()
+// The dev DB may hold the e2e fixture cancers (MONDO_E2E_*), which the Playwright
+// global-setup reseeds on every run -- so "record then convert regenerates the GIF" must
+// not depend on someone having deleted them by hand. Strip them from the recorded catalog
+// here: a view-only filter, no DB edit, so the recording is clean on any machine.
+await page.evaluate(() => {
+  for (const row of document.querySelectorAll('[data-testid="cancer-row"]')) {
+    if (row.textContent?.includes('MONDO_E2E_')) row.remove()
+  }
+})
 await page.waitForTimeout(1800)
 
 // 6. NSCLC -- the disease osimertinib treats. Land on the honest targets metric: the
