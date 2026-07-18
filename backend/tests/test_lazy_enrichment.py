@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator
+from datetime import timedelta
 
 import httpx
 import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backend.ingestion.base import FactStatus, SourceRecord, fact
+from backend.ingestion.base import FactStatus, SourceRecord, fact, utcnow
 from backend.models import Drug
 from backend.repositories import DrugRepository
 from backend.services import briefs
@@ -250,4 +251,48 @@ class TestLazyFetch:
         await get_or_start_brief(session, "CHEMBL_NEW", maker=maker)
         await briefs._in_flight["CHEMBL_NEW"]
 
+        assert not briefs.is_enriching("CHEMBL_NEW")
+
+
+class TestStaleWhileRevalidate:
+    async def _set_enriched(self, session: AsyncSession, *, days_ago: float) -> None:
+        await DrugRepository(session).upsert_drug(
+            "CHEMBL_NEW", last_enriched_at=utcnow() - timedelta(days=days_ago)
+        )
+        await session.commit()
+
+    @respx.mock
+    async def test_a_stale_ready_drug_is_served_now_and_refreshed_behind_it(
+        self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
+    ) -> None:
+        """The reader gets the stored brief immediately (READY, never blocked), and a
+        refresh runs behind it so the next view is fresh. Never ENRICHING -- there ARE
+        facts, and blanking the page to re-fetch what we already hold would be a
+        regression, not freshness."""
+        await self._set_enriched(session, days_ago=60)  # past the 30-day window
+        _mock_sources()
+        maker = async_sessionmaker(db_engine, expire_on_commit=False)
+
+        state = await get_or_start_brief(session, "CHEMBL_NEW", maker=maker)
+        assert state is BriefState.READY
+        assert briefs.is_enriching("CHEMBL_NEW"), "a stale brief must revalidate in the background"
+
+        await briefs._in_flight["CHEMBL_NEW"]
+        async with maker() as fresh:
+            drug = await fresh.get(Drug, "CHEMBL_NEW")
+            assert drug is not None
+            # The refresh landed: the clock moved out of the stale window.
+            assert drug.last_enriched_at is not None
+            assert drug.last_enriched_at > utcnow() - timedelta(days=1)
+
+    async def test_a_fresh_drug_is_not_revalidated(
+        self, session: AsyncSession, catalogued: None
+    ) -> None:
+        """Freshness is the point: a recently-enriched brief must not re-fetch on every
+        open, or stale-while-revalidate becomes revalidate-always -- the tight loop the
+        whole freshness design exists to avoid."""
+        await self._set_enriched(session, days_ago=1)  # well within the window
+
+        state = await get_or_start_brief(session, "CHEMBL_NEW")
+        assert state is BriefState.READY
         assert not briefs.is_enriching("CHEMBL_NEW")

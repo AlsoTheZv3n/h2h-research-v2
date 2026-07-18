@@ -15,7 +15,7 @@ import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backend.cache import close_redis, detail_cache_key, get_redis
+from backend.cache import detail_cache_key, get_redis
 from backend.ingestion.base import SourceRecord, fact, utcnow
 from backend.repositories import DrugRepository
 from backend.services import briefs
@@ -32,16 +32,6 @@ def clear_in_flight() -> Iterator[None]:
     briefs._in_flight.clear()
     yield
     briefs._in_flight.clear()
-
-
-@pytest.fixture(autouse=True)
-async def dispose_redis() -> AsyncIterator[None]:
-    """The redis client is a module singleton bound to the loop that opened it, and
-    pytest-asyncio hands each test a fresh loop. These tests touch redis directly (not
-    only through the `api` fixture, which disposes it itself), so a leaked client would
-    poison the next test with "Event loop is closed"."""
-    yield
-    await close_redis()
 
 
 def _mock_sources() -> None:

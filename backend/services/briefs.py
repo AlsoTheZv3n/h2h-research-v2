@@ -21,12 +21,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backend.cache import invalidate_detail
+from backend.config import get_settings
 from backend.db import get_sessionmaker
+from backend.ingestion.base import utcnow
 from backend.ingestion.enrich import EnrichStats, enrich_drug
 from backend.ingestion.http import build_client
 from backend.models import Drug
@@ -112,6 +115,19 @@ async def _enrich_in_background(chembl_id: str, maker: async_sessionmaker[AsyncS
         _in_flight.pop(chembl_id, None)
 
 
+def _is_stale(last_enriched_at: datetime) -> bool:
+    """Has this brief aged past the freshness window? The same clock the refresh cron
+    uses, so an on-read revalidation and the scheduled pass agree on what 'stale' means."""
+    return last_enriched_at < utcnow() - timedelta(days=get_settings().freshness_days)
+
+
+def _start_refresh(chembl_id: str, maker: async_sessionmaker[AsyncSession] | None) -> None:
+    """Kick a background enrichment and mark the drug in-flight. Used by both the lazy
+    first-fetch and the stale-while-revalidate refresh -- same job, same in-flight dedup."""
+    task = asyncio.create_task(_enrich_in_background(chembl_id, maker or get_sessionmaker()))
+    _in_flight[chembl_id] = task
+
+
 async def get_or_start_brief(
     session: AsyncSession,
     chembl_id: str,
@@ -120,9 +136,12 @@ async def get_or_start_brief(
 ) -> BriefState:
     """Where is this drug's brief, and start building it if nobody has.
 
-    Returns immediately; enrichment runs in the background. The page shows an honest
-    "analyzing" state and polls, rather than holding an HTTP request open for the
-    30-60s ChEMBL routinely takes.
+    Returns immediately; enrichment runs in the background. A never-enriched drug shows
+    an honest "analyzing" state and polls, rather than holding an HTTP request open for
+    the 30-60s ChEMBL routinely takes. An already-enriched one is READY -- and if its
+    facts have aged past the freshness window, it is served *now* from what we hold
+    while a refresh runs in the background (stale-while-revalidate): the reader is never
+    blocked on a re-fetch, and the next view is fresh.
 
     `maker` builds the background task's own session -- the request's session is
     closed by the time that task runs. Injectable because the default reads the
@@ -130,19 +149,24 @@ async def get_or_start_brief(
     looking at: the work would land in the developer's dev database and the
     assertions would fail against an empty one.
     """
-    if chembl_id in _in_flight:
-        return BriefState.ENRICHING
-
     repo = DrugRepository(session)
     drug = await repo.get(chembl_id)
     if drug is None:
         return BriefState.NOT_ANALYZED  # caller 404s; nothing to enrich
 
+    # Already enriched: serve the stored brief. The in-flight check comes AFTER this on
+    # purpose -- a refresh running for an enriched drug must not flip it back to
+    # ENRICHING and blank the page; the reader keeps the facts we already have.
     if drug.last_enriched_at is not None:
+        if _is_stale(drug.last_enriched_at) and chembl_id not in _in_flight:
+            _start_refresh(chembl_id, maker)
+            logger.info("stale-while-revalidate: background refresh for %s", chembl_id)
         return BriefState.READY
 
-    task = asyncio.create_task(_enrich_in_background(chembl_id, maker or get_sessionmaker()))
-    _in_flight[chembl_id] = task
+    # Never enriched. If a fetch is already running, the page just keeps polling.
+    if chembl_id in _in_flight:
+        return BriefState.ENRICHING
+    _start_refresh(chembl_id, maker)
     logger.info("lazy enrichment started for %s", chembl_id)
     return BriefState.ENRICHING
 
@@ -172,8 +196,7 @@ async def retry_brief(
     if drug is None:
         return BriefState.NOT_ANALYZED  # caller 404s
 
-    task = asyncio.create_task(_enrich_in_background(chembl_id, maker or get_sessionmaker()))
-    _in_flight[chembl_id] = task
+    _start_refresh(chembl_id, maker)
     logger.info("retry enrichment started for %s", chembl_id)
     return BriefState.ENRICHING
 

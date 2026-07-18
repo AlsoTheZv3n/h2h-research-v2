@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import pytest
@@ -15,14 +15,36 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from backend.cache import close_redis, get_redis
+from backend.cache import close_redis, get_redis, reset_redis
 from backend.config import get_settings
 from backend.db import get_session
 from backend.ingestion.http import build_client
 from backend.main import app
 from backend.models import Base
+from backend.services import briefs
 
 TEST_DB_NAME = "h2h_test"
+
+
+@pytest.fixture(autouse=True)
+def _reset_async_singletons() -> Iterator[None]:
+    """Keep loop-bound module state from leaking between tests.
+
+    Two module singletons bind to the event loop that first touched them, and
+    pytest-asyncio hands each test a fresh loop: the redis client (get_redis), which
+    background enrichment now reaches via invalidate_detail, and any enrichment task
+    still in briefs._in_flight. Left alone, a client or a lingering task from one test's
+    loop poisons the next with "Event loop is closed".
+
+    Sync on purpose -- so it applies to sync tests too, and so it cannot await (awaiting
+    a redis close while a just-cancelled background task still holds a connection hangs).
+    Cancelling and dropping the references is enough: the next test rebuilds both.
+    """
+    yield
+    for task in list(briefs._in_flight.values()):
+        task.cancel()
+    briefs._in_flight.clear()
+    reset_redis()
 
 
 @pytest.fixture

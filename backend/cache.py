@@ -48,3 +48,13 @@ async def close_redis() -> None:
     if _client is not None:
         await _client.aclose()
     _client = None
+
+
+def reset_redis() -> None:
+    """Drop the client without awaiting its close. For tests: the singleton binds to the
+    loop that opened it, so the next test (a fresh loop) must get a fresh client. Awaiting
+    aclose() here can hang when a just-cancelled background task still holds a connection,
+    so the reference is simply dropped -- the OS reclaims the socket, and in a test that
+    is harmless."""
+    global _client
+    _client = None
