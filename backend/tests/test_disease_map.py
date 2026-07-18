@@ -3,12 +3,17 @@ and an unmappable category stays NULL (recorded), not dropped."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.ingestion.load_disease_map import load
+from backend.ingestion.load_disease_map import _rows, load
 from backend.models import DiseaseSourceMap
 from backend.services.disease_map import load_source_maps
+
+_HEADER = "source,source_code,source_label,mondo_id,note\n"
 
 
 async def _by_key(session: AsyncSession, source: str, code: str) -> DiseaseSourceMap | None:
@@ -67,3 +72,53 @@ class TestLoadSourceMaps:
         assert maps["seer"]["MONDO_0018874"][0] == "96"  # AML exact site
         # Unmappable rows (mondo_id NULL) are NOT resolution targets -> never leak a None key.
         assert all(mondo for src in maps.values() for mondo in src)
+
+
+class TestLoadValidation:
+    """A data typo must be caught HERE, at load, with the offending line named -- never stored
+    as an empty string / lost mapping that detonates deep in per-cancer resolution."""
+
+    def test_rejects_a_blank_required_field(self, tmp_path: Path) -> None:
+        # Valid code + mondo, but a blank source_label. NOT NULL accepts "" in the DB, so
+        # without this guard it would survive to the resolver and raise a mid-request 500
+        # (Resolution forbids a target it cannot name). Reject at load, naming the column.
+        p = tmp_path / "bad.csv"
+        p.write_text(_HEADER + "eurostat,C99,,MONDO_0001234,\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="source_label"):
+            _rows(p)
+
+    def test_rejects_a_short_row_without_an_opaque_crash(self, tmp_path: Path) -> None:
+        # A truncated row leaves trailing columns as None (DictReader fills them). The guard
+        # must turn that into a clear ValueError, not an opaque AttributeError from .strip().
+        p = tmp_path / "short.csv"
+        p.write_text(_HEADER + "eurostat,C99\n", encoding="utf-8")
+        with pytest.raises(ValueError):
+            _rows(p)
+
+    async def test_rejects_duplicate_mondo_within_a_source(
+        self, session: AsyncSession, tmp_path: Path
+    ) -> None:
+        # Two codes -> the same MONDO in one source would silently overwrite each other in the
+        # resolver's mondo-keyed map (non-deterministically, no ORDER BY). Reject at load.
+        p = tmp_path / "dup.csv"
+        p.write_text(
+            _HEADER
+            + "eurostat,C50,Breast,MONDO_0007254,\n"
+            + "eurostat,C50X,Breast dup,MONDO_0007254,\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="duplicate"):
+            await load(session, path=p)
+
+    async def test_same_mondo_in_different_sources_is_allowed(
+        self, session: AsyncSession, tmp_path: Path
+    ) -> None:
+        # The real CSV maps breast to BOTH eurostat C50 and seer 55 -- the same MONDO across
+        # DIFFERENT sources is legitimate (each source keeps its own map) and must NOT trip
+        # the duplicate guard, which is per-source.
+        p = tmp_path / "cross.csv"
+        p.write_text(
+            _HEADER + "eurostat,C50,Breast,MONDO_0007254,\n" + "seer,55,Breast,MONDO_0007254,\n",
+            encoding="utf-8",
+        )
+        assert await load(session, path=p) == 2

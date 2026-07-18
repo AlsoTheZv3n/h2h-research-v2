@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,7 @@ from backend.models import DiseaseSourceMap
 SourceMap = dict[str, tuple[str, str]]
 
 
-class MatchType(str, Enum):
+class MatchType(StrEnum):
     EXACT = "exact"
     ROLLUP = "rollup"
     # The honest "not available for this cancer": no ontology path to any mapped category.
@@ -79,6 +79,17 @@ def resolve(
     `mapped_ancestors` mondo_id -> the mapped ids that are its ancestors, used to pick the
                       CLOSEST hit when a source nests categories (SEER: leukaemia is an
                       ancestor of AML). Non-nested sources never need it.
+
+    Contract for `mapped_ancestors` (the load-bearing assumption of the whole gate). The
+    caller must supply the TRANSITIVE ancestor set in the correct direction -- for each mapped
+    id, every mapped id that is broader than it (Open Targets `disease.ancestors` is already
+    transitive). Closest-wins is only as correct as this dict:
+      - miss a nested pair and two hits that should collapse stay separate -> a resolvable
+        cancer degrades to a silent UNMAPPED (coverage loss, never a wrong entity);
+      - record the direction backwards and a cancer rolls up to the BROADER category -- the
+        exact "specific page shows broader figures" failure this gate exists to prevent.
+    Fail safe: incompleteness costs coverage; only a reversed edge mis-resolves. The worker
+    that computes this dict must therefore take ancestors straight from OT, never invert them.
     """
     if cancer_mondo in source_map:  # the cancer itself is a mapped category
         code, label = source_map[cancer_mondo]
