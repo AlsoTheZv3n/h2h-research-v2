@@ -225,7 +225,10 @@ function Tractable({ on, label, title }: { on: boolean; label: string; title: st
 
 /** The drugged/unexploited/unknown marker — the card's reason to exist. */
 function DrugStatusBadge({ status }: { status: DrugStatus }) {
-  const s = STATUS_STYLE[status]
+  // Fall back to the unknown style if a status outside the union ever reaches here (malformed
+  // persisted data): degrade to "unknown", never throw and blank the page (there is no error
+  // boundary). Unreachable through the current backend, which emits only the four.
+  const s = STATUS_STYLE[status] ?? STATUS_STYLE.unknown
   return (
     <span
       data-testid={`drug-status-${status}`}

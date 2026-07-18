@@ -49,12 +49,17 @@ describe('TargetLandscapeCard', () => {
 
   it('renders each drugged state with its own distinct marker', () => {
     render(<TargetLandscapeCard facts={[fact({ value: landscape })]} />)
-    // Four states, four distinct testids -- the test goes red if two collapse into one.
-    expect(screen.getByTestId('drug-status-approved')).toBeInTheDocument()
-    expect(screen.getByTestId('drug-status-clinical')).toBeInTheDocument()
-    expect(screen.getByTestId('drug-status-unexploited')).toBeInTheDocument()
-    expect(screen.getByTestId('drug-status-unknown')).toBeInTheDocument()
-    // The finding and the gap are different words, not just different colours.
+    const states = ['approved', 'clinical', 'unexploited', 'unknown']
+    for (const s of states) expect(screen.getByTestId(`drug-status-${s}`)).toBeInTheDocument()
+    // Distinct by more than the testid (which is derived from the status, so it can't
+    // collapse): the four must render with four distinct CLASSES (colours) and four distinct
+    // LABELS. Style two alike (e.g. clinical coloured like approved) or label two the same
+    // and this goes red -- the tautology the testid-only check would have missed.
+    const classes = states.map((s) => screen.getByTestId(`drug-status-${s}`).className)
+    expect(new Set(classes).size).toBe(4)
+    const labels = states.map((s) => screen.getByTestId(`drug-status-${s}`).textContent)
+    expect(new Set(labels).size).toBe(4)
+    // And the two whose confusion matters most read as different words.
     expect(screen.getByTestId('drug-status-unexploited')).toHaveTextContent('unexploited')
     expect(screen.getByTestId('drug-status-unknown')).toHaveTextContent('unknown')
   })
