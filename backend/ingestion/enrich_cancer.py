@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -56,6 +57,35 @@ query TargetLandscape($id: String!, $n: Int!) {
   }
 }
 """
+
+_PIPELINE_QUERY = """
+query Pipeline($id: String!) {
+  disease(efoId: $id) {
+    id
+    drugAndClinicalCandidates {
+      count
+      rows { drug { id name } maxClinicalStage }
+    }
+  }
+}
+"""
+
+# Clinical stages in descending order, most advanced first -- how the pipeline card
+# reads top to bottom. Open Targets' maxClinicalStage enum; anything not listed sorts
+# to the end under its raw value. The `drugs` list per stage is capped for size (the
+# stage `count` is the true total); a busy cancer has ~1,000 candidates.
+_PHASE_ORDER = (
+    "APPROVAL",
+    "PHASE_4",
+    "PHASE_3",
+    "PHASE_2_3",
+    "PHASE_2",
+    "PHASE_1_2",
+    "PHASE_1",
+    "EARLY_PHASE_1",
+    "PHASE_0",
+)
+_PIPELINE_CAP = 40
 
 # A source: one function, one SourceRecord for one cancer.
 CancerSource = Callable[[httpx.AsyncClient, Cancer], Awaitable[SourceRecord]]
@@ -166,9 +196,86 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
     )
 
 
+def _group_pipeline(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Group the disease's drugs/candidates by clinical stage, most advanced first.
+
+    Deduped per stage on the drug's ChEMBL id (Open Targets can list a drug under one
+    stage via several trials). Each stage carries its true `count` and a capped `drugs`
+    list -- the count is the pipeline shape, the list is the drilldown.
+    """
+    by_stage: dict[str, list[dict[str, str]]] = defaultdict(list)
+    seen: dict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        drug = row.get("drug") or {}
+        cid = drug.get("id")
+        stage = row.get("maxClinicalStage") or "UNKNOWN"
+        if not cid or cid in seen[stage]:
+            continue
+        seen[stage].add(cid)
+        by_stage[stage].append({"chembl_id": cid, "name": drug.get("name") or cid})
+
+    order = [*_PHASE_ORDER, *sorted(s for s in by_stage if s not in _PHASE_ORDER)]
+    by_phase = [
+        {"stage": stage, "count": len(by_stage[stage]), "drugs": by_stage[stage][:_PIPELINE_CAP]}
+        for stage in order
+        if stage in by_stage
+    ]
+    if not by_phase:
+        return {}
+    total = sum(len(drugs) for drugs in by_stage.values())
+    return {"total": total, "by_phase": by_phase}
+
+
+async def opentargets_pipeline(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
+    """The drugs and clinical candidates for this cancer, grouped by clinical stage.
+
+    Open Targets' disease->drugs list already rolls the disease ontology up, so a drug
+    indicated for a subtype (osimertinib for lung adenocarcinoma) is counted for the
+    parent (NSCLC) -- which an exact disease-id match over stored drug indications would
+    miss. The join is on the disease ID and the drilldown is on the ChEMBL ID; no name
+    matching anywhere (the weave's hard rule).
+    """
+    source, key = "opentargets", "pipeline"
+    url = f"https://platform.opentargets.org/disease/{cancer.disease_id}"
+    retrieved_at = utcnow()
+    prov: dict[str, Any] = {"source_url": url, "retrieved_at": retrieved_at}
+    try:
+        data = await _gql(client, _PIPELINE_QUERY, {"id": cancer.disease_id})
+    except Exception as exc:
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=False,
+            provenance=prov,
+            facts={key: failed(source, str(exc), source_url=url)},
+            error=str(exc),
+            outage=True,
+        )
+    disease = data.get("disease")
+    if disease is None:
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=False,
+            provenance=prov,
+            error="Open Targets did not resolve this disease id",
+        )
+    rows = (disease.get("drugAndClinicalCandidates") or {}).get("rows") or []
+    pipeline = _group_pipeline(rows)
+    # fact() classifies an empty dict as EMPTY -- "resolved, no drug programmes" --
+    # distinct from the not-found and outage cases above.
+    return SourceRecord(
+        source,
+        cancer.disease_id,
+        ok=True,
+        facts={key: fact(pipeline, source, source_url=url, retrieved_at=retrieved_at)},
+        provenance=prov,
+    )
+
+
 def build_cancer_sources() -> list[CancerSource]:
-    """The cancer evidence sources, assembled. Pipeline and trial reality join here."""
-    return [opentargets_target_landscape]
+    """The cancer evidence sources, assembled. Trial reality joins here next."""
+    return [opentargets_target_landscape, opentargets_pipeline]
 
 
 async def _save_source_record(

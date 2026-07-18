@@ -226,10 +226,32 @@ export interface CancerDetail {
   state: BriefState
   /** A ready brief being revalidated in the background (stale-while-revalidate). */
   refreshing: boolean
-  /** Keyed by fact name, e.g. 'target_landscape'. A list because sources can disagree. */
+  /** Keyed by fact name, e.g. 'target_landscape', 'pipeline'. A list because sources disagree. */
   facts: Record<string, SourcedFact[]>
   /** Fact keys where every source failed -- an outage, not an absence. */
   unavailable: string[]
+  /** Of the pipeline's drugs, the ChEMBL ids the catalog holds -- the ones we can link
+   *  to a brief. Matched by exact id (catalog membership), never by name. */
+  catalog_drug_ids: string[]
+}
+
+/** One drug/candidate in a cancer's pipeline fact. */
+export interface PipelineDrug {
+  chembl_id: string
+  name: string
+}
+
+/** One clinical-stage bucket of the pipeline: its true count and a capped drug list. */
+export interface PipelinePhase {
+  stage: string
+  count: number
+  drugs: PipelineDrug[]
+}
+
+/** The pipeline fact's value: drugs for this cancer grouped by highest clinical stage. */
+export interface PipelineData {
+  total: number
+  by_phase: PipelinePhase[]
 }
 
 /** Columns the cancer overview can sort by; must match the API's accepted `sort` values. */

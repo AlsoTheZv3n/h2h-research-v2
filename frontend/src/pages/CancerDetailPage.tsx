@@ -4,6 +4,7 @@ import { getCancer, retryCancer } from '../api/client'
 import type { CancerDetail } from '../api/types'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { BriefStateProvider } from '../components/Fact'
+import { PipelineCard } from '../components/PipelineCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
 import { formatCount } from '../format'
@@ -110,6 +111,10 @@ export function CancerDetailPage() {
         </dl>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <PipelineCard
+            facts={detail.facts['pipeline']}
+            catalogDrugIds={detail.catalog_drug_ids}
+          />
           <TargetLandscapeCard facts={detail.facts['target_landscape']} />
         </div>
 

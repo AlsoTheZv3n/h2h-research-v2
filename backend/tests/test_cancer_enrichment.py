@@ -18,6 +18,7 @@ import pytest
 import respx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from backend.ingestion import enrich_cancer
 from backend.ingestion.base import FactStatus, utcnow
 from backend.models import Cancer
 from backend.repositories.cancers import CancerRepository
@@ -199,10 +200,10 @@ class TestLazyFetch:
         assert all(s is BriefState.ENRICHING for s in states)
         assert len(cancer_briefs._in_flight) == 1
         await cancer_briefs._in_flight[DISEASE]
-        # The dedup that matters: ONE Open Targets fetch, not five. (Asserting the
-        # in-flight dict length alone cannot catch a broken dedup -- five tasks under the
-        # same key still leave len == 1.)
-        assert respx.calls.call_count == 1
+        # The dedup that matters: ONE enrich, not five. One enrich makes one OT call per
+        # source; five would make five times that. (The in-flight dict length alone cannot
+        # catch a broken dedup -- five tasks under the same key still leave len == 1.)
+        assert respx.calls.call_count == len(enrich_cancer.build_cancer_sources())
 
     @respx.mock
     async def test_the_in_flight_marker_is_released(
@@ -247,6 +248,72 @@ class TestStaleWhileRevalidate:
         state = await get_or_start_cancer_brief(session, DISEASE)
         assert state is BriefState.READY
         assert not cancer_briefs.is_cancer_enriching(DISEASE)
+
+
+def _pipeline_response(*drugs: tuple[str, str, str]) -> httpx.Response:
+    """An Open Targets disease->drugs answer: (chembl_id, name, stage) tuples."""
+    rows = [{"drug": {"id": c, "name": n}, "maxClinicalStage": s} for c, n, s in drugs]
+    return httpx.Response(
+        200,
+        json={
+            "data": {
+                "disease": {
+                    "id": DISEASE,
+                    "drugAndClinicalCandidates": {"count": len(rows), "rows": rows},
+                }
+            }
+        },
+    )
+
+
+class TestPipeline:
+    def test_group_pipeline_orders_dedupes_and_counts(self) -> None:
+        rows = [
+            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_2"},
+            {"drug": {"id": "CHEMBL1", "name": "A"}, "maxClinicalStage": "PHASE_2"},  # a dup
+            {"drug": {"id": "CHEMBL2", "name": "B"}, "maxClinicalStage": "APPROVAL"},
+            {"drug": {"id": "CHEMBL3", "name": "C"}, "maxClinicalStage": "PHASE_2"},
+        ]
+        pipe = enrich_cancer._group_pipeline(rows)
+        # Most advanced first: APPROVAL leads PHASE_2.
+        assert [g["stage"] for g in pipe["by_phase"]] == ["APPROVAL", "PHASE_2"]
+        p2 = next(g for g in pipe["by_phase"] if g["stage"] == "PHASE_2")
+        assert p2["count"] == 2  # CHEMBL1 deduped within the stage, plus CHEMBL3
+        assert {d["chembl_id"] for d in p2["drugs"]} == {"CHEMBL1", "CHEMBL3"}
+        assert pipe["total"] == 3
+
+    def test_group_pipeline_empty_is_empty_dict(self) -> None:
+        # An empty dict is what fact() classifies as EMPTY ("resolved, no programmes").
+        assert enrich_cancer._group_pipeline([]) == {}
+
+    @respx.mock
+    async def test_pipeline_source_produces_a_stage_grouped_fact(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        respx.post(OT).mock(
+            return_value=_pipeline_response(
+                ("CHEMBL_A", "A", "APPROVAL"), ("CHEMBL_B", "B", "PHASE_2")
+            )
+        )
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_pipeline(fast_client, cancer)
+        pf = record.facts["pipeline"]
+        assert pf.status is FactStatus.OK
+        assert pf.source == "opentargets"
+        val = cast(dict[str, Any], pf.value)
+        assert val["total"] == 2
+        assert [g["stage"] for g in val["by_phase"]] == ["APPROVAL", "PHASE_2"]
+
+    @respx.mock
+    async def test_pipeline_outage_is_source_failed_not_empty(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        respx.post(OT).mock(
+            return_value=httpx.Response(200, json={"errors": [{"message": "boom"}]})
+        )
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_pipeline(fast_client, cancer)
+        assert record.facts["pipeline"].status is FactStatus.SOURCE_FAILED
 
 
 if __name__ == "__main__":  # pragma: no cover

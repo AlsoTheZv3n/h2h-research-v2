@@ -87,9 +87,21 @@ INSERT INTO cancer_fact (disease_id, key, source, value, status, source_url, ret
 VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
         '[{"symbol":"EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true},
           {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]'::jsonb,
+        'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
+       ('MONDO_E2E_NSCLC', 'pipeline', 'opentargets',
+        '{"total":3,"by_phase":[
+           {"stage":"APPROVAL","count":2,"drugs":[{"chembl_id":"CHEMBL_E2E_INPIPE","name":"E2E APPROVED DRUG"},{"chembl_id":"CHEMBL_E2E_EXTERNAL","name":"E2E EXTERNAL DRUG"}]},
+           {"stage":"PHASE_2","count":1,"drugs":[{"chembl_id":"CHEMBL_E2E_CAND","name":"E2E CANDIDATE"}]}]}'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now())
 ON CONFLICT (disease_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
+
+-- A drug the pipeline names, seeded so it is in the catalog and therefore linkable; the
+-- other two pipeline drugs are NOT seeded, so the page shows them as plain text -- the
+-- exact-id, never-by-name linkability the weave requires, checked end to end.
+INSERT INTO drug (chembl_id, pref_name, drug_type, max_phase, maturity)
+VALUES ('CHEMBL_E2E_INPIPE', 'E2E APPROVED DRUG', 'Small molecule', 4, 'index_only')
+ON CONFLICT (chembl_id) DO UPDATE SET pref_name = excluded.pref_name;
 `
 
 function psql(sql: string): void {

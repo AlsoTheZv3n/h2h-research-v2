@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import SourceRecord
-from backend.models import Cancer, CancerFactRow
+from backend.models import Cancer, CancerFactRow, Drug
 
 # The columns the overview's headers can sort by. Anything else falls back to n_drugs
 # rather than erroring on a bad ?sort= value. Default is n_drugs desc: in a drug-
@@ -100,6 +100,20 @@ class CancerRepository:
             .order_by(CancerFactRow.key)
         )
         return result.scalars().all()
+
+    async def present_drug_ids(self, chembl_ids: Sequence[str]) -> set[str]:
+        """Which of these ChEMBL ids the drug catalog holds.
+
+        The cancer pipeline comes from Open Targets and lists drugs we may or may not
+        have a brief for; this is how the page links only the ones it can drill into,
+        and shows the rest as plain text rather than a dead link.
+        """
+        if not chembl_ids:
+            return set()
+        result = await self.session.execute(
+            select(Drug.chembl_id).where(Drug.chembl_id.in_(chembl_ids))
+        )
+        return set(result.scalars().all())
 
     async def list_cancers(
         self,
