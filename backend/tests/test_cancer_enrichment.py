@@ -496,5 +496,145 @@ class TestTargetLandscape:
         assert record.facts["target_landscape"].status is FactStatus.EMPTY
 
 
+def _landscape_with_ids(targets: list[tuple[str, str, float]]) -> httpx.Response:
+    """A landscape answer whose targets carry Ensembl ids: (symbol, ensembl_id, score)."""
+    rows = [
+        {
+            "score": s,
+            "datatypeScores": [],
+            "target": {"id": eid, "approvedSymbol": sym, "tractability": []},
+        }
+        for sym, eid, s in targets
+    ]
+    return httpx.Response(
+        200,
+        json={
+            "data": {
+                "disease": {"id": DISEASE, "associatedTargets": {"count": len(rows), "rows": rows}}
+            }
+        },
+    )
+
+
+def _drug_status_response(by_id: dict[str, list[str]]) -> httpx.Response:
+    """A targets() drug-status answer. by_id maps Ensembl id -> its maxClinicalStages;
+    an empty list means 'resolved, no drugs'; an id absent from by_id is 'not resolved'."""
+    targets = [
+        {
+            "id": eid,
+            "drugAndClinicalCandidates": {
+                "count": len(stages),
+                "rows": [{"maxClinicalStage": st} for st in stages],
+            },
+        }
+        for eid, stages in by_id.items()
+    ]
+    return httpx.Response(200, json={"data": {"targets": targets}})
+
+
+def _ot_router(landscape: httpx.Response, drug_status: httpx.Response):
+    """Route the two OT POSTs (both to the same endpoint) by which query they carry."""
+
+    def route(request: httpx.Request) -> httpx.Response:
+        body = request.content.decode()
+        if "TargetDrugStatus" in body or "ensemblIds" in body:
+            return drug_status
+        return landscape
+
+    return route
+
+
+class TestDrugStatus:
+    """R4: the drugged/in-development/unexploited flag. The load-bearing rule is that a
+    target OT never resolved reads 'unknown', never 'unexploited' -- absence of a
+    measurement is not a measurement of absence, in the highest-stakes cell on the page."""
+
+    def test_classify_approved_from_approval_or_phase4(self) -> None:
+        assert (
+            enrich_cancer._classify_drug_status({"rows": [{"maxClinicalStage": "APPROVAL"}]})
+            == "approved"
+        )
+        # PHASE_4 is post-marketing -> only reached after approval, so it counts as approved.
+        two = {"rows": [{"maxClinicalStage": "PHASE_4"}, {"maxClinicalStage": "PHASE_2"}]}
+        assert enrich_cancer._classify_drug_status(two) == "approved"
+
+    def test_classify_clinical_when_candidates_but_none_approved(self) -> None:
+        rows = {"rows": [{"maxClinicalStage": "PHASE_3"}, {"maxClinicalStage": "PHASE_2"}]}
+        assert enrich_cancer._classify_drug_status(rows) == "clinical"
+
+    def test_classify_unexploited_only_when_resolved_and_no_rows(self) -> None:
+        assert enrich_cancer._classify_drug_status({"rows": []}) == "unexploited"
+        assert enrich_cancer._classify_drug_status({"count": 0, "rows": None}) == "unexploited"
+        assert enrich_cancer._classify_drug_status(None) == "unexploited"
+
+    @respx.mock
+    async def test_fetch_maps_by_id_not_position(self, fast_client: httpx.AsyncClient) -> None:
+        # Response order reversed vs the request -> the mapping must follow the echoed id,
+        # not the position, or a status lands on the wrong target.
+        respx.post(OT).mock(
+            return_value=_drug_status_response({"ENSG_B": ["PHASE_2"], "ENSG_A": ["APPROVAL"]})
+        )
+        out = await enrich_cancer._fetch_drug_status(fast_client, ["ENSG_A", "ENSG_B"])
+        assert out == {"ENSG_A": "approved", "ENSG_B": "clinical"}
+
+    @respx.mock
+    async def test_fetch_total_failure_returns_empty(self, fast_client: httpx.AsyncClient) -> None:
+        respx.post(OT).mock(
+            return_value=httpx.Response(200, json={"errors": [{"message": "boom"}]})
+        )
+        assert await enrich_cancer._fetch_drug_status(fast_client, ["ENSG_A"]) == {}
+
+    @respx.mock
+    async def test_landscape_attaches_the_three_states(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        landscape = _landscape_with_ids(
+            [("EGFR", "ENSG_E", 0.9), ("TP53", "ENSG_T", 0.8), ("STK11", "ENSG_S", 0.7)]
+        )
+        drugs = _drug_status_response({"ENSG_E": ["APPROVAL"], "ENSG_T": ["PHASE_2"], "ENSG_S": []})
+        respx.post(OT).mock(side_effect=_ot_router(landscape, drugs))
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        by_sym = {t["symbol"]: t["drug_status"] for t in val["targets"]}
+        assert by_sym == {"EGFR": "approved", "TP53": "clinical", "STK11": "unexploited"}
+        # The Ensembl id is carried for the catalog join (R4-2), never the symbol.
+        assert {t["symbol"]: t["ensembl_id"] for t in val["targets"]}["EGFR"] == "ENSG_E"
+
+    @respx.mock
+    async def test_drug_status_outage_leaves_unknown_never_unexploited(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # The landscape resolves, but the drug-status batch is down. Every target must read
+        # 'unknown', NOT 'unexploited' -- an outage is not "the world has no drug for this".
+        landscape = _landscape_with_ids([("EGFR", "ENSG_E", 0.9)])
+        failed_drugs = httpx.Response(200, json={"errors": [{"message": "drug status down"}]})
+        respx.post(OT).mock(side_effect=_ot_router(landscape, failed_drugs))
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        statuses = [t["drug_status"] for t in val["targets"]]
+        assert statuses == ["unknown"]
+        assert "unexploited" not in statuses
+        # The landscape itself still stands -- a down flag sub-query is not a down landscape.
+        assert record.facts["target_landscape"].status is FactStatus.OK
+
+    @respx.mock
+    async def test_partial_batch_marks_only_the_missing_unknown(
+        self, fast_client: httpx.AsyncClient
+    ) -> None:
+        # Two targets, the batch resolves only one. The resolved one keeps its real status;
+        # the unresolved one is 'unknown', NOT 'unexploited', and does not contaminate the
+        # resolved one.
+        landscape = _landscape_with_ids([("EGFR", "ENSG_E", 0.9), ("MYSTERY", "ENSG_M", 0.8)])
+        drugs = _drug_status_response({"ENSG_E": ["APPROVAL"]})  # ENSG_M omitted = unresolved
+        respx.post(OT).mock(side_effect=_ot_router(landscape, drugs))
+        cancer = Cancer(disease_id=DISEASE, name="NSCLC", n_drugs=0, n_targets=0)
+        record = await enrich_cancer.opentargets_target_landscape(fast_client, cancer)
+        val = cast(dict[str, Any], record.facts["target_landscape"].value)
+        by_sym = {t["symbol"]: t["drug_status"] for t in val["targets"]}
+        assert by_sym == {"EGFR": "approved", "MYSTERY": "unknown"}
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))

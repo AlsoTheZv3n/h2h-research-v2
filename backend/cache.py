@@ -36,8 +36,9 @@ def detail_cache_key(chembl_id: str) -> str:
 
 # The cancer brief has its own shape and its own version, so a change to one cannot
 # strand entries of the other. v4: target_landscape fact reshaped to carry the strong-
-# association count + threshold beside the displayed targets.
-_CANCER_DETAIL_SCHEMA_VERSION = "v4"
+# association count + threshold beside the displayed targets. v5: each displayed target
+# gained an Ensembl id + a drugged/in-development/unexploited status.
+_CANCER_DETAIL_SCHEMA_VERSION = "v5"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:
