@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDrugs, listTargetClasses } from '../api/client'
 import type { DataMaturity, DrugList, SortField, SortOrder } from '../api/types'
 import { MaturityPill, PhasePill } from '../components/MaturityPill'
+import { Pagination } from '../components/Pagination'
 import { countLabel, formatCount } from '../format'
 
 const PAGE_SIZE = 25
@@ -391,28 +392,17 @@ export function OverviewPage() {
       </div>
 
       {data && data.total > PAGE_SIZE && (
-        <div className="mt-3 flex items-center justify-between text-xs text-ink-muted">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
           <span>
             {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of {formatCount(data.total)}
+            {' · '}
+            {formatCount(Math.ceil(data.total / PAGE_SIZE))} pages
           </span>
-          <span className="flex gap-2">
-            <button
-              type="button"
-              disabled={offset === 0}
-              onClick={() => update({ offset: String(Math.max(0, offset - PAGE_SIZE)) })}
-              className="rounded border border-line px-2 py-1 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={offset + PAGE_SIZE >= data.total}
-              onClick={() => update({ offset: String(offset + PAGE_SIZE) })}
-              className="rounded border border-line px-2 py-1 disabled:opacity-40"
-            >
-              Next
-            </button>
-          </span>
+          <Pagination
+            page={Math.floor(offset / PAGE_SIZE) + 1}
+            totalPages={Math.ceil(data.total / PAGE_SIZE)}
+            onPage={(p) => update({ offset: p > 1 ? String((p - 1) * PAGE_SIZE) : '' })}
+          />
         </div>
       )}
     </section>
