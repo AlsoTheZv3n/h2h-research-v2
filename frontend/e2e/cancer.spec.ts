@@ -9,9 +9,10 @@ import { expect, test } from '@playwright/test'
 test.describe('cancer catalog', () => {
   test('the nav opens the cancer catalog and lists the real catalog', async ({ page, request }) => {
     const all = await (await request.get('/api/cancers?limit=1')).json()
-    // The seed keeps only cancers with a real hit; there must be a substantial catalog
-    // or the whole page is untested.
-    expect(all.total, 'the cancer catalog is empty -- loader never ran').toBeGreaterThan(100)
+    // A non-empty catalog is the premise (global-setup seeds fixtures; dev has the real
+    // ~1,300). The count assertion below is what proves the number is the API's, not a
+    // hardcoded one, so this only guards against a totally empty table.
+    expect(all.total, 'the cancer catalog is empty -- seed/loader never ran').toBeGreaterThan(0)
 
     await page.goto('/')
     await page.getByTestId('nav-cancers').click()

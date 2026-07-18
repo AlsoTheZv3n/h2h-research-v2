@@ -63,6 +63,21 @@ VALUES ('CHEMBL_E2E_UNSEEN', 'E2E NEVER LOOKED', 'Small molecule', 1,
         'index_only', NULL, NULL)
 ON CONFLICT (chembl_id) DO UPDATE
    SET last_enriched_at = NULL, literature_fetched_at = NULL;
+
+-- Cancer catalog fixtures. The cancer overview e2e needs a real, filterable catalog,
+-- but CI seeds only the drug demo fixture, so the Open-Targets-loaded cancer table is
+-- empty there and every cancer test would probe nothing. Two drugged cancers and one
+-- with no drug programme, so the has_drugs facet has something to narrow -- the same
+-- reason the source_failed drug fixture is seeded rather than waited for. Idempotent,
+-- last_enriched_at NULL (never analyzed); they persist beside the real catalog in dev.
+INSERT INTO cancer (disease_id, name, therapeutic_area, n_drugs, n_targets, last_enriched_at)
+VALUES
+  ('MONDO_E2E_NSCLC',  'E2E lung carcinoma',   'respiratory or thoracic disease',       500, 8000, NULL),
+  ('MONDO_E2E_BREAST', 'E2E breast carcinoma', 'reproductive system or breast disease', 400, 9000, NULL),
+  ('MONDO_E2E_RARE',   'E2E rare tumor',       'hematologic disorder',                    0,   12, NULL)
+ON CONFLICT (disease_id) DO UPDATE
+   SET name = excluded.name, therapeutic_area = excluded.therapeutic_area,
+       n_drugs = excluded.n_drugs, n_targets = excluded.n_targets;
 `
 
 function psql(sql: string): void {
