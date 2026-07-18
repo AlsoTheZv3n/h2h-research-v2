@@ -21,7 +21,7 @@ from backend.db import get_session
 from backend.ingestion.http import build_client
 from backend.main import app
 from backend.models import Base
-from backend.services import briefs
+from backend.services import briefs, cancer_briefs
 
 TEST_DB_NAME = "h2h_test"
 
@@ -41,9 +41,10 @@ def _reset_async_singletons() -> Iterator[None]:
     Cancelling and dropping the references is enough: the next test rebuilds both.
     """
     yield
-    for task in list(briefs._in_flight.values()):
+    for task in (*briefs._in_flight.values(), *cancer_briefs._in_flight.values()):
         task.cancel()
     briefs._in_flight.clear()
+    cancer_briefs._in_flight.clear()
     reset_redis()
 
 

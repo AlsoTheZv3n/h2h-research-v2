@@ -44,7 +44,7 @@ test.describe('cancer catalog', () => {
     )
   })
 
-  test('a row opens the cancer page, honest that the brief is not built yet', async ({ page }) => {
+  test('a row opens the cancer page, with the non-clinical disclaimer', async ({ page }) => {
     await page.goto('/cancers?sort=drugs&order=desc')
     const first = page.getByTestId('cancer-row').first()
     await expect(first).toBeVisible()
@@ -52,11 +52,22 @@ test.describe('cancer catalog', () => {
     await first.click()
     // A real disease id in the URL (MONDO_ or the residual EFO_).
     await expect(page).toHaveURL(/\/cancers\/(MONDO|EFO)_/)
-    // The honest state: no enrich_cancer job yet, so the brief is not built -- never
-    // rendered as "no evidence".
-    await expect(page.getByTestId('cancer-brief-pending')).toBeVisible()
+    // This is a research view, not clinical advice -- the disclaimer is always present.
+    await expect(page.getByTestId('non-clinical-disclaimer')).toBeVisible()
     // The detail page keeps the Cancers tab lit.
     await expect(page.getByTestId('nav-cancers')).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('an enriched cancer shows its target landscape with provenance', async ({ page }) => {
+    // MONDO_E2E_NSCLC is seeded with a target-landscape brief (global-setup), so it is
+    // READY on open and renders the real card -- no live Open Targets fetch.
+    await page.goto('/cancers/MONDO_E2E_NSCLC')
+    const card = page.getByTestId('target-landscape')
+    await expect(card).toBeVisible()
+    await expect(card).toContainText('EGFR')
+    await expect(card).toContainText('KRAS')
+    // Provenance behind the info icon, the same chip the drug page uses.
+    await expect(page.getByTestId('source-info').first()).toBeVisible()
   })
 
   test('the drug catalog still works, and its tab is active there', async ({ page }) => {

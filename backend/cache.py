@@ -34,6 +34,16 @@ def detail_cache_key(chembl_id: str) -> str:
     return f"drug:detail:{_DETAIL_SCHEMA_VERSION}:{chembl_id}"
 
 
+# The cancer brief has its own shape and its own version, so a change to one cannot
+# strand entries of the other. v1: catalog facts + target landscape.
+_CANCER_DETAIL_SCHEMA_VERSION = "v1"
+
+
+def cancer_detail_cache_key(disease_id: str) -> str:
+    """The disease-side twin of detail_cache_key."""
+    return f"cancer:detail:{_CANCER_DETAIL_SCHEMA_VERSION}:{disease_id}"
+
+
 async def invalidate_detail(chembl_id: str) -> None:
     """Drop a drug's cached brief. Best-effort: a dead cache degrades latency, never
     correctness, so a failure here is logged and swallowed rather than raised."""
@@ -41,6 +51,14 @@ async def invalidate_detail(chembl_id: str) -> None:
         await get_redis().delete(detail_cache_key(chembl_id))
     except Exception as exc:
         logger.warning("detail cache invalidation failed for %s: %s", chembl_id, exc)
+
+
+async def invalidate_cancer_detail(disease_id: str) -> None:
+    """Drop a cancer's cached brief. Best-effort, like invalidate_detail."""
+    try:
+        await get_redis().delete(cancer_detail_cache_key(disease_id))
+    except Exception as exc:
+        logger.warning("cancer detail cache invalidation failed for %s: %s", disease_id, exc)
 
 
 async def close_redis() -> None:

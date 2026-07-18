@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Cancer
+from backend.ingestion.base import SourceRecord
+from backend.models import Cancer, CancerFactRow
 
 # The columns the overview's headers can sort by. Anything else falls back to n_drugs
 # rather than erroring on a bad ?sort= value. Default is n_drugs desc: in a drug-
@@ -46,6 +48,58 @@ class CancerRepository:
         cancer = await self.session.get(Cancer, disease_id)
         assert cancer is not None
         return cancer
+
+    async def mark_enriched(self, disease_id: str, when: datetime) -> None:
+        """Stamp last_enriched_at on an existing cancer -- a plain UPDATE, not an upsert.
+
+        The row always exists when we get here (enrichment runs on a cancer we fetched),
+        and a partial INSERT ... ON CONFLICT would form a `name=NULL` candidate tuple that
+        Postgres rejects on the NOT NULL check *before* the conflict redirects to UPDATE.
+        The drug side gets away with upsert only because pref_name is nullable.
+        """
+        await self.session.execute(
+            update(Cancer).where(Cancer.disease_id == disease_id).values(last_enriched_at=when)
+        )
+
+    async def save_record(self, disease_id: str, record: SourceRecord) -> None:
+        """Persist every fact of one source's answer for one cancer.
+
+        Mirrors DrugRepository.save_record: a source_failed row is written like any
+        other, so an outage lands on the record rather than being mistaken for an
+        absence. Upserts on (disease, key, source), so re-enrichment refreshes in place.
+        """
+        for key, f in record.facts.items():
+            stmt = insert(CancerFactRow).values(
+                disease_id=disease_id,
+                key=key,
+                source=f.source,
+                value=f.value,
+                status=f.status,
+                source_url=f.source_url,
+                retrieved_at=f.retrieved_at,
+                error=f.error,
+                confidence=f.confidence,
+            )
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_cancer_fact_disease_key_source",
+                set_={
+                    "value": stmt.excluded.value,
+                    "status": stmt.excluded.status,
+                    "source_url": stmt.excluded.source_url,
+                    "retrieved_at": stmt.excluded.retrieved_at,
+                    "error": stmt.excluded.error,
+                    "confidence": stmt.excluded.confidence,
+                },
+            )
+            await self.session.execute(stmt)
+
+    async def facts_for(self, disease_id: str) -> Sequence[CancerFactRow]:
+        result = await self.session.execute(
+            select(CancerFactRow)
+            .where(CancerFactRow.disease_id == disease_id)
+            .order_by(CancerFactRow.key)
+        )
+        return result.scalars().all()
 
     async def list_cancers(
         self,

@@ -72,12 +72,24 @@ ON CONFLICT (chembl_id) DO UPDATE
 -- last_enriched_at NULL (never analyzed); they persist beside the real catalog in dev.
 INSERT INTO cancer (disease_id, name, therapeutic_area, n_drugs, n_targets, last_enriched_at)
 VALUES
-  ('MONDO_E2E_NSCLC',  'E2E lung carcinoma',   'respiratory or thoracic disease',       500, 8000, NULL),
+  ('MONDO_E2E_NSCLC',  'E2E lung carcinoma',   'respiratory or thoracic disease',       500, 8000, now()),
   ('MONDO_E2E_BREAST', 'E2E breast carcinoma', 'reproductive system or breast disease', 400, 9000, NULL),
   ('MONDO_E2E_RARE',   'E2E rare tumor',       'hematologic disorder',                    0,   12, NULL)
 ON CONFLICT (disease_id) DO UPDATE
    SET name = excluded.name, therapeutic_area = excluded.therapeutic_area,
-       n_drugs = excluded.n_drugs, n_targets = excluded.n_targets;
+       n_drugs = excluded.n_drugs, n_targets = excluded.n_targets,
+       last_enriched_at = excluded.last_enriched_at;
+
+-- MONDO_E2E_NSCLC is the ENRICHED fixture: it carries a target-landscape brief so the
+-- cancer detail e2e renders the real card without a live Open Targets fetch (a never-
+-- enriched cancer would trigger one on open). The other two stay not-analyzed.
+INSERT INTO cancer_fact (disease_id, key, source, value, status, source_url, retrieved_at)
+VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
+        '[{"symbol":"EGFR","score":0.89,"evidence_types":["clinical","somatic_mutation"],"sm_tractable":true,"ab_tractable":true},
+          {"symbol":"KRAS","score":0.83,"evidence_types":["clinical"],"sm_tractable":true,"ab_tractable":false}]'::jsonb,
+        'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now())
+ON CONFLICT (disease_id, key, source) DO UPDATE
+   SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 `
 
 function psql(sql: string): void {

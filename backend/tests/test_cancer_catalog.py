@@ -17,6 +17,7 @@ import httpx
 import pytest
 
 from backend.ingestion import cancer_catalog
+from backend.ingestion.base import utcnow
 from backend.repositories.cancers import CancerRepository
 
 
@@ -298,17 +299,21 @@ async def test_api_lists_filters_and_counts(api: httpx.AsyncClient, session: Any
     assert all(c["n_drugs"] > 0 for c in drugged["items"])
 
 
-async def test_api_detail_is_not_analyzed_until_enriched(
+async def test_api_detail_serves_catalog_facts_when_ready(
     api: httpx.AsyncClient, session: Any
 ) -> None:
-    await _seed(CancerRepository(session))
+    repo = CancerRepository(session)
+    await _seed(repo)
+    # Enriched already, so the detail is READY and opening it starts no background fetch.
+    # The lazy/enriching path is exercised in test_cancer_enrichment.py, where the Open
+    # Targets calls are mocked and the background session points at the test database.
+    await repo.mark_enriched("MONDO_1", utcnow())
     await session.commit()
 
     detail = (await api.get("/cancers/MONDO_1")).json()
     assert detail["name"] == "lung cancer"
     assert detail["n_drugs"] == 40
-    # No enrich_cancer job yet: the honest state is not_analyzed, never "ready".
-    assert detail["state"] == "not_analyzed"
+    assert detail["state"] == "ready"
 
     assert (await api.get("/cancers/MONDO_nope")).status_code == 404
 

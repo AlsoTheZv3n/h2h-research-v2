@@ -99,6 +99,19 @@ export function getCancer(diseaseId: string): Promise<CancerDetail> {
   return get<CancerDetail>(`/cancers/${encodeURIComponent(diseaseId)}`)
 }
 
+/** Re-fetch every source for a cancer whose brief has failures. Returns the new state;
+ *  the caller polls getCancer until it is `ready`, as on the drug side. */
+export async function retryCancer(diseaseId: string): Promise<{ state: BriefState }> {
+  const response = await fetch(`${BASE}/cancers/${encodeURIComponent(diseaseId)}/retry`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    throw new ApiError(`${response.status} ${response.statusText}`, response.status)
+  }
+  return response.json() as Promise<{ state: BriefState }>
+}
+
 /** The structure SVG is rendered server-side by RDKit; the browser just shows it. */
 export function structureUrl(chemblId: string): string {
   return `${BASE}/drugs/${encodeURIComponent(chemblId)}/structure.svg`
