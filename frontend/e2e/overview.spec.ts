@@ -138,4 +138,34 @@ test.describe('overview filters', () => {
     await expect(count).toContainText('of')
     await expect(count).toContainText('shown')
   })
+
+  test('editing the current-page field jumps straight to that page', async ({ page, request }) => {
+    // Premise: the catalog must span enough pages for a jump to mean anything. With 25
+    // a page over a few thousand drugs it does, but assert it rather than assume it --
+    // an empty catalog would make this test pass by rendering no pager at all.
+    const total: number = (await (await request.get('/api/drugs?limit=1')).json()).total
+    const PAGE_SIZE = 25
+    expect(Math.ceil(total / PAGE_SIZE), 'too few drugs to page through').toBeGreaterThan(10)
+
+    await page.goto('/')
+    await expect(page.getByTestId('drug-row').first()).toBeVisible()
+    const firstOnPageOne = await page.getByTestId('drug-row').first().textContent()
+
+    // The jump itself: retype the current page as 10 and press Enter -- no Next clicks.
+    const pageInput = page.getByTestId('page-input')
+    await pageInput.fill('10')
+    await pageInput.press('Enter')
+
+    // Proof it actually paged, three independent ways: the URL offset is page 10's
+    // ((10-1)*25 = 225), the field now reads 10, and the data underneath changed.
+    await expect(page).toHaveURL(/offset=225/)
+    await expect(page.getByTestId('page-input')).toHaveValue('10')
+    await expect
+      .poll(async () => (await page.getByTestId('drug-row').first().textContent()) ?? '')
+      .not.toBe(firstOnPageOne)
+
+    // And the jump survives a reload from the URL alone -- shareable, refresh-proof.
+    await page.reload()
+    await expect(page.getByTestId('page-input')).toHaveValue('10')
+  })
 })
