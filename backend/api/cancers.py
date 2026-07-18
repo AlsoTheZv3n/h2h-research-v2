@@ -142,12 +142,7 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
     catalog_drug_ids: list[str] = []
     pipeline = facts.get("pipeline")
     if pipeline and pipeline[0].status is FactStatus.OK and isinstance(pipeline[0].value, dict):
-        ids = [
-            d["chembl_id"]
-            for group in pipeline[0].value.get("by_phase", [])
-            for d in group.get("drugs", [])
-            if d.get("chembl_id")
-        ]
+        ids = [d["chembl_id"] for d in pipeline[0].value.get("drugs", []) if d.get("chembl_id")]
         catalog_drug_ids = sorted(await repo.present_drug_ids(ids))
 
     detail = CancerDetail(

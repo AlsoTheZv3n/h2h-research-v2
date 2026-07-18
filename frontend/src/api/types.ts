@@ -235,23 +235,28 @@ export interface CancerDetail {
   catalog_drug_ids: string[]
 }
 
-/** One drug/candidate in a cancer's pipeline fact. */
+/** One drug/candidate in a cancer's pipeline, at its most advanced stage. */
 export interface PipelineDrug {
   chembl_id: string
   name: string
+  stage: string
+  /** Open Targets drugType (small molecule, antibody, ADC…). null when unannotated. */
+  modality: string | null
+  /** The drug's mechanism of action. null when Open Targets has none -> render "—". */
+  mechanism: string | null
 }
 
-/** One clinical-stage bucket of the pipeline: its true count and a capped drug list. */
+/** One clinical-stage bucket: its stage and true count, for the distribution bars. */
 export interface PipelinePhase {
   stage: string
   count: number
-  drugs: PipelineDrug[]
 }
 
-/** The pipeline fact's value: drugs for this cancer grouped by highest clinical stage. */
+/** The pipeline fact's value: the flat drug list plus the per-stage distribution. */
 export interface PipelineData {
   total: number
   by_phase: PipelinePhase[]
+  drugs: PipelineDrug[]
 }
 
 /** Columns the cancer overview can sort by; must match the API's accepted `sort` values. */

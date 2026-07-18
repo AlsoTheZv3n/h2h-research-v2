@@ -335,15 +335,22 @@ async def test_api_detail_marks_only_catalog_drugs_as_linkable(
                 "pipeline": fact(
                     {
                         "total": 2,
-                        "by_phase": [
+                        "by_phase": [{"stage": "PHASE_2", "count": 2}],
+                        "drugs": [
                             {
+                                "chembl_id": "CHEMBL_IN",
+                                "name": "In",
                                 "stage": "PHASE_2",
-                                "count": 2,
-                                "drugs": [
-                                    {"chembl_id": "CHEMBL_IN", "name": "In"},
-                                    {"chembl_id": "CHEMBL_OUT", "name": "Out"},
-                                ],
-                            }
+                                "modality": "Small molecule",
+                                "mechanism": None,
+                            },
+                            {
+                                "chembl_id": "CHEMBL_OUT",
+                                "name": "Out",
+                                "stage": "PHASE_2",
+                                "modality": None,
+                                "mechanism": None,
+                            },
                         ],
                     },
                     "opentargets",
@@ -363,7 +370,7 @@ async def test_api_detail_marks_only_catalog_drugs_as_linkable(
     assert detail["catalog_drug_ids"] == ["CHEMBL_IN"]
     # Both drugs still appear in the pipeline fact -- shown, just not both linked.
     pipeline = detail["facts"]["pipeline"][0]["value"]
-    shown = {d["chembl_id"] for g in pipeline["by_phase"] for d in g["drugs"]}
+    shown = {d["chembl_id"] for d in pipeline["drugs"]}
     assert shown == {"CHEMBL_IN", "CHEMBL_OUT"}
 
 
