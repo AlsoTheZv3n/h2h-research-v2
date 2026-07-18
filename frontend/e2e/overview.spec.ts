@@ -117,16 +117,19 @@ test.describe('overview filters', () => {
   test('reversing the sort order actually reorders the table', async ({ page }) => {
     await page.goto('/')
     await page.getByTestId('sort-phase').click() // phase, its default direction (desc)
+    await expect(page).toHaveURL(/order=desc/)
     await expect(page.getByTestId('drug-row').first()).toBeVisible()
-    const desc = await page.getByTestId('drug-row').first().textContent()
+    const desc = (await page.getByTestId('drug-row').first().textContent()) ?? ''
 
     await page.getByTestId('sort-phase').click() // same column again -> flip to asc
     await expect(page).toHaveURL(/order=asc/)
-    await expect(page.getByTestId('drug-row').first()).toBeVisible()
-    const asc = await page.getByTestId('drug-row').first().textContent()
-
-    // A real sort: the two ends differ. If order were ignored these would match.
-    expect(asc).not.toEqual(desc)
+    // A real sort: the two ends differ. Poll rather than read once -- the descending
+    // rows linger on screen while the re-sorted page is still in flight, so reading the
+    // first row immediately raced that fetch (and failed under CI load). If order were
+    // ignored, the row never changes and this times out.
+    await expect
+      .poll(async () => (await page.getByTestId('drug-row').first().textContent()) ?? '')
+      .not.toBe(desc)
   })
 
   test('the filtered count reads "X of Y shown"', async ({ page }) => {
