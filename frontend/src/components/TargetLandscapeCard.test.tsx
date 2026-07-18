@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { SourcedFact } from '../api/types'
 import { BriefStateProvider } from './Fact'
@@ -79,6 +80,35 @@ describe('TargetLandscapeCard', () => {
     const rows = screen.getAllByTestId('landscape-row')
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('STK11')).toBeInTheDocument()
+  })
+
+  it('links a target to a catalog drug brief when we hold one, by Ensembl id', () => {
+    render(
+      <MemoryRouter>
+        <TargetLandscapeCard
+          facts={[fact({ value: landscape })]}
+          catalogDrugByTarget={{ ENSG_E: 'CHEMBL_EGFR' }}
+        />
+      </MemoryRouter>,
+    )
+    // EGFR (ENSG_E) is the only target we hold a drug for -> its symbol links to that brief.
+    const link = screen.getByTestId('landscape-catalog-link')
+    expect(link).toHaveAttribute('href', '/drugs/CHEMBL_EGFR')
+    expect(link).toHaveTextContent('EGFR')
+    expect(screen.getAllByTestId('landscape-catalog-link')).toHaveLength(1)
+  })
+
+  it('a drugged target with no catalog drug shows its status but no link', () => {
+    // EGFR is `approved` in the fact but absent from our catalog map: it must read
+    // "approved, no link". Catalog absence is a missing link, never the drugged status --
+    // and never "unexploited", the world's answer, which the fact still supplies.
+    render(
+      <MemoryRouter>
+        <TargetLandscapeCard facts={[fact({ value: landscape })]} catalogDrugByTarget={{}} />
+      </MemoryRouter>,
+    )
+    expect(screen.queryByTestId('landscape-catalog-link')).not.toBeInTheDocument()
+    expect(screen.getByTestId('drug-status-approved')).toBeInTheDocument()
   })
 
   it('still renders targets from a pre-reshape (bare array) fact value', () => {

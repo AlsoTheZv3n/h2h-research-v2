@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { DrugStatus, SourcedFact, TargetLandscape, TargetLandscapeEntry } from '../api/types'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
@@ -17,7 +18,14 @@ import { useBriefState } from './Fact'
  * "approved for this cancer". `unknown` (not measured) and `unexploited` (measured, none)
  * are kept visibly distinct: collapsing them would resurrect the None-vs-0 lie one level up.
  */
-export function TargetLandscapeCard({ facts }: { facts?: SourcedFact[] }) {
+export function TargetLandscapeCard({
+  facts,
+  catalogDrugByTarget,
+}: {
+  facts?: SourcedFact[]
+  /** Ensembl id -> a catalog drug's ChEMBL id, for the per-target "open a brief" link. */
+  catalogDrugByTarget?: Record<string, string>
+}) {
   const briefState = useBriefState()
   const fact = facts?.[0]
 
@@ -72,7 +80,7 @@ export function TargetLandscapeCard({ facts }: { facts?: SourcedFact[] }) {
 
   return (
     <Card title="Target landscape" note="Top associated targets · Open Targets association score">
-      <TargetLandscapeBody targets={targets} fact={fact} />
+      <TargetLandscapeBody targets={targets} fact={fact} catalogDrugByTarget={catalogDrugByTarget} />
     </Card>
   )
 }
@@ -117,7 +125,15 @@ const FILTERS: { value: string; label: string }[] = [
 // Pre-flag facts (before drug_status shipped) have no status -> "unknown", never a guess.
 const statusOf = (t: TargetLandscapeEntry): DrugStatus => t.drug_status ?? 'unknown'
 
-function TargetLandscapeBody({ targets, fact }: { targets: TargetLandscapeEntry[]; fact: SourcedFact }) {
+function TargetLandscapeBody({
+  targets,
+  fact,
+  catalogDrugByTarget,
+}: {
+  targets: TargetLandscapeEntry[]
+  fact: SourcedFact
+  catalogDrugByTarget?: Record<string, string>
+}) {
   const [status, setStatus] = useState('')
   const filtered = useMemo(
     () => (status ? targets.filter((t) => statusOf(t) === status) : targets),
@@ -144,9 +160,27 @@ function TargetLandscapeBody({ targets, fact }: { targets: TargetLandscapeEntry[
       </div>
 
       <ul className="divide-y divide-line" data-testid="target-landscape">
-        {filtered.map((t) => (
+        {filtered.map((t) => {
+          // The catalog-link: a drug WE hold that acts on this target, keyed by Ensembl id.
+          // Absent -> plain symbol ("drugged, no link"), never a dead link and never a claim
+          // about the target's drugged status, which is the badge's job, not this link's.
+          const catalogDrug = t.ensembl_id ? catalogDrugByTarget?.[t.ensembl_id] : undefined
+          return (
           <li key={t.symbol} data-testid="landscape-row" className="flex items-center gap-2 py-1.5 text-sm">
-            <span className="w-16 shrink-0 font-medium text-ink">{t.symbol}</span>
+            <span className="w-16 shrink-0 font-medium">
+              {catalogDrug ? (
+                <Link
+                  to={`/drugs/${catalogDrug}`}
+                  data-testid="landscape-catalog-link"
+                  title="Open a catalog drug against this target"
+                  className="text-accent hover:underline"
+                >
+                  {t.symbol}
+                </Link>
+              ) : (
+                <span className="text-ink">{t.symbol}</span>
+              )}
+            </span>
             <span className="w-9 shrink-0 tabular-nums text-xs text-ink-muted">
               {t.score.toFixed(2)}
             </span>
@@ -162,7 +196,8 @@ function TargetLandscapeBody({ targets, fact }: { targets: TargetLandscapeEntry[
               {t.evidence_types.slice(0, 2).join(' · ')}
             </span>
           </li>
-        ))}
+          )
+        })}
         {filtered.length === 0 && (
           <li className="py-3 text-center text-sm text-ink-faint">No targets with this status.</li>
         )}

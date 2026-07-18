@@ -259,6 +259,10 @@ export interface CancerDetail {
   /** Of the pipeline's drugs, the ChEMBL ids the catalog holds -- the ones we can link
    *  to a brief. Matched by exact id (catalog membership), never by name. */
   catalog_drug_ids: string[]
+  /** For each landscape target's Ensembl id, one catalog drug (ChEMBL id) that acts on it
+   *  -- the drugged flag's separate, weaker catalog-link. A target absent here has no drug
+   *  in our catalog (NOT "unexploited", which is the world's answer); it gets no link. */
+  target_catalog_drug: Record<string, string>
 }
 
 /** One drug/candidate in a cancer's pipeline, at its most advanced stage. */
