@@ -69,7 +69,7 @@ class LoadStats:
     resolved: int = 0
     loaded: int = 0
     pruned: int = 0
-    batches_failed: int = 0
+    ids_failed: int = 0
 
     def report(self) -> str:
         lines = [
@@ -78,11 +78,9 @@ class LoadStats:
             f"  loaded into `cancer`         : {self.loaded}",
             f"  pruned (no drug, no target)  : {self.pruned}",
         ]
-        if self.batches_failed:
+        if self.ids_failed:
             # Never let a partial load read as a complete one.
-            lines.append(
-                f"  !! batches lost              : {self.batches_failed} (catalog incomplete)"
-            )
+            lines.append(f"  !! ids unresolved            : {self.ids_failed} (catalog incomplete)")
             lines.append("  NOTE: this run is a FLOOR. Re-run with --only-missing to fill gaps.")
         return "\n".join(lines)
 
@@ -123,6 +121,32 @@ async def fetch_batch(client: httpx.AsyncClient, ids: list[str]) -> list[dict[st
     out = []
     for i in range(len(ids)):
         d = data.get(f"d{i}")
+        if d and d.get("id"):
+            out.append(d)
+    return out
+
+
+async def _fetch_singles(
+    client: httpx.AsyncClient, ids: list[str], stats: LoadStats
+) -> list[dict[str, Any]]:
+    """Resolve ids one at a time -- the fallback when a batched query fails as a whole.
+
+    A single alias whose resolver errors makes Open Targets answer 200-with-errors for
+    the *entire* batched document, so _gql raises and the batch's other (up to 49) ids
+    would be discarded alongside the one that actually failed. Retrying each id alone
+    confines the loss to the id that errors -- counted in ids_failed so the run reports
+    itself a floor -- and lets --only-missing fill the rest. chembl_catalog degrades to
+    single fetches for the same reason.
+    """
+    out: list[dict[str, Any]] = []
+    for did in ids:
+        try:
+            data = await _gql(client, "{" + _DISEASE_FRAGMENT.format(i=0, id=did) + "}")
+        except Exception as exc:
+            stats.ids_failed += 1
+            logger.warning("cancer id %s unresolved: %s", did, str(exc)[:100])
+            continue
+        d = data.get("d0")
         if d and d.get("id"):
             out.append(d)
     return out
@@ -186,17 +210,21 @@ async def load_catalog(
     batches = [ids[i : i + _BATCH] for i in range(0, len(ids), _BATCH)]
     for i in range(0, len(batches), _CONCURRENCY):
         wave = batches[i : i + _CONCURRENCY]
-        # return_exceptions so one failed batch is recorded and skipped, never fatal --
-        # the run stays resumable rather than all-or-nothing.
+        # return_exceptions so a failed batch degrades instead of killing the run.
         results = await asyncio.gather(
             *(fetch_batch(client, b) for b in wave), return_exceptions=True
         )
-        for res in results:
+        for batch, res in zip(wave, results, strict=True):
             if isinstance(res, BaseException):
-                stats.batches_failed += 1
-                logger.warning("cancer batch failed: %s", str(res)[:120])
-                continue
-            for disease in res:
+                # A batch fails as a whole when one alias's resolver errors (a 200-with-
+                # errors that _gql raises on). Retry the batch one id at a time so a
+                # single poison id loses only itself, not its innocent batch-mates, and
+                # --only-missing can still fill the rest.
+                logger.warning("cancer batch failed, retrying per id: %s", str(res)[:120])
+                diseases = await _fetch_singles(client, batch, stats)
+            else:
+                diseases = res
+            for disease in diseases:
                 stats.resolved += 1
                 columns = to_columns(disease)
                 if not is_real_hit(columns):

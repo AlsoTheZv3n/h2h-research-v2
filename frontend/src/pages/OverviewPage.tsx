@@ -97,11 +97,19 @@ export function OverviewPage() {
     }
     if (draft === q) return
     const timer = setTimeout(() => {
-      const merged = new URLSearchParams(params)
-      if (draft) merged.set('q', draft)
-      else merged.delete('q')
-      merged.delete('offset')
-      setParams(merged, { replace: true })
+      // Functional updater, not a captured `params` snapshot: a facet chosen during the
+      // debounce window changes params but not draft, so this effect never re-ran and a
+      // snapshot would clobber that facet. Reading the live params at fire time keeps it.
+      setParams(
+        (prev) => {
+          const merged = new URLSearchParams(prev)
+          if (draft) merged.set('q', draft)
+          else merged.delete('q')
+          merged.delete('offset')
+          return merged
+        },
+        { replace: true },
+      )
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

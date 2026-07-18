@@ -128,6 +128,63 @@ async def test_loader_maps_columns_and_picks_the_specific_area(session: Any) -> 
     assert a.last_enriched_at is None
 
 
+def _ot_transport_with_poison(
+    descendants: list[str], diseases: dict[str, dict[str, Any]], poison: str
+) -> httpx.MockTransport:
+    """Like _ot_transport, but any query naming `poison` answers 200-with-errors.
+
+    Simulates a single alias whose resolver throws, which poisons the whole batched
+    GraphQL document (and the poison id itself when fetched alone).
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        query = json.loads(request.content)["query"]
+        if "descendants" in query:
+            return httpx.Response(200, json={"data": {"disease": {"descendants": descendants}}})
+        ids = re.findall(r'disease\(efoId:"([^"]+)"\)', query)
+        if poison in ids:
+            return httpx.Response(
+                200, json={"errors": [{"message": f"resolver error on {poison}"}]}
+            )
+        data: dict[str, Any] = {}
+        for i, did in enumerate(ids):
+            d = diseases.get(did)
+            data[f"d{i}"] = (
+                None
+                if d is None
+                else {
+                    "id": did,
+                    "name": d["name"],
+                    "therapeuticAreas": d.get("areas", []),
+                    "drugs": {"count": d["drugs"]},
+                    "targets": {"count": d["targets"]},
+                }
+            )
+        return httpx.Response(200, json={"data": data})
+
+    return httpx.MockTransport(handler)
+
+
+async def test_loader_degrades_to_single_fetches_when_a_batch_errors(session: Any) -> None:
+    # A, B, D are real hits; POISON deterministically errors. Batched together (one wave),
+    # the whole batch 200-with-errors -- without the per-id fallback all four are lost.
+    diseases = {k: _DISEASES[k] for k in ("MONDO_A", "MONDO_B", "MONDO_D")}
+    descendants = ["MONDO_A", "MONDO_B", "POISON", "MONDO_D"]
+    client = httpx.AsyncClient(transport=_ot_transport_with_poison(descendants, diseases, "POISON"))
+    try:
+        stats = await cancer_catalog.load_catalog(session, client=client)
+    finally:
+        await client.aclose()
+
+    repo = CancerRepository(session)
+    rows, total = await repo.list_cancers(limit=100)
+    # The poison id lost only itself: its three innocent batch-mates still landed, and
+    # the run reports itself a floor.
+    assert {c.disease_id for c in rows} == {"MONDO_A", "MONDO_B", "MONDO_D"}
+    assert total == 3
+    assert stats.ids_failed == 1
+
+
 async def _seed(repo: CancerRepository) -> None:
     await repo.upsert_cancer(
         "MONDO_1",
