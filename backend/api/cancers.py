@@ -137,6 +137,19 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
         if entries and all(f.status is FactStatus.SOURCE_FAILED for f in entries)
     )
 
+    # The pipeline fact lists Open Targets drugs; mark which ones the catalog can drill
+    # into, so the page links only those and shows the rest as plain text.
+    catalog_drug_ids: list[str] = []
+    pipeline = facts.get("pipeline")
+    if pipeline and pipeline[0].status is FactStatus.OK and isinstance(pipeline[0].value, dict):
+        ids = [
+            d["chembl_id"]
+            for group in pipeline[0].value.get("by_phase", [])
+            for d in group.get("drugs", [])
+            if d.get("chembl_id")
+        ]
+        catalog_drug_ids = sorted(await repo.present_drug_ids(ids))
+
     detail = CancerDetail(
         disease_id=cancer.disease_id,
         name=cancer.name,
@@ -148,6 +161,7 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
         refreshing=state is BriefState.READY and is_cancer_enriching(disease_id),
         facts=dict(facts),
         unavailable=unavailable,
+        catalog_drug_ids=catalog_drug_ids,
     )
 
     # Cache only a finished brief, and not one being re-fetched right now (the retry-race

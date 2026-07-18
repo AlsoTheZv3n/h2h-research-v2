@@ -182,3 +182,9 @@ class CancerDetail(BaseModel):
         description="Fact keys where every source failed. Hoisted so a client cannot "
         "mistake an outage for an absence without looking.",
     )
+
+    catalog_drug_ids: list[str] = Field(
+        default_factory=list,
+        description="Of the drugs in the pipeline fact, the ChEMBL ids the catalog holds "
+        "-- so the UI links only the ones with a brief and shows the rest as plain text.",
+    )

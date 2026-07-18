@@ -17,7 +17,8 @@ import httpx
 import pytest
 
 from backend.ingestion import cancer_catalog
-from backend.ingestion.base import utcnow
+from backend.ingestion.base import SourceRecord, fact, utcnow
+from backend.repositories import DrugRepository
 from backend.repositories.cancers import CancerRepository
 
 
@@ -316,6 +317,54 @@ async def test_api_detail_serves_catalog_facts_when_ready(
     assert detail["state"] == "ready"
 
     assert (await api.get("/cancers/MONDO_nope")).status_code == 404
+
+
+async def test_api_detail_marks_only_catalog_drugs_as_linkable(
+    api: httpx.AsyncClient, session: Any
+) -> None:
+    repo = CancerRepository(session)
+    await repo.upsert_cancer("MONDO_PIPE", name="pipeline cancer", n_drugs=2, n_targets=5)
+    # A pipeline fact as Open Targets would leave it, naming two drugs.
+    await repo.save_record(
+        "MONDO_PIPE",
+        SourceRecord(
+            "opentargets",
+            "MONDO_PIPE",
+            ok=True,
+            facts={
+                "pipeline": fact(
+                    {
+                        "total": 2,
+                        "by_phase": [
+                            {
+                                "stage": "PHASE_2",
+                                "count": 2,
+                                "drugs": [
+                                    {"chembl_id": "CHEMBL_IN", "name": "In"},
+                                    {"chembl_id": "CHEMBL_OUT", "name": "Out"},
+                                ],
+                            }
+                        ],
+                    },
+                    "opentargets",
+                )
+            },
+        ),
+    )
+    await repo.mark_enriched("MONDO_PIPE", utcnow())
+    # Only CHEMBL_IN is in the drug catalog.
+    await DrugRepository(session).upsert_drug("CHEMBL_IN", pref_name="In")
+    await session.commit()
+
+    detail = (await api.get("/cancers/MONDO_PIPE")).json()
+    assert detail["state"] == "ready"
+    # Marked by exact ChEMBL id (catalog membership), never by name: CHEMBL_OUT is in the
+    # pipeline but not the catalog, so it is not linkable.
+    assert detail["catalog_drug_ids"] == ["CHEMBL_IN"]
+    # Both drugs still appear in the pipeline fact -- shown, just not both linked.
+    pipeline = detail["facts"]["pipeline"][0]["value"]
+    shown = {d["chembl_id"] for g in pipeline["by_phase"] for d in g["drugs"]}
+    assert shown == {"CHEMBL_IN", "CHEMBL_OUT"}
 
 
 async def test_api_area_facet_endpoint(api: httpx.AsyncClient, session: Any) -> None:
