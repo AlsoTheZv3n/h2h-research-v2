@@ -166,6 +166,27 @@ class TestLazyFetch:
             assert cancer.last_enriched_at is not None, "a failed look is still a look"
 
     @respx.mock
+    async def test_a_disease_ot_cannot_resolve_writes_no_fact_not_empty(
+        self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
+    ) -> None:
+        """Open Targets answers 200 but does not resolve the disease id (deprecated or
+        remapped). That is a lookup failure, not "no targets": no EMPTY fact is written,
+        so the card never claims this cancer has zero druggable biology."""
+        respx.post(OT).mock(return_value=httpx.Response(200, json={"data": {"disease": None}}))
+        maker = async_sessionmaker(db_engine, expire_on_commit=False)
+
+        await get_or_start_cancer_brief(session, DISEASE, maker=maker)
+        await cancer_briefs._in_flight[DISEASE]
+
+        async with maker() as fresh:
+            rows = await CancerRepository(fresh).facts_for(DISEASE)
+            # No target_landscape fact at all -- never an EMPTY that reads as "no targets".
+            assert not any(r.key == "target_landscape" for r in rows)
+            cancer = await fresh.get(Cancer, DISEASE)
+            assert cancer is not None
+            assert cancer.last_enriched_at is not None, "we still looked"
+
+    @respx.mock
     async def test_concurrent_readers_cause_one_fetch(
         self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
     ) -> None:
@@ -178,6 +199,10 @@ class TestLazyFetch:
         assert all(s is BriefState.ENRICHING for s in states)
         assert len(cancer_briefs._in_flight) == 1
         await cancer_briefs._in_flight[DISEASE]
+        # The dedup that matters: ONE Open Targets fetch, not five. (Asserting the
+        # in-flight dict length alone cannot catch a broken dedup -- five tasks under the
+        # same key still leave len == 1.)
+        assert respx.calls.call_count == 1
 
     @respx.mock
     async def test_the_in_flight_marker_is_released(

@@ -125,10 +125,9 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
         data = await _gql(
             client, _TARGET_LANDSCAPE_QUERY, {"id": cancer.disease_id, "n": _TOP_TARGETS}
         )
-        rows = ((data.get("disease") or {}).get("associatedTargets") or {}).get("rows") or []
     except Exception as exc:
-        # An outage, recorded as a source_failed fact so the card reads "Open Targets
-        # unavailable" -- never "no targets", which would be a claim about the disease.
+        # An outage (network, 5xx, 200-with-errors), recorded as a source_failed fact so
+        # the card reads "Open Targets unavailable" -- never "no targets".
         return SourceRecord(
             source,
             cancer.disease_id,
@@ -138,9 +137,26 @@ async def opentargets_target_landscape(client: httpx.AsyncClient, cancer: Cancer
             error=str(exc),
             outage=True,
         )
+
+    disease = data.get("disease")
+    if disease is None:
+        # Open Targets answered but does not resolve this disease id (deprecated or
+        # remapped across releases -- the same EFO->MONDO drift the catalog guards). That
+        # is a lookup failure, NOT "this cancer has no targets": write no fact for the
+        # key, mirroring the drug adapter's no-hit branch, so it never becomes a measured
+        # EMPTY that claims zero druggable biology for a disease we could not look up.
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=False,
+            provenance=prov,
+            error="Open Targets did not resolve this disease id",
+        )
+
+    rows = (disease.get("associatedTargets") or {}).get("rows") or []
     landscape = [_target_row(r) for r in rows if (r.get("target") or {}).get("approvedSymbol")]
-    # fact() classifies an empty list as EMPTY -- "Open Targets answered, no associated
-    # targets" -- a real measured negative, distinct from the source_failed above.
+    # fact() classifies an empty list as EMPTY -- a genuine "Open Targets resolved the
+    # disease and lists no associated targets", now distinct from the not-found case above.
     return SourceRecord(
         source,
         cancer.disease_id,
@@ -158,6 +174,13 @@ def build_cancer_sources() -> list[CancerSource]:
 async def _save_source_record(
     repo: CancerRepository, disease_id: str, record: SourceRecord, stats: CancerEnrichStats
 ) -> None:
+    if record.error and not record.facts:
+        # The source answered with no data for this entity and it is not an outage (e.g.
+        # Open Targets does not resolve the disease id): nothing to record. Writing an
+        # empty fact would claim "no targets" for a disease we could not look up -- the
+        # same lie the outage path is guarded against, pointed the other way.
+        stats.records_failed += 1
+        return
     await repo.save_record(disease_id, record)
     stats.facts_written += len(record.facts)
     failed_here = len(record.failed_facts)
