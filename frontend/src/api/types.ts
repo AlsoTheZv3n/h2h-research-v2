@@ -176,3 +176,55 @@ export interface DrugListParams {
   limit?: number
   offset?: number
 }
+
+/** A cancer overview row. Index columns only, mirroring DrugSummary. */
+export interface CancerSummary {
+  /** The Open Targets canonical disease id (mostly MONDO_), the spine everything joins on. */
+  disease_id: string
+  name: string
+  therapeutic_area: string | null
+  /** Drugs/clinical candidates for this cancer, per Open Targets. A sort key and a signal. */
+  n_drugs: number
+  /** Associated targets, per Open Targets. */
+  n_targets: number
+  last_enriched_at: string | null
+  updated_at: string
+}
+
+export interface CancerList {
+  items: CancerSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * A cancer's page. For now the catalog facts plus its brief state -- the rich blocks
+ * (target landscape, pipeline, trials) land with enrich_cancer in P1-T2. `state` is
+ * `not_analyzed` until then: the honest "we have not looked yet", never "found nothing".
+ */
+export interface CancerDetail {
+  disease_id: string
+  name: string
+  therapeutic_area: string | null
+  n_drugs: number
+  n_targets: number
+  last_enriched_at: string | null
+  state: BriefState
+}
+
+/** Columns the cancer overview can sort by; must match the API's accepted `sort` values. */
+export type CancerSortField = 'drugs' | 'targets' | 'name' | 'area'
+
+export interface CancerListParams {
+  /** Free text: cancer name or disease id. Partial, case-insensitive. */
+  q?: string
+  /** Exact therapeutic area, e.g. "hematologic disorder". A facet, not a search box. */
+  therapeutic_area?: string
+  /** Only cancers that have (true) or lack (false) a drug/clinical candidate programme. */
+  has_drugs?: boolean
+  sort?: CancerSortField
+  order?: SortOrder
+  limit?: number
+  offset?: number
+}

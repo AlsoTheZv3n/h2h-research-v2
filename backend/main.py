@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from backend import __version__
-from backend.api import chat_router, drugs_router
+from backend.api import cancers_router, chat_router, drugs_router
 from backend.cache import close_redis, get_redis
 from backend.config import get_settings
 from backend.db import dispose_engine, get_sessionmaker
@@ -45,6 +45,7 @@ app = FastAPI(
 )
 
 app.include_router(drugs_router)
+app.include_router(cancers_router)
 app.include_router(chat_router)
 
 

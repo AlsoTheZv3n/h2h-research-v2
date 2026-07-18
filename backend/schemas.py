@@ -123,3 +123,43 @@ class DrugDetail(BaseModel):
             " client cannot mistake an outage for an absence without looking."
         ),
     )
+
+
+class CancerSummary(BaseModel):
+    """A cancer overview row. Index columns only, mirroring DrugSummary.
+
+    n_drugs and n_targets are the two Open Targets counts the seed keeps only cancers
+    for; they double as sort keys and as the richness a reader scans the table by.
+    """
+
+    disease_id: str
+    name: str
+    therapeutic_area: str | None = None
+    n_drugs: int
+    n_targets: int
+    last_enriched_at: datetime | None = None
+    updated_at: datetime
+
+
+class CancerList(BaseModel):
+    items: list[CancerSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class CancerDetail(BaseModel):
+    """A cancer's page. For now the catalog facts plus its brief state.
+
+    Thin on purpose: enrich_cancer (P1-T2) is what fills a brief with target
+    landscape, pipeline and trial reality. Until then `state` is not_analyzed -- the
+    honest "we have not looked yet", never "ready with nothing".
+    """
+
+    disease_id: str
+    name: str
+    therapeutic_area: str | None = None
+    n_drugs: int
+    n_targets: int
+    last_enriched_at: datetime | None = None
+    state: BriefState = BriefState.NOT_ANALYZED

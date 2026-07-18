@@ -24,10 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import utcnow
 from backend.ingestion.literature import Article, LiteratureRecord
-from backend.models import Drug
+from backend.models import Cancer, Drug
 from backend.repositories.literature import LiteratureRepository
 
 CHEMBL_ID = "CHEMBL_BOUNDARY"
+# A cancer for the route sweep to reach: /cancers/{disease_id} takes a path param the
+# sweep must be able to fill, or it fails loudly (by design). The cancer detail carries
+# no abstract text today, but the sweep must cover it so it still does the day it might.
+DISEASE_ID = "MONDO_BOUNDARY"
 
 # A sentence that exists nowhere else in this codebase, so finding it in a response
 # body can only mean it came out of the abstract table.
@@ -39,6 +43,8 @@ TITLE = "A canary title, which is metadata and may be shown"
 async def indexed_drug(session: AsyncSession) -> Drug:
     drug = Drug(chembl_id=CHEMBL_ID, pref_name="canarylimab", last_enriched_at=utcnow())
     session.add(drug)
+    # A catalog cancer so /cancers/{disease_id} is reachable by the route sweep below.
+    session.add(Cancer(disease_id=DISEASE_ID, name="canary carcinoma", n_drugs=0, n_targets=0))
     await session.commit()
 
     await LiteratureRepository(session).save(
@@ -103,7 +109,7 @@ class TestNoAbstractTextIsServed:
         for path, operations in schema["paths"].items():
             if "get" not in operations:
                 continue
-            url = path.replace("{chembl_id}", CHEMBL_ID)
+            url = path.replace("{chembl_id}", CHEMBL_ID).replace("{disease_id}", DISEASE_ID)
             if "{" in url:
                 # A path param this sweep cannot fill. A FAILURE, not a silent skip:
                 # a future /abstracts/{pmid} must not slip through unchecked while the
