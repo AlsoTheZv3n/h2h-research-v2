@@ -25,10 +25,15 @@ date**, and gaps are shown honestly instead of papered over.
 
 ## What it does
 
-- Browse the oncology drug catalog. Open **any** drug → a brief generated on demand from four open
-  databases, cached after the first view.
-- Each fact is one of four **honest states**, never conflated: a value (with a citation you can
-  inspect), *measured but empty*, *source unavailable*, or *not yet analyzed*.
+- Browse the oncology drug catalog — filter by target, **target class**, modality and phase, sort any
+  column, all in the URL so a view is shareable. Non-oncology false positives the source's blunt
+  disease-matching pulls in (statins, contrast agents) are **scoped out by default**, one toggle away.
+- Open **any** drug → a brief built from four open databases. It **fills card by card** as each source
+  returns rather than blocking on the slowest; a scheduled **refresh cron** warms drugs ahead of demand
+  and re-enriches stale ones; and once a brief's facts age past the freshness window it is served
+  instantly from storage while a refresh runs behind it (**stale-while-revalidate**).
+- Each fact is one of four **honest states**, never conflated: a value (source and date behind an info
+  icon), *measured but empty*, *source unavailable*, or *not yet analyzed*.
 - Binding is distilled to a **decision-grade potency** — on-target median + range over exact
   measurements — not a raw dump of every activity.
 - Biologics are handled honestly: they appear in the catalog, but structure/binding cards show
@@ -43,14 +48,15 @@ lying:
 
 | State | Means | Renders as |
 |---|---|---|
-| `ok` | The source measured it | the value + a citation chip |
+| `ok` | The source measured it | the value + a citation, its source and retrieval date one hover behind an info icon |
 | `empty` | The source measured, and the answer is nothing | a muted *"none found"* |
-| `source_failed` | The source was down. **Not a finding.** | a red *"source unavailable"* |
+| `source_failed` | The source was down. **Not a finding.** | a calm amber *"source unavailable"* chip |
 | `not_analyzed` | Nobody has asked yet | *"waiting for sources…"* |
 
 ChEMBL returns a 500 often enough that this matters daily. A brief that renders an outage as *"no
-mechanism"* tells you something false about the drug; H2H shows the red chip instead and says which
-source failed.
+mechanism"* tells you something false about the drug; H2H shows the amber chip instead and says which
+source failed. When a whole brief has gaps, a calm amber advisory at the top says the picture is
+partial — a gap in our pipeline, not a finding about the drug — and offers to fetch the sources again.
 
 ## Asking questions
 
@@ -104,8 +110,9 @@ cd h2h-research-v2
 docker compose up
 ```
 
-Then open **<http://localhost:5173>**. That brings up the UI, the API, PostgreSQL and Redis, and applies
-the migrations on the way.
+Then open **<http://localhost:5173>**. That brings up the UI, the API, PostgreSQL and Redis, and a
+refresh cron that warms and re-freshens the catalog on a schedule — and applies the migrations on the
+way.
 
 The catalog starts empty. Fill it — no host toolchain needed, it runs in the container:
 
@@ -129,18 +136,30 @@ load only decides what is *listed*, not what is *viewable*.
 
 ```mermaid
 flowchart LR
-  UI["React UI — overview + detail brief<br/>citation chips, four honest states"] -->|"/api/drugs and /api/drugs/:id"| API[FastAPI]
+  UI["React UI<br/>overview: facets, sort, oncology scoping<br/>detail: four cards, provenance behind an info icon, calm advisory"] -->|"/api/drugs · /api/drugs/:id"| API[FastAPI]
+  API -->|"reads only — never calls a source on a request"| DB[("PostgreSQL<br/>facts + provenance")]
   API -->|cached brief| REDIS[(Redis)]
-  API -->|"facts + provenance"| DB[("PostgreSQL")]
-  API -. "enrich on first open" .-> ENR["enrich.py"]
-  CAT["catalog loader"] -->|"index columns only — no provenance"| DB
-  ENR --> AD{"source adapters — shared SourceRecord"}
+  API -. "lazy on first open · retry · stale-while-revalidate" .-> ENR["enrich.py<br/>commits per source → page fills card by card"]
+  CRON["refresh cron<br/>fills unenriched + re-enriches stale, on a schedule"] --> ENR
+  CAT["catalog loader<br/>index columns only — no provenance"] --> DB
+  ENR --> AD{"source adapters<br/>shared SourceRecord"}
   AD --> CH[ChEMBL]
   AD --> CT[ClinicalTrials.gov]
   AD --> OT[Open Targets]
   AD --> PM[PubMed]
   AD -->|"normalize + provenance + status"| DB
 ```
+
+**The API never calls a source on a user request** — it reads facts from Postgres, so a source being
+down stops being a page's problem and becomes "open it again later". Facts get there through one
+`enrich.py` job, reached three ways: **lazily** the first time someone opens a drug — committed source
+by source, so the page fills card by card instead of blocking on the slowest; by a scheduled **refresh
+cron** (`backend.refresh`) that fills never-touched drugs and re-enriches any older than the freshness
+window, ahead of demand; and on an explicit **retry** of a failed source. A brief that has itself aged
+past that window is served immediately from storage while a refresh runs behind it
+(**stale-while-revalidate**), so the reader is never blocked on a re-fetch. `last_enriched_at` is the
+one clock all of this shares — the never-touched marker, the freshness gauge, and the resumability
+bookmark, in a single column.
 
 Source adapters are a plugin layer: one per source, all behind a shared `SourceRecord`. Entity
 resolution deliberately is not — that is typed cross-entity logic and stays cohesive.
