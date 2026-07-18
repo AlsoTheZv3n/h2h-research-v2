@@ -286,6 +286,18 @@ class TestPipeline:
         # An empty dict is what fact() classifies as EMPTY ("resolved, no programmes").
         assert enrich_cancer._group_pipeline([]) == {}
 
+    def test_group_pipeline_ranks_preapproval_as_advanced_not_bottom(self) -> None:
+        # PREAPPROVAL (submitted, awaiting approval) is a real, advanced Open Targets
+        # stage -- it must rank above earlier phases, not fall into the unknown tail. A
+        # genuinely unknown stage does stay at the end.
+        rows = [
+            {"drug": {"id": "C1", "name": "A"}, "maxClinicalStage": "PHASE_1"},
+            {"drug": {"id": "C2", "name": "B"}, "maxClinicalStage": "PREAPPROVAL"},
+            {"drug": {"id": "C3", "name": "C"}, "maxClinicalStage": "MADE_UP_STAGE"},
+        ]
+        stages = [g["stage"] for g in enrich_cancer._group_pipeline(rows)["by_phase"]]
+        assert stages == ["PREAPPROVAL", "PHASE_1", "MADE_UP_STAGE"]
+
     @respx.mock
     async def test_pipeline_source_produces_a_stage_grouped_fact(
         self, fast_client: httpx.AsyncClient

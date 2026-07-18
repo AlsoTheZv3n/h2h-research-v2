@@ -10,6 +10,7 @@ import { useBriefState } from './Fact'
 const PHASE_LABELS: Record<string, string> = {
   APPROVAL: 'Approved',
   PHASE_4: 'Phase 4',
+  PREAPPROVAL: 'Pre-registration',
   PHASE_3: 'Phase 3',
   PHASE_2_3: 'Phase 2/3',
   PHASE_2: 'Phase 2',
@@ -17,6 +18,7 @@ const PHASE_LABELS: Record<string, string> = {
   PHASE_1: 'Phase 1',
   EARLY_PHASE_1: 'Early Phase 1',
   PHASE_0: 'Phase 0',
+  PRECLINICAL: 'Preclinical',
   UNKNOWN: 'Unknown stage',
 }
 

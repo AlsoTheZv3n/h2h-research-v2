@@ -71,12 +71,16 @@ query Pipeline($id: String!) {
 """
 
 # Clinical stages in descending order, most advanced first -- how the pipeline card
-# reads top to bottom. Open Targets' maxClinicalStage enum; anything not listed sorts
-# to the end under its raw value. The `drugs` list per stage is capped for size (the
-# stage `count` is the true total); a busy cancer has ~1,000 candidates.
+# reads top to bottom. Open Targets' maxClinicalStage enum (verified live: APPROVAL,
+# PHASE_4, PREAPPROVAL, PHASE_3, PHASE_2_3, PHASE_2, PHASE_1_2, PHASE_1, EARLY_PHASE_1,
+# PHASE_0, PRECLINICAL all occur). PREAPPROVAL (submitted, awaiting approval) is a genuinely
+# advanced stage and must rank near the top, not fall into the alphabetical tail -- so the
+# enum is listed in full. Only a truly-unknown value sorts to the end. The drugs list per
+# stage is capped for size; the stage count is the true total (a busy cancer has ~1,000).
 _PHASE_ORDER = (
     "APPROVAL",
     "PHASE_4",
+    "PREAPPROVAL",
     "PHASE_3",
     "PHASE_2_3",
     "PHASE_2",
@@ -84,6 +88,7 @@ _PHASE_ORDER = (
     "PHASE_1",
     "EARLY_PHASE_1",
     "PHASE_0",
+    "PRECLINICAL",
 )
 _PIPELINE_CAP = 40
 
