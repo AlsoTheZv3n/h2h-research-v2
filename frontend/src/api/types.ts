@@ -211,6 +211,17 @@ export interface TargetLandscapeEntry {
 }
 
 /**
+ * The target-landscape fact's value: the top displayed targets plus the count of strong
+ * associations (score ≥ `threshold`). The strong count is the headline metric; the raw
+ * "any evidence" total lives on the catalog row (n_targets).
+ */
+export interface TargetLandscape {
+  threshold: number
+  n_strong: number
+  targets: TargetLandscapeEntry[]
+}
+
+/**
  * A cancer's evidence brief: the catalog facts plus every fact we hold, with
  * provenance. `state` is enriching while the brief is built, ready once stored --
  * never "ready with nothing", which would claim a cancer has no evidence when the

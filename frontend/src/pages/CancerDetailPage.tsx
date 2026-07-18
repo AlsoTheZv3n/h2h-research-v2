@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getCancer, retryCancer } from '../api/client'
-import type { CancerDetail } from '../api/types'
+import type { CancerDetail, TargetLandscape } from '../api/types'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { BriefStateProvider } from '../components/Fact'
 import { PipelineCard } from '../components/PipelineCard'
@@ -73,6 +73,18 @@ export function CancerDetailPage() {
   }
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
 
+  // The strong-association metric lives in the target_landscape fact, computed once from the
+  // real score distribution (see enrich_cancer). n_targets is the raw "any evidence" total --
+  // a threshold artifact near whole-genome size -- so the strong count is the headline and the
+  // total is only ever shown beside its threshold, never bare.
+  // Array.isArray guards the pre-reshape fact shape (a bare target array): it has no strong
+  // count, so the stat falls back to the raw total until revalidation upgrades the fact.
+  const tlFact = detail.facts['target_landscape']?.[0]
+  const tl =
+    tlFact?.status === 'ok' && !Array.isArray(tlFact.value)
+      ? (tlFact.value as TargetLandscape | null)
+      : null
+
   return (
     <BriefStateProvider value={detail.state}>
       <article>
@@ -107,7 +119,7 @@ export function CancerDetailPage() {
 
         <dl className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
           <Stat label="Drugs & clinical candidates" value={formatCount(detail.n_drugs)} />
-          <Stat label="Associated targets" value={formatCount(detail.n_targets)} />
+          <TargetsStat strong={tl?.n_strong} threshold={tl?.threshold} total={detail.n_targets} />
         </dl>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -132,6 +144,42 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-line bg-card px-3 py-2">
       <dt className="text-xs text-ink-faint">{label}</dt>
       <dd className="text-lg font-semibold tabular-nums text-ink">{value}</dd>
+    </div>
+  )
+}
+
+/**
+ * The associated-targets stat. The headline is the count of *strong* associations (score above
+ * the documented threshold); the raw total is a threshold artifact near whole-genome size, so it
+ * only appears as a sub-line qualified by the threshold -- the number is never shown bare.
+ * Before the fact is ready (enriching, or an outage) there is no threshold yet, so we fall back
+ * to the raw total, still labelled "with any evidence" -- honest about what it is.
+ */
+export function TargetsStat({
+  strong,
+  threshold,
+  total,
+}: {
+  strong?: number
+  threshold?: number
+  total: number
+}) {
+  const hasStrong = strong !== undefined && threshold !== undefined
+  return (
+    <div className="rounded-lg border border-line bg-card px-3 py-2" data-testid="targets-stat">
+      <dt className="text-xs text-ink-faint">Associated targets</dt>
+      <dd className="text-lg font-semibold tabular-nums text-ink">
+        {formatCount(hasStrong ? strong : total)}
+      </dd>
+      <dd className="mt-0.5 text-[11px] text-ink-faint">
+        {hasStrong ? (
+          <>
+            score ≥ {threshold} · {formatCount(total)} with any evidence
+          </>
+        ) : (
+          'with any evidence'
+        )}
+      </dd>
     </div>
   )
 }
