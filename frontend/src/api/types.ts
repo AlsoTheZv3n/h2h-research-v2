@@ -198,10 +198,23 @@ export interface CancerList {
   offset: number
 }
 
+/** One associated target in a cancer's target-landscape fact (Open Targets). */
+export interface TargetLandscapeEntry {
+  symbol: string
+  /** Open Targets association score, 0–1. */
+  score: number
+  /** The typed evidence channels behind the association, e.g. "clinical". */
+  evidence_types: string[]
+  /** Whether a small-molecule / antibody modality is tractable at all. */
+  sm_tractable: boolean
+  ab_tractable: boolean
+}
+
 /**
- * A cancer's page. For now the catalog facts plus its brief state -- the rich blocks
- * (target landscape, pipeline, trials) land with enrich_cancer in P1-T2. `state` is
- * `not_analyzed` until then: the honest "we have not looked yet", never "found nothing".
+ * A cancer's evidence brief: the catalog facts plus every fact we hold, with
+ * provenance. `state` is enriching while the brief is built, ready once stored --
+ * never "ready with nothing", which would claim a cancer has no evidence when the
+ * truth is we have not looked.
  */
 export interface CancerDetail {
   disease_id: string
@@ -211,6 +224,12 @@ export interface CancerDetail {
   n_targets: number
   last_enriched_at: string | null
   state: BriefState
+  /** A ready brief being revalidated in the background (stale-while-revalidate). */
+  refreshing: boolean
+  /** Keyed by fact name, e.g. 'target_landscape'. A list because sources can disagree. */
+  facts: Record<string, SourcedFact[]>
+  /** Fact keys where every source failed -- an outage, not an absence. */
+  unavailable: string[]
 }
 
 /** Columns the cancer overview can sort by; must match the API's accepted `sort` values. */

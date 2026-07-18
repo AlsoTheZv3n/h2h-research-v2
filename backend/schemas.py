@@ -149,11 +149,12 @@ class CancerList(BaseModel):
 
 
 class CancerDetail(BaseModel):
-    """A cancer's page. For now the catalog facts plus its brief state.
+    """A cancer's evidence brief: the catalog row plus every fact we hold, with
+    provenance. The disease-side twin of DrugDetail.
 
-    Thin on purpose: enrich_cancer (P1-T2) is what fills a brief with target
-    landscape, pipeline and trial reality. Until then `state` is not_analyzed -- the
-    honest "we have not looked yet", never "ready with nothing".
+    `state` is not_analyzed until enrich_cancer has looked, enriching while it fetches,
+    ready once facts are stored -- never "ready with nothing", which would tell the
+    reader a cancer has no evidence when the truth is we have not looked.
     """
 
     disease_id: str
@@ -162,4 +163,22 @@ class CancerDetail(BaseModel):
     n_drugs: int
     n_targets: int
     last_enriched_at: datetime | None = None
+
     state: BriefState = BriefState.NOT_ANALYZED
+
+    refreshing: bool = False
+    """A READY brief whose facts aged past the freshness window, being revalidated in
+    the background (stale-while-revalidate). Stored facts are shown now; poll until it
+    clears. Not `enriching` -- there ARE facts, and the reader is not blocked."""
+
+    facts: dict[str, list[SourcedFact]] = Field(
+        default_factory=dict,
+        description="Keyed by fact name (e.g. 'target_landscape'); a list because "
+        "sources can disagree. Each carries its own source, status and provenance.",
+    )
+
+    unavailable: list[str] = Field(
+        default_factory=list,
+        description="Fact keys where every source failed. Hoisted so a client cannot "
+        "mistake an outage for an absence without looking.",
+    )

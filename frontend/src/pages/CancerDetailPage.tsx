@@ -1,77 +1,124 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCancer } from '../api/client'
+import { getCancer, retryCancer } from '../api/client'
 import type { CancerDetail } from '../api/types'
+import { AnalyzingNotice } from '../components/AnalyzingNotice'
+import { BriefStateProvider } from '../components/Fact'
+import { SourceAdvisory } from '../components/SourceAdvisory'
+import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
 import { formatCount } from '../format'
 
+// Long enough not to hammer the API, short enough that a finished enrichment shows up
+// while the reader is still looking. Same cadence as the drug page.
+const POLL_MS = 2000
+
 /**
- * A cancer's page. Deliberately thin for P1-T1: it shows the catalog facts and says,
- * honestly, that the evidence brief has not been built yet -- because enrich_cancer
- * (the target landscape, pipeline and trial-reality blocks) is P1-T2. The pending
- * notice is the not_analyzed state, never "no evidence exists".
+ * A cancer's evidence brief. It enriches on first open and serves from Postgres after,
+ * so a never-seen cancer arrives `enriching` and this polls until the target landscape
+ * lands -- the disease-side twin of the drug detail page.
  */
 export function CancerDetailPage() {
   const { diseaseId = '' } = useParams()
-  const [cancer, setCancer] = useState<CancerDetail | null>(null)
+  const [detail, setDetail] = useState<CancerDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    setDetail(null)
     setError(null)
-    getCancer(diseaseId)
-      .then((c) => !cancelled && setCancer(c))
-      .catch((e: Error) => !cancelled && setError(e.message))
-      .finally(() => !cancelled && setLoading(false))
+
+    async function load() {
+      try {
+        const d = await getCancer(diseaseId)
+        if (cancelled) return
+        setDetail(d)
+        // Keep polling while the brief is being built (not ready) or revalidated behind
+        // the scenes (ready but refreshing): the next poll swaps in fresher facts.
+        if (d.state !== 'ready' || d.refreshing) timer = setTimeout(load, POLL_MS)
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message)
+      }
+    }
+    void load()
+
     return () => {
       cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [diseaseId, reloadNonce])
+
+  const retry = useCallback(async () => {
+    setRetrying(true)
+    try {
+      await retryCancer(diseaseId)
+      setReloadNonce((n) => n + 1) // re-poll for the fresh attempt
+    } catch {
+      // Leave the advisory in place; the reader can try again.
+    } finally {
+      setRetrying(false)
     }
   }, [diseaseId])
 
+  if (error) {
+    return (
+      <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
+        Could not load this cancer: {error}
+      </p>
+    )
+  }
+  if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
+
   return (
-    <div>
-      <Link to="/cancers" className="text-sm text-accent hover:underline">
-        ← All cancers
-      </Link>
+    <BriefStateProvider value={detail.state}>
+      <article>
+        <nav className="mb-3 text-xs">
+          <Link to="/cancers" className="text-accent hover:underline">
+            ← All cancers
+          </Link>
+        </nav>
 
-      {loading && <p className="mt-4 text-sm text-ink-faint">Loading…</p>}
+        <header className="mb-1 flex flex-wrap items-baseline gap-3">
+          <h1 className="text-xl font-semibold tracking-tight text-ink">{detail.name}</h1>
+          <span className="font-mono text-xs text-ink-faint">{detail.disease_id}</span>
+          {detail.therapeutic_area && (
+            <span className="text-xs text-ink-faint">{detail.therapeutic_area}</span>
+          )}
+          {detail.refreshing && (
+            <span data-testid="refreshing" className="text-xs text-ink-faint italic">
+              refreshing…
+            </span>
+          )}
+        </header>
 
-      {error && (
-        <p className="mt-4 rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-          Could not load this cancer: {error}
+        {/* Non-clinical disclaimer: this shows treatment evidence, not treatment advice. */}
+        <p className="mb-4 text-[11px] text-ink-faint" data-testid="non-clinical-disclaimer">
+          A research and drug-intelligence view of the evidence and trial record — not clinical
+          decision support, and not medical advice.
         </p>
-      )}
 
-      {cancer && (
-        <>
-          <header className="mt-3">
-            <h1 className="text-xl font-semibold tracking-tight text-ink">{cancer.name}</h1>
-            <p className="mt-0.5 text-xs text-ink-faint">
-              <span className="font-mono">{cancer.disease_id}</span>
-              {cancer.therapeutic_area && <> · {cancer.therapeutic_area}</>}
-            </p>
-          </header>
+        <AnalyzingNotice state={detail.state} />
 
-          <dl className="mt-4 grid grid-cols-2 gap-3 sm:max-w-md">
-            <Stat label="Drugs & clinical candidates" value={formatCount(cancer.n_drugs)} />
-            <Stat label="Associated targets" value={formatCount(cancer.n_targets)} />
-          </dl>
+        {detail.unavailable.length > 0 && <SourceAdvisory onRetry={retry} retrying={retrying} />}
 
-          <div
-            className="mt-6 rounded-lg border border-line bg-card p-4"
-            data-testid="cancer-brief-pending"
-          >
-            <p className="text-sm font-medium text-ink">The evidence brief is not built yet</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              This cancer is in the catalog, but its target landscape, pipeline and trial
-              reality have not been assembled. That is the next step — enrichment — not a
-              finding that no evidence exists.
-            </p>
-          </div>
-        </>
-      )}
-    </div>
+        <dl className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
+          <Stat label="Drugs & clinical candidates" value={formatCount(detail.n_drugs)} />
+          <Stat label="Associated targets" value={formatCount(detail.n_targets)} />
+        </dl>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <TargetLandscapeCard facts={detail.facts['target_landscape']} />
+        </div>
+
+        <p className="mt-4 text-[11px] text-ink-faint">
+          Target landscape from Open Targets (CC0). Pipeline, trial reality and biomarker evidence
+          are the next blocks. H2H surfaces evidence; it does not predict or advise.
+        </p>
+      </article>
+    </BriefStateProvider>
   )
 }
 
