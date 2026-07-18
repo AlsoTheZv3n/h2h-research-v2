@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.load_disease_map import load
 from backend.models import DiseaseSourceMap
+from backend.services.disease_map import load_source_maps
 
 
 async def _by_key(session: AsyncSession, source: str, code: str) -> DiseaseSourceMap | None:
@@ -51,3 +52,18 @@ class TestLoadDiseaseMap:
         total = await session.scalar(select(func.count()).select_from(DiseaseSourceMap))
         # A second load upserts in place -- no duplicate rows (the PK is source+code).
         assert first == again == total
+
+
+class TestLoadSourceMaps:
+    async def test_groups_by_source_by_mondo_and_skips_unmappable(
+        self, session: AsyncSession
+    ) -> None:
+        await load(session)
+        await session.commit()
+        maps = await load_source_maps(session)
+        assert set(maps) == {"eurostat", "seer"}
+        # keyed by MONDO -> (code, label), per source
+        assert maps["eurostat"]["MONDO_0008903"][0] == "C33_C34"  # lung
+        assert maps["seer"]["MONDO_0018874"][0] == "96"  # AML exact site
+        # Unmappable rows (mondo_id NULL) are NOT resolution targets -> never leak a None key.
+        assert all(mondo for src in maps.values() for mondo in src)
