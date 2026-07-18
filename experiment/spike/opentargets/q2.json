@@ -1,0 +1,1 @@
+{"query":"{ disease(efoId:\"MONDO_0005233\"){ id name } }"}

@@ -1,0 +1,1 @@
+{"query":"query L($id:String!){ disease(efoId:$id){ id name associatedTargets(page:{index:0,size:5}){ count rows{ score datatypeScores{ id score } target{ id approvedSymbol tractability{ label modality value } } } } } }","variables":{"id":"MONDO_0005233"}}

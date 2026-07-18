@@ -1,0 +1,1 @@
+{"query":"query S($q:String!){ search(queryString:$q, entityNames:[\"disease\"]){ hits{ id name entity } } }","variables":{"q":"non-small cell lung carcinoma"}}

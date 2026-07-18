@@ -1,0 +1,1 @@
+{"query":"query D($id: String!){ disease(efoId:$id){ id name therapeuticAreas{ id name } } }","variables":{"id":"EFO_0003060"}}
