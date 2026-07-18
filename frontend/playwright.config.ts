@@ -23,8 +23,8 @@ export default defineConfig({
   testDir: './e2e',
   // Seeds the deterministic source_failed fixture into the real database.
   globalSetup: './e2e/global-setup.ts',
-  // The recording script is not a test.
-  testIgnore: ['**/demo.record.ts', '**/global-setup.ts'],
+  // The recording and conversion scripts are tooling, not tests.
+  testIgnore: ['**/demo.record.ts', '**/demo.convert.ts', '**/global-setup.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
