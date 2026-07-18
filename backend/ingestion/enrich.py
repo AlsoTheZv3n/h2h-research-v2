@@ -20,9 +20,10 @@ import argparse
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -296,6 +297,7 @@ async def enrich_catalog(
     limit: int | None = None,
     chembl_id: str | None = None,
     only_unenriched: bool = False,
+    stale_before: datetime | None = None,
 ) -> EnrichStats:
     if client is None:
         async with build_client() as owned:
@@ -305,6 +307,7 @@ async def enrich_catalog(
                 limit=limit,
                 chembl_id=chembl_id,
                 only_unenriched=only_unenriched,
+                stale_before=stale_before,
             )
 
     stats = EnrichStats()
@@ -315,14 +318,20 @@ async def enrich_catalog(
     if chembl_id:
         query = select(Drug).where(Drug.chembl_id == chembl_id)
     else:
-        # The pre-warmer's dedup and resumability, in one clause. Enriching only the
-        # never-touched drugs means it skips whatever the lazy on-demand path (or a
-        # previous pass) already did, and a crash-and-restart picks up exactly where
-        # it stopped -- no bookkeeping, because last_enriched_at IS the bookmark. A
-        # collision with an on-demand enrich of the same null drug is possible and
-        # harmless: enrich_drug upserts, so the worst case is one drug fetched twice.
+        # The refresh pass's dedup and resumability, in one clause -- last_enriched_at
+        # is both the "never touched" marker and the freshness clock, so no separate
+        # bookkeeping. only_unenriched picks the never-touched drugs (fill); stale_before
+        # picks the ones last looked at before the cutoff (refresh). Together they are
+        # the fill-and-refresh selection; either alone is one half. A collision with an
+        # on-demand enrich of the same drug is harmless -- enrich_drug upserts, so the
+        # worst case is one drug fetched twice.
+        conds: list[ColumnElement[bool]] = []
         if only_unenriched:
-            query = query.where(Drug.last_enriched_at.is_(None))
+            conds.append(Drug.last_enriched_at.is_(None))
+        if stale_before is not None:
+            conds.append(Drug.last_enriched_at < stale_before)
+        if conds:
+            query = query.where(or_(*conds))
         if limit:
             query = query.limit(limit)
 

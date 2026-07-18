@@ -43,18 +43,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # The pre-warmer: enriches drugs ahead of demand so opening one is instant, instead
-  # of the first visitor paying the fetch. Same image as the api, different command;
-  # it shares Postgres and speaks HTTP to no one, so it needs no port and no
-  # healthcheck. Waits for the api to be healthy because migrations run in the api's
-  # entrypoint -- the worker must not try to write before the schema exists. It warms
-  # whatever is in the catalog; on a fresh stack that is nothing until the loader has
-  # run, and the worker simply idles until it is.
-  worker:
+  # The refresh cron: fills drugs ahead of demand AND re-enriches stale ones, on a
+  # schedule (daily by default) rather than the tight loop the old pre-warmer ran. Same
+  # image as the api, different command; it shares Postgres and speaks HTTP to no one,
+  # so it needs no port and no healthcheck. Waits for the api to be healthy because
+  # migrations run in the api's entrypoint -- it must not write before the schema
+  # exists. It sleeps between passes; on a fresh stack an early pass finds nothing until
+  # the loader has run, and it simply tries again next interval. For a real external
+  # scheduler instead of the in-stack service, run `python -m backend.refresh --once`.
+  refresh:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["python", "-m", "backend.prewarm"]
+    command: ["python", "-m", "backend.refresh"]
     environment:
       DATABASE_URL: postgresql+asyncpg://h2h:h2h@postgres:5432/h2h
       REDIS_URL: redis://redis:6379/0
@@ -62,7 +63,8 @@ services:
       NCBI_API_KEY: ${NCBI_API_KEY:-}
       NCBI_TOOL: ${NCBI_TOOL:-}
       NCBI_EMAIL: ${NCBI_EMAIL:-}
-      PREWARM_INTERVAL_SECONDS: ${PREWARM_INTERVAL_SECONDS:-300}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-86400}
+      FRESHNESS_DAYS: ${FRESHNESS_DAYS:-30}
     depends_on:
       api:
         condition: service_healthy

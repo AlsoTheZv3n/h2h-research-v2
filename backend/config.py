@@ -24,11 +24,14 @@ class Settings(BaseSettings):
     # after a re-ingest -- it is not a hot path against the sources.
     cache_ttl_seconds: int = 3600
 
-    # How long the pre-warmer waits between passes over the catalog. A pass enriches
-    # every not-yet-enriched drug; the interval only governs how often it re-checks
-    # for drugs added since. Long by default: the whole point is to work quietly ahead
-    # of demand, not to poll.
-    prewarm_interval_seconds: int = 300
+    # The refresh cron. It replaced a pre-warmer that churned every few minutes with a
+    # scheduled fill-and-refresh: each pass enriches never-touched drugs AND re-enriches
+    # any last looked at more than `freshness_days` ago, then sleeps for the interval.
+    # Daily by default -- source facts change on the order of weeks, not minutes, so a
+    # tight loop was cost without benefit. `--once` runs a single pass for a real
+    # external scheduler; the service form is the in-stack default.
+    refresh_interval_seconds: int = 86_400
+    freshness_days: int = 30
 
     # Optional: raises PubMed (E-utilities) rate limits. Never required.
     ncbi_api_key: str | None = None
