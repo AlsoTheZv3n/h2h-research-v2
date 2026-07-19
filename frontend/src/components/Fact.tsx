@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { BriefState, SourcedFact } from '../api/types'
 import { CitationChip } from './CitationChip'
+import { SourceFailedChip } from './SourceFailedChip'
 
 /**
  * The brief's state, available to every Fact without threading it through twenty
@@ -26,7 +27,8 @@ export const BriefStateProvider = BriefStateContext.Provider
  *   ok             the value, plus a citation chip
  *   empty          a muted "none found" -- the source looked, and there is nothing.
  *                  A real, measured negative.
- *   source_failed  a red "source unavailable" -- we never measured it.
+ *   source_failed  an amber "source unavailable" (via SourceFailedChip) -- we never
+ *                  measured it. Amber, not red: a gap in our pipeline, not a fault in the drug.
  *
  * Rendering source_failed as "none found" would tell the reader a drug has no
  * mechanism when the truth is that ChEMBL was down. That is the exact lie this
@@ -96,23 +98,9 @@ function SingleFact({
   render?: FactProps['render']
   emptyLabel?: string
 }) {
-  if (fact.status === 'source_failed') {
-    // Amber, not red. A source we could not reach is a gap in our pipeline, not a fault
-    // in the drug -- the calm tone the advisory already uses, applied per fact. Still
-    // distinct from an empty (muted "none found") and an ok value, so the three states
-    // never blur; it just stops shouting.
-    return (
-      <span
-        data-testid="fact-source-failed"
-        className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
-                   text-xs font-medium text-partial"
-        title={fact.error ?? undefined}
-      >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
-        {fact.source} unavailable
-      </span>
-    )
-  }
+  // Amber, not red, and never an empty "none found": the calm per-fact outage marker,
+  // shared with every section card so the three states never blur (see SourceFailedChip).
+  if (fact.status === 'source_failed') return <SourceFailedChip fact={fact} />
 
   if (fact.status === 'empty') {
     return (

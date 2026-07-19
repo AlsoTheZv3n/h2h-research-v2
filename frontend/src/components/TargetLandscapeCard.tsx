@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import type { DrugStatus, SourcedFact, TargetLandscape, TargetLandscapeEntry } from '../api/types'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
-import { useBriefState } from './Fact'
+import { FactGate } from './FactGate'
 
 /**
  * The cancer's target landscape: the top associated targets from Open Targets, each with
@@ -19,68 +19,42 @@ import { useBriefState } from './Fact'
  * are kept visibly distinct: collapsing them would resurrect the None-vs-0 lie one level up.
  */
 export function TargetLandscapeCard({
+  id,
   facts,
   catalogDrugByTarget,
 }: {
+  id?: string
   facts?: SourcedFact[]
   /** Ensembl id -> a catalog drug's ChEMBL id, for the per-target "open a brief" link. */
   catalogDrugByTarget?: Record<string, string>
 }) {
-  const briefState = useBriefState()
-  const fact = facts?.[0]
-
-  if (!fact) {
-    return (
-      <Card title="Target landscape">
-        {briefState !== 'ready' ? (
-          <p data-testid="fact-pending" className="text-sm text-ink-faint italic">
-            Waiting for sources…
-          </p>
-        ) : (
-          <p data-testid="fact-not-collected" className="text-sm text-ink-faint italic">
-            Not collected
-          </p>
-        )}
-      </Card>
-    )
-  }
-
-  if (fact.status === 'source_failed') {
-    return (
-      <Card title="Target landscape">
-        <p
-          data-testid="fact-source-failed"
-          className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
-                     text-xs font-medium text-partial"
-          title={fact.error ?? undefined}
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
-          {fact.source} unavailable
-        </p>
-      </Card>
-    )
-  }
-
-  // Tolerate both fact shapes. The current value is {threshold, n_strong, targets}; a fact
-  // stored before that reshape is a bare target array. Reading either keeps an already-
-  // enriched cancer's card rendering its targets until stale-while-revalidate upgrades it --
-  // an old fact just lacks the strong count, which lives on the stat card, not here.
-  const value = fact.value as TargetLandscape | TargetLandscapeEntry[] | null
-  const targets = Array.isArray(value) ? value : (value?.targets ?? [])
-  if (fact.status === 'empty' || targets.length === 0) {
-    return (
-      <Card title="Target landscape">
-        <p className="text-sm text-ink-faint">
-          No associated targets
-          <CitationChip fact={fact} />
-        </p>
-      </Card>
-    )
-  }
-
   return (
-    <Card title="Target landscape" note="Top associated targets · Open Targets association score">
-      <TargetLandscapeBody targets={targets} fact={fact} catalogDrugByTarget={catalogDrugByTarget} />
+    <Card id={id} title="Target landscape" note="Top associated targets · Open Targets association score">
+      <FactGate facts={facts}>
+        {(fact) => {
+          // Tolerate both fact shapes. The current value is {threshold, n_strong, targets}; a
+          // fact stored before that reshape is a bare target array. Reading either keeps an
+          // already-enriched cancer's card rendering its targets until stale-while-revalidate
+          // upgrades it -- an old fact just lacks the strong count, which lives on the stat card.
+          const value = fact.value as TargetLandscape | TargetLandscapeEntry[] | null
+          const targets = Array.isArray(value) ? value : (value?.targets ?? [])
+          if (fact.status === 'empty' || targets.length === 0) {
+            return (
+              <p className="text-sm text-ink-faint">
+                No associated targets
+                <CitationChip fact={fact} />
+              </p>
+            )
+          }
+          return (
+            <TargetLandscapeBody
+              targets={targets}
+              fact={fact}
+              catalogDrugByTarget={catalogDrugByTarget}
+            />
+          )
+        }}
+      </FactGate>
     </Card>
   )
 }
