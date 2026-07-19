@@ -84,6 +84,19 @@ test.describe('overview', () => {
     )
   })
 
+  test('the facets show per-option counts from the API', async ({ page }) => {
+    // The counts flow DB -> API -> UI: at least one modality option carries a "(N)" of how many
+    // match the other filters. A count-less list would mean the page never fetched /drugs/facets
+    // or never wired it in -- the whole point of the faceted refinement.
+    await page.goto('/')
+    await expect(page.getByTestId('drug-row').first()).toBeVisible()
+    const counted = page
+      .getByTestId('facet-modality')
+      .locator('option')
+      .filter({ hasText: /\(\d+\)/ })
+    expect(await counted.count()).toBeGreaterThan(0)
+  })
+
   test('a row click opens that drug’s brief', async ({ page }) => {
     await page.goto(`/?q=kras`)
     const row = page.getByTestId('drug-row').first()

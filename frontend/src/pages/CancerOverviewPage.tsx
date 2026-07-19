@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { listCancers, listTherapeuticAreas } from '../api/client'
-import type { CancerList, CancerSortField, SortOrder } from '../api/types'
+import { listCancerFacets, listCancers, listTherapeuticAreas } from '../api/client'
+import type { CancerList, CancerSortField, FacetCounts, SortOrder } from '../api/types'
+import { Facet } from '../components/Facet'
 import { Pagination } from '../components/Pagination'
 import { formatCount } from '../format'
 
@@ -29,6 +30,7 @@ export function CancerOverviewPage() {
   const [data, setData] = useState<CancerList | null>(null)
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
   const [areas, setAreas] = useState<string[]>([])
+  const [facetCounts, setFacetCounts] = useState<FacetCounts>({})
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -87,6 +89,23 @@ export function CancerOverviewPage() {
       .then(setAreas)
       .catch(() => setAreas([]))
   }, [])
+
+  // The per-facet option counts, refetched on a FILTER change (not sort/order/offset). Each
+  // facet's counts exclude its own selection, server-side, so an option's "(N)" reads as what
+  // selecting it would give. A failure just leaves the options count-less.
+  useEffect(() => {
+    let cancelled = false
+    listCancerFacets({
+      q: q || undefined,
+      therapeutic_area: area || undefined,
+      has_drugs: hasDrugs === '' ? undefined : hasDrugs === 'true',
+    })
+      .then((f) => !cancelled && setFacetCounts(f))
+      .catch(() => !cancelled && setFacetCounts({}))
+    return () => {
+      cancelled = true
+    }
+  }, [q, area, hasDrugs])
 
   useEffect(() => {
     let cancelled = false
@@ -167,6 +186,7 @@ export function CancerOverviewPage() {
           value={area}
           onChange={(v) => update({ therapeutic_area: v })}
           options={areas.map((a): [string, string] => [a, a])}
+          counts={facetCounts.therapeutic_area}
         />
         <Facet
           name="Drug programme"
@@ -177,6 +197,7 @@ export function CancerOverviewPage() {
             ['true', 'Has drug programme'],
             ['false', 'No drug programme'],
           ]}
+          counts={facetCounts.has_drugs}
         />
       </div>
 
@@ -292,38 +313,6 @@ export function CancerOverviewPage() {
         </div>
       )}
     </section>
-  )
-}
-
-function Facet({
-  name,
-  placeholder,
-  value,
-  onChange,
-  options,
-}: {
-  name: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-  options: [string, string][]
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={name}
-      data-testid={`facet-${name.toLowerCase().replace(/\s+/g, '-')}`}
-      className="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-ink
-                 focus:border-accent focus:outline-none"
-    >
-      <option value="">{placeholder}</option>
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
   )
 }
 

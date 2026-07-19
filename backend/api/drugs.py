@@ -17,7 +17,7 @@ from backend.ingestion.base import FactStatus
 from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
-from backend.schemas import DrugDetail, DrugList, DrugSummary, SourcedFact
+from backend.schemas import DrugDetail, DrugList, DrugSummary, FacetCount, SourcedFact
 from backend.services.briefs import BriefState, get_or_start_brief, is_enriching, retry_brief
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,43 @@ async def list_target_classes(session: SessionDep) -> list[str]:
     "Unclassified" option; this returns only the classes that actually exist.
     """
     return await DrugRepository(session).distinct_target_classes()
+
+
+@router.get(
+    "/facets",
+    response_model=dict[str, list[FacetCount]],
+    summary="Per-facet option counts for the overview, given the current filters",
+)
+async def drug_facets(
+    session: SessionDep,
+    q: Annotated[str | None, Query(description="Same free-text search as the listing")] = None,
+    target: Annotated[str | None, Query()] = None,
+    max_phase: Annotated[int | None, Query(ge=0, le=4)] = None,
+    modality: Annotated[str | None, Query()] = None,
+    maturity: Annotated[DataMaturity | None, Query()] = None,
+    has_target: Annotated[bool | None, Query()] = None,
+    target_class: Annotated[str | None, Query()] = None,
+    include_out_of_scope: Annotated[bool, Query()] = False,
+) -> dict[str, list[FacetCount]]:
+    """For each categorical/boolean facet, how many drugs match every OTHER active filter, grouped
+    by that facet's values (its own selection excluded, so the count reads as "what selecting this
+    option would give"). Takes the SAME filter params as the listing; drives the "(N)" beside each
+    option. Declared before /{chembl_id} so the path parameter does not swallow "facets".
+    """
+    counts = await DrugRepository(session).facet_counts(
+        q=q,
+        target=target,
+        max_phase=max_phase,
+        modality=modality,
+        maturity=maturity,
+        has_target=has_target,
+        target_class=target_class,
+        include_out_of_scope=include_out_of_scope,
+    )
+    return {
+        facet: [FacetCount(value=v, count=n) for v, n in options]
+        for facet, options in counts.items()
+    }
 
 
 @router.get(

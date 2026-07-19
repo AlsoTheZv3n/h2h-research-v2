@@ -28,8 +28,8 @@ Live on `main` (all merged):
 **Tags:** **`v2.0.0`** — "the cancer entity" — is the current release, tagged on the merged cancer
 expansion (Phase-0 spike → catalog → Gate 1 → Block C → Blocks A/B → SEER extension); `v1.0.0` was the
 drug-only app. Since v2.0.0, `main` carries the change-feed (#30, PR #46), the R4 follow-ups (#31–33,
-PR #47) and P1-T4 trial reality in full (#21 PR #48, #22/#23 PR #49). The drug-page bug-fixes (which
-close #34) are in the open PR that also carries this update.
+PR #47), P1-T4 trial reality in full (#21 PR #48, #22/#23 PR #49) and the drug-page bug-fixes (#34,
+PR #50). The overview per-facet counts (finishing #35) are in the open PR that carries this update.
 
 **Deploy note (not code):** run `python -m backend.refresh --once` after deploy so already-enriched
 cancers pick up their epidemiology/survival facts (or they read "not collected" until the next stale
@@ -39,10 +39,10 @@ refresh). New pages get the data lazily on first open.
 
 ## Open PRs (awaiting merge — Claude Code cannot merge)
 
-The **drug-page bug-fixes** (closing #34 — the redesign already shipped in b3f833a; a bug-hunt's
-findings fixed) land as one PR, which also carries this status update. Nothing else is outstanding —
-the spike (#29), bookkeeping (#45), change-feed (#46), R4 follow-ups (#47) and all of P1-T4 trial
-reality (#48, #49) are merged.
+The **overview per-facet counts** (finishing #35 — the rest of the overview refinement, server-side
+facets + sortable columns + target-class facet, already shipped) land as one PR, which also carries
+this status update. Nothing else is outstanding — the spike (#29), bookkeeping (#45), change-feed
+(#46), R4 follow-ups (#47), P1-T4 (#48, #49) and the drug-page bug-fixes (#50) are merged.
 
 ---
 
@@ -51,14 +51,15 @@ reality (#48, #49) are merged.
 **Done since this map was written:** #29 & #45 merged, **v2.0.0** tagged, the **change-feed #30** (PR
 #46), the **R4 follow-ups #31/#32/#33** (PR #47), and **P1-T4 trial reality** in full — gate #20
 (GREEN), backend #21 (PR #48), UI #22 + e2e #23 (PR #49), #24 closed. *(R4 itself was done earlier as
-#19; P2-B Blocks A/B/C are complete.)* The cancer detail page's evidence blocks are done. The **drug
-detail redesign #34** was already shipped earlier (commit b3f833a); the open PR fixes the genuine
-drug-page bugs a hunt found (a measured-0 vs None collapse; a "biologic" misstatement) and closes it.
+#19; P2-B Blocks A/B/C are complete.)* The cancer detail page's evidence blocks are done. **#34** (drug
+redesign, shipped as b3f833a) was closed by a bug-fix PR (#50). Like #31/#32/#34, **#35's overview
+refinement was already shipped** (server-side facets, sortable columns, target-class facet); the open
+PR adds the one missing piece — per-facet option counts — and closes it.
 
 Next, in order:
 
-1. **Overview refinement — #35** (server-side facets, sortable columns, target-class facet), then
-   **regenerate the GIF — #36** (now unblocked — the drug redesign it targets has shipped).
+1. **Regenerate the GIF — #36** (unblocked — the drug redesign it targets has shipped). The last
+   frontend-polish item.
 2. **Then, and only then — spike follow-ups + backlog:** S1 target page **#37**, S3 combinations **#38**,
    S4 sponsor **#39**, S5 modality **#40**; usability harness **#41**, MeSH/pub-types **#42**, cBioPortal
    **#43**, PubTator **#44**.
@@ -71,10 +72,11 @@ Next, in order:
 - #30 — Change-feed event table ✓ (PR #46)
 - #31/#32/#33 — R4 follow-ups ✓ (PR #47)
 - #20–24 — P1-T4 trial reality ✓ end-to-end (gate, backend #48, UI + e2e #49)
-- #34 — drug detail redesign ✓ (shipped earlier as b3f833a); its remaining "known bugs" fixed in the open PR
+- #34 — drug detail redesign ✓ (b3f833a); remaining bugs fixed in PR #50
+- #35 — overview refinement ✓ (server-side facets, sortable columns, target-class facet already
+  shipped; per-facet option counts added in the open PR)
 
 **Frontend polish (remaining)**
-- #35 — overview refinement (server-side facets, sortable columns, target-class facet)
 - #36 — regenerate `docs/demo.gif` · unblocked (the #34 redesign has shipped)
 
 **Spike follow-ups (verdicts measured — `experiment/spike-backlog/REPORT.md`)**

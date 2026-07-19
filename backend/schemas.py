@@ -62,6 +62,16 @@ class DrugList(BaseModel):
     offset: int
 
 
+class FacetCount(BaseModel):
+    """One facet option and how many rows match it, given the OTHER active filters. The overview
+    shows this as a "(N)" beside each option, so a reader sees what a filter would narrow to before
+    clicking it. Shared by the drug and cancer overviews; the facets endpoint returns a mapping of
+    facet name -> the option counts for that facet."""
+
+    value: str
+    count: int
+
+
 class DrugDetail(BaseModel):
     """The evidence brief: the catalog row plus every fact we hold, with provenance."""
 
