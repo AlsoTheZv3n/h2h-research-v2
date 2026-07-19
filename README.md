@@ -50,13 +50,32 @@ date**, and gaps are shown honestly instead of papered over.
   whether it is **drugged (approved), in development, or unexploited** in the world — sourced from Open
   Targets (not our catalog), joined on stable Ensembl ids, with a separate link to a catalog drug
   against it where we hold one. A high-association target with no drug anywhere is the finding; one
-  merely absent from *our* catalog is not.
+  merely absent from *our* catalog is not. Two more blocks ship beside these — **epidemiology**
+  (European age-standardised cancer mortality, from Eurostat) and **survival** (SEER 5-year relative
+  survival by stage) — each attached through a MONDO disease crosswalk and each loading and failing on
+  its own, with the same honest states: a cancer with no mapped category reads *not available for this
+  cancer*, never a false zero.
 
 The cancer view is deliberately partial, and says which parts exist. **Known gaps, named not shipped:**
-trial reality, the molecular profile, epidemiology (incidence / age-standardised rates), cost-of-care
-and unmet-need blocks are not built yet. What is shown is sourced; what is missing is stated rather than
-faked — the same discipline as the honest states below. It is a research and drug-intelligence view of
-the evidence, not clinical decision support and not medical advice.
+trial reality (which trials, where, recruiting), the molecular profile, cost-of-care and unmet-need
+blocks are not built yet. What is shown is sourced; what is missing is stated rather than faked — the
+same discipline as the honest states below. It is a research and drug-intelligence view of the
+evidence, not clinical decision support and not medical advice.
+
+Other things were **measured and deliberately left out** — its own kind of honesty, since a measured
+"no" is easy to mistake for "not tried":
+
+- **Epidemiology is European mortality, not global incidence.** GLOBOCAN (all-rights-reserved),
+  IHME-GBD / OWID (non-redistributable) and CI5 are licence-blocked, so the block uses Eurostat
+  age-standardised mortality (open, redistributable) — deaths, not new cases. Myeloma has no separate
+  Eurostat rate, so its epidemiology shows as a *labelled* lymphoma roll-up (its survival is exact).
+- **No tissue-agnostic badge.** An organ-span count measures commercial breadth, not biomarker
+  agnosticism; on a golden set it ranked lung-bound osimertinib above genuinely tissue-agnostic drugs.
+  No badge without a biomarker signal Open Targets does not expose.
+- **No aggregate sponsor counts.** Big pharma fragments across subsidiaries (~4:1 in the head, and
+  Merck KGaA ≠ Merck & Co), so sponsors stay display-only until a curated name map exists.
+- **Individualised mRNA vaccines are not catalog drugs.** They have no fixed compound and surface via
+  trials, not the drug table — a modality filter over the catalog cannot see them.
 
 ### The honest states, and why they are the point
 
@@ -215,7 +234,9 @@ that emptying the `fact` table makes it fail, which is the only way to know a te
 ## Data sources & licensing
 
 Built entirely on open data, no API keys required: **ChEMBL** (CC BY-SA), **ClinicalTrials.gov**
-(public domain), **Open Targets**, **PubMed** (read locally, never redistributed). See
+(public domain), **Open Targets**, **PubMed** (read locally, never redistributed), **Eurostat** (EU
+open-data reuse — the cancer epidemiology block) and **SEER** (U.S. public domain — the survival
+block). See
 [`NOTICE.md`](NOTICE.md) — the PubMed section is worth reading before you fork this, because NLM
 does not own the abstracts it serves and so cannot license them to you either. Literature data
 courtesy of the U.S. National Library of Medicine. The software is MIT-licensed (see
