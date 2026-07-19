@@ -175,7 +175,9 @@ test.describe('the biologic case', () => {
 
     const na = page.getByTestId('not-applicable')
     await expect(na.first()).toBeVisible()
-    await expect(na.first()).toContainText(/biologic/i)
+    // Accurate for any non-small-molecule modality (Antibody, ADC, Oligonucleotide, ...), not a
+    // blanket "biologic" that would misstate an oligonucleotide or an Unknown-typed drug.
+    await expect(na.first()).toContainText(/not a small molecule/i)
     // Never a blank image standing in for a molecule.
     await expect(page.getByTestId('structure-svg')).toHaveCount(0)
   })

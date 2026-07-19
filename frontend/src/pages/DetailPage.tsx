@@ -143,7 +143,7 @@ export function DetailPage() {
           <Card title="Structure & chemistry">
             {isBiologic ? (
               <NotApplicable
-                reason={`Not applicable — ${detail.drug_type ?? 'this'} is a biologic. Antibodies and ADCs have no small-molecule structure or physchem profile; their data model is v2.`}
+                reason={`Not applicable — ${detail.drug_type ?? 'This drug'} is not a small molecule, so it has no structure or physicochemical profile; that data model is v2.`}
               />
             ) : (
               <>
@@ -177,18 +177,22 @@ export function DetailPage() {
 
                 <dl className="mt-3 border-t border-line pt-2">
                   <Fact label="Molecular weight" facts={pick(detail, 'mw')} render={(v) => `${v} Da`} />
-                  <Fact label="LogP" facts={pick(detail, 'alogp')} />
-                  <Fact label="H-bond donors" facts={pick(detail, 'hbd')} />
-                  <Fact label="H-bond acceptors" facts={pick(detail, 'hba')} />
+                  {/* showZero: a measured 0 is the value for these properties (0 H-bond donors,
+                      LogP 0, 0 Lipinski violations), never the "None found" that reads as no data. */}
+                  <Fact label="LogP" facts={pick(detail, 'alogp')} showZero />
+                  <Fact label="H-bond donors" facts={pick(detail, 'hbd')} showZero />
+                  <Fact label="H-bond acceptors" facts={pick(detail, 'hba')} showZero />
                   <Fact
                     label="Polar surface area"
                     facts={pick(detail, 'psa')}
                     render={(v) => `${v} Å²`}
+                    showZero
                   />
                   <Fact
                     label="Lipinski violations"
                     facts={pick(detail, 'ro5_violations')}
-                    emptyLabel="0 — passes all four"
+                    render={(v) => (Number(v) === 0 ? '0 — passes all four' : String(v))}
+                    showZero
                   />
                 </dl>
               </>
@@ -225,7 +229,9 @@ export function DetailPage() {
           <Card title="Clinical & literature">
             <dl>
               <Fact label="Trials" facts={pick(detail, 'n_trials')} emptyLabel="None registered" />
-              <Fact label="Highest phase" facts={pick(detail, 'ct_max_phase')} />
+              {/* showZero: ct_max_phase is an ordinal (0 = early phase 1), a real stage, not the
+                  "None found" that would read as no phase on record. */}
+              <Fact label="Highest phase" facts={pick(detail, 'ct_max_phase')} showZero />
               <Fact
                 label="Phases seen"
                 facts={pick(detail, 'phases')}
@@ -262,8 +268,10 @@ export function DetailPage() {
                 emptyLabel="None"
                 render={(v) => (
                   <ul className="mt-0.5 space-y-0.5">
-                    {(v as string[]).map((t) => (
-                      <li key={t} className="text-xs text-ink-muted">
+                    {/* keyed by index+title: two records can share a title (errata, duplicate
+                        deposits) and a title-only key would drop one row. */}
+                    {(v as string[]).map((t, i) => (
+                      <li key={`${i}-${t}`} className="text-xs text-ink-muted">
                         {t}
                       </li>
                     ))}

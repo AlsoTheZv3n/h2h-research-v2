@@ -43,20 +43,28 @@ interface FactProps {
   render?: (value: unknown, fact: SourcedFact) => ReactNode
   /** What "nothing" reads as for this field, e.g. "No mechanism annotated". */
   emptyLabel?: string
+  /**
+   * Render a measured NUMERIC zero (an EMPTY fact whose value is 0) as the value, not the
+   * emptyLabel. For a physical property -- 0 H-bond donors, 0 Lipinski violations, an
+   * early-phase-1 highest phase -- a zero is a real answer, and "None found" is the exact
+   * 0-vs-None lie base.py warns about. Off by default: for a COUNT (0 trials, 0 publications)
+   * the emptyLabel ("None registered") is the honest read, so counts stay as they are.
+   */
+  showZero?: boolean
 }
 
-export function Fact({ label, facts, render, emptyLabel = 'None found' }: FactProps) {
+export function Fact({ label, facts, render, emptyLabel = 'None found', showZero }: FactProps) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-line py-2 last:border-b-0">
       <dt className="text-xs text-ink-faint">{label}</dt>
       <dd className="text-sm text-ink">
-        <FactValue facts={facts} render={render} emptyLabel={emptyLabel} />
+        <FactValue facts={facts} render={render} emptyLabel={emptyLabel} showZero={showZero} />
       </dd>
     </div>
   )
 }
 
-function FactValue({ facts, render, emptyLabel }: Omit<FactProps, 'label'>) {
+function FactValue({ facts, render, emptyLabel, showZero }: Omit<FactProps, 'label'>) {
   const briefState = useContext(BriefStateContext)
 
   if (!facts || facts.length === 0) {
@@ -82,7 +90,7 @@ function FactValue({ facts, render, emptyLabel }: Omit<FactProps, 'label'>) {
     <>
       {facts.map((fact, i) => (
         <div key={`${fact.source}-${i}`} className={i > 0 ? 'mt-1' : undefined}>
-          <SingleFact fact={fact} render={render} emptyLabel={emptyLabel} />
+          <SingleFact fact={fact} render={render} emptyLabel={emptyLabel} showZero={showZero} />
         </div>
       ))}
     </>
@@ -93,16 +101,29 @@ function SingleFact({
   fact,
   render,
   emptyLabel,
+  showZero,
 }: {
   fact: SourcedFact
   render?: FactProps['render']
   emptyLabel?: string
+  showZero?: boolean
 }) {
   // Amber, not red, and never an empty "none found": the calm per-fact outage marker,
   // shared with every section card so the three states never blur (see SourceFailedChip).
   if (fact.status === 'source_failed') return <SourceFailedChip fact={fact} />
 
   if (fact.status === 'empty') {
+    // A measured numeric zero is a value, not an absence -- but only for a field that opts in
+    // (see showZero). The backend classifies 0 as EMPTY, so this is the one place a measured
+    // zero (rendered as the value) can be told from a measured nothing (the emptyLabel).
+    if (showZero && typeof fact.value === 'number') {
+      return (
+        <span data-testid="fact-ok">
+          {render ? render(fact.value, fact) : String(fact.value)}
+          <CitationChip fact={fact} />
+        </span>
+      )
+    }
     return (
       <span data-testid="fact-empty" className="text-ink-faint">
         {emptyLabel}
