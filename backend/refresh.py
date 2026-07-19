@@ -30,15 +30,18 @@ from backend.db import dispose_engine, get_sessionmaker
 from backend.ingestion.base import utcnow
 from backend.ingestion.enrich import EnrichStats, enrich_catalog
 from backend.ingestion.enrich_cancer import CancerEnrichStats, enrich_cancer_catalog
+from backend.ingestion.enrich_target import TargetEnrichStats, enrich_target_catalog
 
 logger = logging.getLogger(__name__)
 
 
-async def refresh_once(*, limit: int | None = None) -> tuple[EnrichStats, CancerEnrichStats]:
-    """One pass over BOTH catalogs: enrich every never-touched drug and cancer, and re-enrich
-    any gone stale. Cancers ride the same fill+refresh query as drugs (last_enriched_at IS NULL
-    for fill, `< cutoff` for refresh), so a cancer enriched before a new block shipped picks up
-    its epidemiology/survival facts on the next pass rather than sitting on 'not collected'."""
+async def refresh_once(
+    *, limit: int | None = None
+) -> tuple[EnrichStats, CancerEnrichStats, TargetEnrichStats]:
+    """One pass over ALL THREE catalogs: enrich every never-touched drug, cancer and target, and
+    re-enrich any gone stale. Each rides the same fill+refresh query (last_enriched_at IS NULL
+    for fill, `< cutoff` for refresh), so an entity enriched before a new block shipped picks up
+    its facts on the next pass rather than sitting on 'not collected'."""
     settings = get_settings()
     cutoff = utcnow() - timedelta(days=settings.freshness_days)
     async with get_sessionmaker()() as session:
@@ -48,7 +51,10 @@ async def refresh_once(*, limit: int | None = None) -> tuple[EnrichStats, Cancer
         cancers = await enrich_cancer_catalog(
             session, only_unenriched=True, stale_before=cutoff, limit=limit
         )
-        return drugs, cancers
+        targets = await enrich_target_catalog(
+            session, only_unenriched=True, stale_before=cutoff, limit=limit
+        )
+        return drugs, cancers, targets
 
 
 async def refresh_forever() -> None:
@@ -61,20 +67,21 @@ async def refresh_forever() -> None:
     )
     while True:
         try:
-            drugs, cancers = await refresh_once()
+            drugs, cancers, targets = await refresh_once()
         except Exception:
-            # A pass must not take the service down: an unenriched or stale drug/cancer is a
-            # state the system already handles honestly, so a failed pass just means the
-            # next one retries. Log and carry on.
+            # A pass must not take the service down: an unenriched or stale entity is a state
+            # the system already handles honestly, so a failed pass just means the next one
+            # retries. Log and carry on.
             logger.exception("refresh pass failed; retrying after the interval")
         else:
-            if drugs.drugs == 0 and cancers.cancers == 0:
+            if drugs.drugs == 0 and cancers.cancers == 0 and targets.targets == 0:
                 logger.info("refresh: catalog is warm and fresh, nothing to do")
             else:
                 logger.info(
-                    "refresh pass done -- drugs: %s | cancers: %s",
+                    "refresh pass done -- drugs: %s | cancers: %s | targets: %s",
                     drugs.report().replace("\n", " |"),
                     cancers.report().replace("\n", " |"),
+                    targets.report().replace("\n", " |"),
                 )
         await asyncio.sleep(settings.refresh_interval_seconds)
 
@@ -95,11 +102,13 @@ async def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         if args.once:
-            drugs, cancers = await refresh_once(limit=args.limit)
+            drugs, cancers, targets = await refresh_once(limit=args.limit)
             print("\n=== refresh: drugs ===")
             print(drugs.report())
             print("\n=== refresh: cancers ===")
             print(cancers.report())
+            print("\n=== refresh: targets ===")
+            print(targets.report())
         else:
             await refresh_forever()
     finally:

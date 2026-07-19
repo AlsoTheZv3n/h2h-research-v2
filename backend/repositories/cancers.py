@@ -113,6 +113,18 @@ class CancerRepository:
         )
         return result.scalars().all()
 
+    async def all_cancer_ids(self) -> set[str]:
+        """Every disease id in the catalog, as a set.
+
+        The target page's reverse Open Targets query returns a target's associated diseases --
+        cancers and non-cancers alike (KRAS leads with Noonan syndrome). Enrichment filters
+        those to the ones we actually list by membership in this set, so a target page shows
+        the cancers it drives, never a developmental syndrome. Loaded once per enrich run and
+        reused across the batch, rather than a per-target IN query.
+        """
+        result = await self.session.execute(select(Cancer.disease_id))
+        return set(result.scalars().all())
+
     async def present_drug_ids(self, chembl_ids: Sequence[str]) -> set[str]:
         """Which of these ChEMBL ids the drug catalog holds.
 

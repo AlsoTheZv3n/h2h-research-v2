@@ -22,9 +22,10 @@ from backend.ingestion.base import Fact
 from backend.models import ChangeEvent
 from backend.models.cancer_fact import CancerFactRow
 from backend.models.fact import FactRow
+from backend.models.target_fact import TargetFactRow
 
 # The two fact tables share the (key, source, value, status) shape the feed reads.
-FactModel = type[FactRow] | type[CancerFactRow]
+FactModel = type[FactRow] | type[CancerFactRow] | type[TargetFactRow]
 
 
 async def log_fact_changes(

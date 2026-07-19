@@ -18,7 +18,7 @@ from typing import Any
 import httpx
 import pytest
 
-from backend.ingestion import cancer_catalog, enrich_cancer, opentargets
+from backend.ingestion import cancer_catalog, enrich_cancer, enrich_target, opentargets
 
 pytestmark = pytest.mark.live_ot
 
@@ -42,6 +42,15 @@ _QUERIES: list[tuple[str, str, dict[str, Any], tuple[str, ...]]] = [
         enrich_cancer._TARGET_DRUG_STATUS_QUERY,
         {"ids": ["ENSG00000146648"]},
         ("targets",),
+    ),
+    # The target page's reverse query: target -> associated diseases (filtered to our catalog).
+    # If `associatedDiseases` drifts, or EGFR's Ensembl id stops resolving, every target brief
+    # silently degrades -- so it is guarded like the forward landscape query above.
+    (
+        "target_associated_cancers",
+        enrich_target._REVERSE_QUERY,
+        {"id": "ENSG00000146648", "n": 5},
+        ("target", "associatedDiseases", "rows"),
     ),
     (
         "pipeline",
