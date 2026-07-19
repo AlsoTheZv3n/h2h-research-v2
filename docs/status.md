@@ -58,11 +58,9 @@ PR adds the one missing piece — per-facet option counts — and closes it.
 
 Next, in order:
 
-1. **Regenerate the GIF — #36** (unblocked — the drug redesign it targets has shipped). The last
-   frontend-polish item.
-2. **Then, and only then — spike follow-ups + backlog:** S1 target page **#37**, S3 combinations **#38**,
-   S4 sponsor **#39**, S5 modality **#40**; usability harness **#41**, MeSH/pub-types **#42**, cBioPortal
-   **#43**, PubTator **#44**.
+1. **Spike follow-ups + backlog** (frontend polish and the usability harness are done): S1 target page
+   **#37**, S3 combinations **#38**, S4 sponsor **#39**, S5 modality **#40**; MeSH/pub-types **#42**,
+   cBioPortal **#43**, PubTator **#44**.
 
 ---
 
@@ -73,11 +71,14 @@ Next, in order:
 - #31/#32/#33 — R4 follow-ups ✓ (PR #47)
 - #20–24 — P1-T4 trial reality ✓ end-to-end (gate, backend #48, UI + e2e #49)
 - #34 — drug detail redesign ✓ (b3f833a); remaining bugs fixed in PR #50
-- #35 — overview refinement ✓ (server-side facets, sortable columns, target-class facet already
-  shipped; per-facet option counts added in the open PR)
+- #35 — overview refinement ✓ (server-side facets, sortable columns, target-class facet; per-facet
+  option counts added in PR #51)
+- #36 — regenerate `docs/demo.gif` ✓ (all five cancer blocks, PR #52)
+- #41 — usability & comprehension harness ✓ (`frontend/eval/usability/`; first report + human triage,
+  PR — this change)
 
 **Frontend polish (remaining)**
-- #36 — regenerate `docs/demo.gif` · unblocked (the #34 redesign has shipped)
+- _none — all shipped (#34, #35, #36)._
 
 **Spike follow-ups (verdicts measured — `experiment/spike-backlog/REPORT.md`)**
 - #37 — S1 green: target detail page (OT reverse query, joined by ID)
@@ -86,7 +87,6 @@ Next, in order:
 - #40 — S5 amber: modality badge/filter (reliable for ADC/antibody/cell, honest about vaccines)
 
 **Backlog (not scheduled)**
-- #41 — usability & comprehension harness ([spec](specs/usability-harness.md))
 - #42 — MeSH + publication types on the PubMed adapter
 - #43 — cBioPortal alteration frequency *(new source → Gate-0 first)*
 - #44 — PubTator extracted relations *(new source → Gate-0; needs an "extracted, not curated" status)*

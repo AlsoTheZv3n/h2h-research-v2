@@ -33,3 +33,6 @@ dist-ssr
 # demo recording intermediates (the committed artifact is docs/demo.gif)
 /demo-recording/
 
+# usability-harness screenshots (regenerated each run; the committed artifact is the dated report)
+/eval/usability/captures/
+

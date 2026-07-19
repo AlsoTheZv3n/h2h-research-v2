@@ -1,6 +1,6 @@
 # Spec — Usability & comprehension harness (Playwright + LLM evaluator)
 
-**Status:** backlog, not scheduled. Tracked by a GitHub issue. This file is the self-contained spec.
+**Status:** shipped — `frontend/eval/usability/`, first report `report-2026-07-19.md`. This file is the self-contained spec.
 
 **Goal:** find out whether a domain reader **understands** the app — not whether it renders. The existing
 ~380 tests cover correctness (does the state render, does the filter filter, does the link resolve). None
