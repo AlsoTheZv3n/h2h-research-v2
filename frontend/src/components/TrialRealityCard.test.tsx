@@ -64,10 +64,11 @@ describe('TrialRealityCard', () => {
     expect(screen.getByTestId('trial-count')).toHaveTextContent(/8,442 registered trials/)
     expect(screen.getByText(/Matched on condition text/i)).toBeInTheDocument()
     expect(screen.getByTestId('trial-sample-note')).toHaveTextContent(/1,000 most-relevant/)
-    // Distributions render with human labels.
-    expect(
-      within(screen.getByTestId('trial-phase-distribution')).getByText('Phase 2'),
-    ).toBeInTheDocument()
+    // Distributions render with human labels AND as counts, never shares -- the seeded 440
+    // (Phase 2) is what a regression to percentages would drop.
+    const phaseDist = screen.getByTestId('trial-phase-distribution')
+    expect(within(phaseDist).getByText('Phase 2')).toBeInTheDocument()
+    expect(within(phaseDist).getByText('440')).toBeInTheDocument()
     expect(
       within(screen.getByTestId('trial-status-distribution')).getByText('Recruiting'),
     ).toBeInTheDocument()

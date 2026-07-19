@@ -97,8 +97,9 @@ VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
             {"chembl_id":"CHEMBL_E2E_CAND","name":"E2E CANDIDATE","stage":"PHASE_2","modality":"Small molecule","mechanism":null}]}'::jsonb,
         'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
        -- The trial-reality block (ClinicalTrials.gov, by condition). A TRUE count far above the
-       -- scanned sample (so the card's "over a sample" note is exercised), phase (with a combined
-       -- Phase-1/2 trial, so by_phase multi-count is proven) and status distributions, a
+       -- scanned sample (so the card's "over a sample" note is exercised), phase and status
+       -- distributions (this is the aggregate fact -- per-phase counts, not per-trial rows -- so
+       -- the by_phase multi-count semantic is a backend unit test, not this fixture), a
        -- stopped-with-reasons count, and a query-side DACH count -- the whole card, DB -> API -> UI.
        ('MONDO_E2E_NSCLC', 'trial_reality', 'clinicaltrials',
         '{"condition":"E2E lung carcinoma","n_trials":8442,"n_trials_scanned":1000,

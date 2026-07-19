@@ -131,8 +131,11 @@ test.describe('cancer catalog', () => {
     // The count reads as the TRUE total (8,442), never the scanned page -- with the sample noted.
     await expect(count).toContainText('8,442')
     await expect(page.getByTestId('trial-sample-note')).toContainText('1,000')
-    // Phase (rendered as counts, not shares) and status distributions.
-    await expect(page.getByTestId('trial-phase-distribution')).toContainText('Phase 2')
+    // Phase and status distributions render as COUNTS, not shares -- the seeded 440 (Phase 2) is
+    // exactly what a regression to percentages would drop.
+    const phaseDist = page.getByTestId('trial-phase-distribution')
+    await expect(phaseDist).toContainText('Phase 2')
+    await expect(phaseDist).toContainText('440')
     await expect(page.getByTestId('trial-status-distribution')).toContainText('Recruiting')
     // The query-side DACH count and the stopped-with-reasons honesty angle.
     await expect(page.getByTestId('trial-dach')).toContainText('122')
