@@ -8,12 +8,16 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
  * catalog" link is not navigation. The active tab is computed from the path, not from
  * NavLink's exact match, so a drug or cancer *detail* page keeps its catalog's tab lit:
  * `/drugs/:id` belongs to Drugs, `/cancers/:id` to Cancers.
+ *
+ * A target detail page (`/targets/:id`) belongs to neither catalog -- it is a third entity
+ * with no overview -- so it lights no tab rather than falsely claiming the Drugs tab.
  */
 export function App() {
   const { pathname } = useLocation()
   // The drug overview lives at "/", detail at "/drugs/:id" -- both are the Drugs tab.
   const onCancers = pathname.startsWith('/cancers')
-  const onDrugs = !onCancers
+  const onTargets = pathname.startsWith('/targets')
+  const onDrugs = !onCancers && !onTargets
 
   return (
     <div className="min-h-screen bg-surface">

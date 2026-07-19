@@ -126,6 +126,25 @@ ON CONFLICT (chembl_id) DO UPDATE SET pref_name = excluded.pref_name;
 INSERT INTO drug_target (drug_chembl_id, target_ensembl_id)
 VALUES ('CHEMBL_E2E_INPIPE', 'ENSG_E2E_EGFR')
 ON CONFLICT DO NOTHING;
+
+-- Target catalog fixture: ENSG_E2E_EGFR (the same EGFR that leads the NSCLC landscape above)
+-- as a first-class, ENRICHED target, so the target detail e2e renders without a live Open
+-- Targets fetch (a never-enriched target would trigger one on open). Its associated_cancers
+-- points back to MONDO_E2E_NSCLC -- a catalog cancer -- so the target -> cancer link is live,
+-- closing the cancer -> target -> cancer thread the landscape symbol now opens. And the existing
+-- drug_target row above makes CHEMBL_E2E_INPIPE its catalog drug, checked end to end.
+INSERT INTO target (ensembl_id, symbol, name, n_cancers, last_enriched_at)
+VALUES ('ENSG_E2E_EGFR', 'EGFR', 'epidermal growth factor receptor', 1, now())
+ON CONFLICT (ensembl_id) DO UPDATE
+   SET symbol = excluded.symbol, name = excluded.name, n_cancers = excluded.n_cancers,
+       last_enriched_at = excluded.last_enriched_at;
+
+INSERT INTO target_fact (ensembl_id, key, source, value, status, source_url, retrieved_at)
+VALUES ('ENSG_E2E_EGFR', 'associated_cancers', 'opentargets',
+        '{"n_cancers":1,"cancers":[{"disease_id":"MONDO_E2E_NSCLC","name":"E2E lung carcinoma","score":0.89}]}'::jsonb,
+        'ok', 'https://platform.opentargets.org/target/ENSG_E2E_EGFR', now())
+ON CONFLICT (ensembl_id, key, source) DO UPDATE
+   SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 `
 
 function psql(sql: string): void {

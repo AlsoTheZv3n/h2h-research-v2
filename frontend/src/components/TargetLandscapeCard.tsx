@@ -142,11 +142,14 @@ function TargetLandscapeBody({
           return (
           <li key={t.symbol} data-testid="landscape-row" className="flex items-center gap-2 py-1.5 text-sm">
             <span className="w-16 shrink-0 font-medium">
-              {catalogDrug ? (
+              {/* The symbol drills into the target's own page -- the cancers it drives and the
+                  drugs against it. Every displayed row carries an Ensembl id; a defensive plain
+                  span covers the (unreached) case where one is missing. */}
+              {t.ensembl_id ? (
                 <Link
-                  to={`/drugs/${catalogDrug}`}
-                  data-testid="landscape-catalog-link"
-                  title="Open a catalog drug against this target"
+                  to={`/targets/${t.ensembl_id}`}
+                  data-testid="landscape-target-link"
+                  title="Open this target's page"
                   className="text-accent hover:underline"
                 >
                   {t.symbol}
@@ -162,6 +165,19 @@ function TargetLandscapeBody({
               <Tractable on={t.sm_tractable} label="SM" title="Small-molecule tractable" />
               <Tractable on={t.ab_tractable} label="AB" title="Antibody tractable" />
               <DrugStatusBadge status={statusOf(t)} />
+              {/* A weaker, separate signal: a drug WE hold against this target (keyed by Ensembl
+                  id). Absent -> nothing, never a claim about the target's world drugged status,
+                  which is the badge's job. */}
+              {catalogDrug && (
+                <Link
+                  to={`/drugs/${catalogDrug}`}
+                  data-testid="landscape-catalog-link"
+                  title="Open a drug in our catalog that acts on this target"
+                  className="text-[11px] text-accent hover:underline"
+                >
+                  ℞
+                </Link>
+              )}
             </span>
             <span
               className="ml-auto truncate text-[11px] text-ink-faint"

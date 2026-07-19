@@ -90,19 +90,24 @@ test.describe('cancer catalog', () => {
     await expect(stat).toContainText('8,000 with any evidence')
   })
 
-  test('the target landscape shows the drugged flag and the catalog link', async ({ page }) => {
-    // Fixture: EGFR is `approved` and we hold a drug against it (drug_target, by Ensembl
-    // id) -> a badge AND a link; KRAS is `unexploited` with no drug anywhere -> a badge,
-    // no link. This checks the R4 flag and its separate catalog-link end to end.
+  test('the target landscape shows the drugged flag, the target link and the catalog ℞ link', async ({
+    page,
+  }) => {
+    // Fixture: EGFR is `approved` and we hold a drug against it (drug_target, by Ensembl id)
+    // -> a badge AND a ℞ link to that drug; KRAS is `unexploited` with no drug anywhere -> a
+    // badge, no ℞. Every target's symbol also drills into its own page. This checks the R4 flag
+    // and both catalog links (target page + drug) end to end.
     await page.goto('/cancers/MONDO_E2E_NSCLC')
     await expect(page.getByTestId('drug-status-approved')).toBeVisible()
     await expect(page.getByTestId('drug-status-unexploited')).toBeVisible()
-    // EGFR links to the catalog brief, matched by Ensembl id.
-    const link = page.getByTestId('landscape-catalog-link')
-    await expect(link).toHaveText('EGFR')
-    await expect(link).toHaveAttribute('href', '/drugs/CHEMBL_E2E_INPIPE')
-    // Exactly one link: KRAS (unexploited, no drug) stays plain text, not a dead link.
-    await expect(link).toHaveCount(1)
+    // EGFR's symbol drills into its own target page, matched by Ensembl id.
+    const targetLink = page.getByTestId('landscape-target-link').filter({ hasText: 'EGFR' })
+    await expect(targetLink).toHaveAttribute('href', '/targets/ENSG_E2E_EGFR')
+    // The separate, weaker ℞ signal links the catalog drug we hold against EGFR.
+    const drugLink = page.getByTestId('landscape-catalog-link')
+    await expect(drugLink).toHaveAttribute('href', '/drugs/CHEMBL_E2E_INPIPE')
+    // Exactly one ℞: KRAS (unexploited, no drug) stays plain, not a dead link.
+    await expect(drugLink).toHaveCount(1)
 
     // The status filter narrows to the unexploited finding (KRAS), the decision-useful cell.
     await page.getByTestId('landscape-filter-status').selectOption('unexploited')
