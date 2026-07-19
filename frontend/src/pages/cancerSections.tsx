@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { CancerDetail } from '../api/types'
+import { EpidemiologyCard } from '../components/EpidemiologyCard'
 import { PipelineCard } from '../components/PipelineCard'
+import { SurvivalCard } from '../components/SurvivalCard'
 import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
 
 /**
@@ -39,5 +41,17 @@ export const CANCER_SECTIONS: CancerSection[] = [
         catalogDrugByTarget={d.target_catalog_drug}
       />
     ),
+  },
+  {
+    id: 'epidemiology',
+    label: 'Epidemiology',
+    render: (d) => (
+      <EpidemiologyCard id="epidemiology" facts={d.facts['epidemiology']} cancerName={d.name} />
+    ),
+  },
+  {
+    id: 'survival',
+    label: 'Survival',
+    render: (d) => <SurvivalCard id="survival" facts={d.facts['survival']} cancerName={d.name} />,
   },
 ]

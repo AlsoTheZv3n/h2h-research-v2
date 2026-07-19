@@ -6,6 +6,8 @@ const SOURCE_LABELS: Record<string, string> = {
   clinicaltrials: 'ClinicalTrials.gov',
   opentargets: 'Open Targets',
   pubmed: 'PubMed',
+  eurostat: 'Eurostat',
+  seer: 'SEER',
 }
 
 function confidenceTone(confidence: number | null): string {

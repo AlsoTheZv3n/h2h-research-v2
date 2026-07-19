@@ -304,3 +304,66 @@ export interface CancerListParams {
   limit?: number
   offset?: number
 }
+
+/**
+ * How a cancer resolved against an external source's vocabulary (Eurostat, SEER), mirroring
+ * the backend disease_map MatchType. The load-bearing distinction lives here too:
+ *
+ *   exact     the cancer IS the mapped category.
+ *   rollup    the figures describe a BROADER ancestor entity, whose label the UI MUST show
+ *             ("broader than NSCLC") so a specific page never passes them off as its own.
+ *   unmapped  no source category applies -- the honest "not available for this cancer",
+ *             distinct from empty (source had nothing) and source_failed (an outage).
+ */
+export type SourceMatch = 'exact' | 'rollup' | 'unmapped'
+
+/** The metadata every resolved-source fact carries, alongside its own data. */
+export interface Resolved {
+  match_type: SourceMatch
+  /** The external category code (ICD-10 site, SEER site). Absent when unmapped. */
+  source_code?: string | null
+  /** The entity the figures describe -- the name a rollup must show. Absent when unmapped. */
+  source_label?: string | null
+  target_mondo?: string | null
+}
+
+/** One country's age-standardised mortality rate (deaths per 100k), for the Block A bars. */
+export interface EpiCountry {
+  geo: string
+  country: string
+  asr: number
+}
+
+/** The epidemiology fact's value: European mortality for the resolved cancer (Eurostat). */
+export interface Epidemiology extends Resolved {
+  year: number
+  unit: string
+  /** EU aggregate and Switzerland ASR headlines; null when that geography has no rate. */
+  eu_asr: number | null
+  ch_asr: number | null
+  /** EU total deaths for the year (absolute); null if the absolute dataset was unavailable. */
+  total_deaths: number | null
+  by_country: EpiCountry[]
+}
+
+/** One SEER summary stage's 5-year relative survival, with CI, case count and share. */
+export interface SurvivalStage {
+  stage: string
+  rate: number
+  /** 95% CI bounds; null when the rate is capped (e.g. 100%) and the bound is suppressed. */
+  ci_low: number | null
+  ci_high: number | null
+  n: number | null
+  /** This stage's share of all cases (0-1); may not sum to 1 (unstaged cases remain). */
+  share: number | null
+}
+
+/** The survival fact's value: SEER 5-year relative survival for the resolved cancer. */
+export interface Survival extends Resolved {
+  metric: string
+  /** False for leukemias: not decomposed into Localized/Regional/Distant. Then by_stage is []
+   *  and only all_stages is shown -- a real EMPTY for the stage block, never a zero. */
+  staged: boolean
+  all_stages: { rate: number; ci_low: number | null; ci_high: number | null; n: number | null }
+  by_stage: SurvivalStage[]
+}

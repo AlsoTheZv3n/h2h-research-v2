@@ -29,10 +29,18 @@ from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
-from backend.ingestion.base import SourceRecord, fact, failed, utcnow
+from backend.ingestion import eurostat, seer
+from backend.ingestion.base import Fact, SourceRecord, fact, failed, utcnow
 from backend.ingestion.http import build_client
 from backend.models import Cancer
 from backend.repositories.cancers import CancerRepository
+from backend.services.disease_map import (
+    MatchType,
+    Resolution,
+    SourceMap,
+    load_source_maps,
+    resolve,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -456,9 +464,283 @@ async def opentargets_pipeline(client: httpx.AsyncClient, cancer: Cancer) -> Sou
     )
 
 
-def build_cancer_sources() -> list[CancerSource]:
-    """The cancer evidence sources, assembled. Trial reality joins here next."""
-    return [opentargets_target_landscape, opentargets_pipeline]
+# -- Disease-map-resolved sources (epidemiology, survival) -------------------------------------
+#
+# These attach an external source (Eurostat mortality, SEER survival) to a cancer by crossing
+# the vocabulary in the Gate-1 disease map: resolve() says whether the cancer IS a mapped
+# category (exact), rolls up to a broader one (rollup -- which the value NAMES so a specific
+# page never passes off broader figures as its own), or has no path at all (unmapped -- the
+# honest "not available for this cancer", distinct from empty/source_failed). Only then is the
+# external source fetched, keyed by the resolved source_code, never by name.
+
+_ANCESTORS_QUERY = "query A($id: String!) { disease(efoId: $id) { id ancestors } }"
+
+
+class _DiseaseNotResolved(Exception):
+    """Open Targets answered but does not resolve this disease id (deprecated / remapped across
+    releases). NOT an outage, and NOT "unmapped": a lookup miss the sources must skip, exactly as
+    opentargets_target_landscape and opentargets_pipeline do -- never a settled "not available"."""
+
+
+async def _fetch_ancestors(client: httpx.AsyncClient, disease_id: str) -> list[str]:
+    """The cancer's MONDO ancestors from Open Targets -- the ontology path resolve() walks.
+
+    A disease OT cannot resolve raises _DiseaseNotResolved: its empty ancestry must not be read
+    as "no mapped category" (UNMAPPED), which would assert availability we never determined."""
+    data = await _gql(client, _ANCESTORS_QUERY, {"id": disease_id})
+    disease = data.get("disease")
+    if disease is None:
+        raise _DiseaseNotResolved(disease_id)
+    return disease.get("ancestors") or []
+
+
+async def _fetch_mapped_ancestors(
+    client: httpx.AsyncClient, hits: list[str], source_map: SourceMap
+) -> dict[str, frozenset[str]]:
+    """For each hit (a mapped id that is the cancer's ancestor), the mapped ids among ITS
+    ancestors -- what closest-wins needs to drop a broader hit when a narrower one is present
+    (SEER leukaemia when AML is also a hit). Fetched only when there are >= 2 hits to compare."""
+    parts = [f'h{i}: disease(efoId: "{h}") {{ id ancestors }}' for i, h in enumerate(hits)]
+    data = await _gql(client, "{ " + " ".join(parts) + " }", {})
+    out: dict[str, frozenset[str]] = {}
+    for i, h in enumerate(hits):
+        anc = set(((data.get(f"h{i}") or {}).get("ancestors")) or [])
+        out[h] = frozenset(a for a in anc if a in source_map)
+    return out
+
+
+async def _resolve_cancer(
+    client: httpx.AsyncClient,
+    disease_id: str,
+    source_map: SourceMap,
+    ancestors_cache: dict[str, list[str]],
+) -> Resolution:
+    """Resolve one cancer against one source's map, fetching only the ontology it needs: nothing
+    for an exact match, the cancer's ancestors otherwise, and the hits' ancestors only when two
+    or more mapped ancestors must be disambiguated. resolve() remains the single decision point.
+
+    `ancestors_cache` is shared across the sources of one enrichment run, so a cancer's ancestors
+    are fetched from Open Targets ONCE even though both the epidemiology and survival sources
+    resolve it (against different maps)."""
+    if disease_id in source_map:
+        code, label = source_map[disease_id]
+        return Resolution(MatchType.EXACT, disease_id, code, label)
+    ancestors = ancestors_cache.get(disease_id)
+    if ancestors is None:
+        ancestors = await _fetch_ancestors(client, disease_id)
+        ancestors_cache[disease_id] = ancestors
+    hits = [a for a in ancestors if a in source_map]
+    mapped_ancestors: dict[str, frozenset[str]] = {}
+    if len(hits) >= 2:
+        mapped_ancestors = await _fetch_mapped_ancestors(client, hits, source_map)
+    return resolve(disease_id, ancestors, source_map, mapped_ancestors)
+
+
+def _resolved_value(resolution: Resolution, data: dict[str, Any]) -> dict[str, Any]:
+    """The fact value for a resolved source: the match type + the entity the figures describe
+    (so a rollup can be labelled "broader than X"), merged with the source's own data."""
+    return {
+        "match_type": resolution.match_type.value,
+        "source_code": resolution.source_code,
+        "source_label": resolution.source_label,
+        "target_mondo": resolution.target_mondo,
+        **data,
+    }
+
+
+def _unmapped_fact(source: str, retrieved_at: datetime) -> Fact:
+    """The honest UNMAPPED state as a fact: an OK fact whose value says only that no source
+    category applies -- kept distinct from empty (the source had nothing) and source_failed
+    (an outage), so the UI can render "not available for this cancer" as its own answer."""
+    return fact({"match_type": MatchType.UNMAPPED.value}, source, retrieved_at=retrieved_at)
+
+
+def _not_resolved_record(source: str, disease_id: str, prov: dict[str, Any]) -> SourceRecord:
+    """A cancer whose id Open Targets does not resolve: a lookup miss, so NO fact is written --
+    the same skip opentargets_target_landscape / opentargets_pipeline make -- never a settled
+    "not available for this cancer" (which UNMAPPED asserts) for an id we could not look up."""
+    return SourceRecord(
+        source,
+        disease_id,
+        ok=False,
+        provenance=prov,
+        error="Open Targets did not resolve this disease id",
+    )
+
+
+_EUROSTAT_URL = "https://ec.europa.eu/eurostat/databrowser/view/hlth_cd_asdr2/default/table"
+
+
+def make_epidemiology_source(
+    source_map: SourceMap, ancestors_cache: dict[str, list[str]]
+) -> CancerSource:
+    """Block A: European mortality (Eurostat), attached via the disease map's eurostat vocab."""
+
+    async def cancer_epidemiology(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
+        source, key = "eurostat", "epidemiology"
+        retrieved_at = utcnow()
+        prov: dict[str, Any] = {"source_url": _EUROSTAT_URL, "retrieved_at": retrieved_at}
+        try:
+            resolution = await _resolve_cancer(
+                client, cancer.disease_id, source_map, ancestors_cache
+            )
+        except _DiseaseNotResolved:
+            return _not_resolved_record(source, cancer.disease_id, prov)
+        except Exception as exc:
+            # We could not even resolve the cancer (Open Targets ancestry fetch failed): an
+            # outage, so an amber source_failed fact -- never a silent "not available".
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, f"disease resolution failed: {exc}")},
+                error=str(exc),
+                outage=True,
+            )
+        if not resolution.available:
+            # UNMAPPED: no European mortality category applies to this cancer. An honest,
+            # measured answer about the mapping -- kept distinct from empty and source_failed.
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={key: _unmapped_fact(source, retrieved_at)},
+            )
+        try:
+            data = await eurostat.fetch_epidemiology(client, resolution.source_code or "")
+        except Exception as exc:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, str(exc), source_url=_EUROSTAT_URL)},
+                error=str(exc),
+                outage=True,
+            )
+        if data is None:
+            # The category resolved but Eurostat reports no rate for it -- a measured EMPTY.
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={
+                    key: fact(None, source, source_url=_EUROSTAT_URL, retrieved_at=retrieved_at)
+                },
+            )
+        value = _resolved_value(resolution, data)
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=True,
+            provenance=prov,
+            facts={key: fact(value, source, source_url=_EUROSTAT_URL, retrieved_at=retrieved_at)},
+        )
+
+    return cancer_epidemiology
+
+
+def _seer_url(site: int) -> str:
+    return (
+        "https://seer.cancer.gov/statistics-network/explorer/application.html"
+        f"?site={site}&data_type=4&graph_type=5&compareBy=stage"
+    )
+
+
+def make_survival_source(
+    source_map: SourceMap, ancestors_cache: dict[str, list[str]]
+) -> CancerSource:
+    """Block B: SEER 5-year relative survival, attached via the disease map's seer vocab."""
+
+    async def cancer_survival(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
+        source, key = "seer", "survival"
+        retrieved_at = utcnow()
+        prov: dict[str, Any] = {"retrieved_at": retrieved_at}
+        try:
+            resolution = await _resolve_cancer(
+                client, cancer.disease_id, source_map, ancestors_cache
+            )
+        except _DiseaseNotResolved:
+            return _not_resolved_record(source, cancer.disease_id, prov)
+        except Exception as exc:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, f"disease resolution failed: {exc}")},
+                error=str(exc),
+                outage=True,
+            )
+        if not resolution.available:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={key: _unmapped_fact(source, retrieved_at)},
+            )
+        # SEER site codes are numeric; a non-numeric mapped code is a data error, not an outage.
+        try:
+            site = int(resolution.source_code or "")
+        except ValueError:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                error=f"non-numeric SEER site code {resolution.source_code!r}",
+            )
+        url = _seer_url(site)
+        prov["source_url"] = url
+        try:
+            data = await seer.fetch_survival(client, site)
+        except Exception as exc:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, str(exc), source_url=url)},
+                error=str(exc),
+                outage=True,
+            )
+        if data is None:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={key: fact(None, source, source_url=url, retrieved_at=retrieved_at)},
+            )
+        value = _resolved_value(resolution, data)
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=True,
+            provenance=prov,
+            facts={key: fact(value, source, source_url=url, retrieved_at=retrieved_at)},
+        )
+
+    return cancer_survival
+
+
+async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
+    """The cancer evidence sources, assembled. The disease-map-resolved sources (epidemiology,
+    survival) capture their source's crosswalk, loaded once from the DB here."""
+    source_maps = await load_source_maps(session)
+    # One ancestor cache shared by the two disease-map sources, so a cancer's Open Targets
+    # ancestors are fetched once even though epidemiology and survival both resolve it.
+    ancestors_cache: dict[str, list[str]] = {}
+    return [
+        opentargets_target_landscape,
+        opentargets_pipeline,
+        make_epidemiology_source(source_maps.get("eurostat", {}), ancestors_cache),
+        make_survival_source(source_maps.get("seer", {}), ancestors_cache),
+    ]
 
 
 async def _save_source_record(
@@ -538,7 +820,7 @@ async def enrich_cancer_catalog(
             )
 
     stats = CancerEnrichStats()
-    sources = build_cancer_sources()
+    sources = await build_cancer_sources(session)
 
     query = select(Cancer).order_by(Cancer.n_drugs.desc(), Cancer.disease_id)
     if disease_id:

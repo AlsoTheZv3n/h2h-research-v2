@@ -116,9 +116,9 @@ describe('CancerDetailPage sections', () => {
 
     // The target section renders its body...
     expect(await screen.findByTestId('target-landscape')).toBeInTheDocument()
-    // ...while the pipeline section, whose fact is absent mid-enrichment, shows its own
-    // pending state (not "not collected", and not blanked)...
-    expect(screen.getByTestId('fact-pending')).toBeInTheDocument()
+    // ...while every other section whose fact is absent mid-enrichment (pipeline, epidemiology,
+    // survival) shows its own pending state -- independently, not "not collected", not blanked.
+    expect(screen.getAllByTestId('fact-pending').length).toBeGreaterThanOrEqual(1)
     // ...and the page shell is present throughout: one slow section never blanks the page.
     expect(
       screen.getByRole('heading', { level: 1, name: /lung carcinoma/i }),

@@ -31,8 +31,9 @@ _in_flight: dict[str, asyncio.Task[None]] = {}
 
 _INTERACTIVE_TIMEOUT = 30.0
 _INTERACTIVE_ATTEMPTS = 2
-# Tighter than the drug's 90s: Open Targets is reliable and there is one source today.
-_ENRICH_DEADLINE = 60.0
+# Four sources now (Open Targets landscape + pipeline, Eurostat mortality, SEER survival), each
+# a few seconds; 90s leaves headroom for the slower stat endpoints without stalling the page.
+_ENRICH_DEADLINE = 90.0
 
 
 async def _enrich_in_background(disease_id: str, maker: async_sessionmaker[AsyncSession]) -> None:
@@ -47,12 +48,13 @@ async def _enrich_in_background(disease_id: str, maker: async_sessionmaker[Async
                 timeout=_INTERACTIVE_TIMEOUT, attempts=_INTERACTIVE_ATTEMPTS
             ) as client:
                 stats = CancerEnrichStats()
+                sources = await build_cancer_sources(session)
                 await asyncio.wait_for(
                     enrich_cancer(
                         session,
                         cancer,
                         client,
-                        build_cancer_sources(),
+                        sources,
                         stats,
                         commit_each=True,
                     ),
