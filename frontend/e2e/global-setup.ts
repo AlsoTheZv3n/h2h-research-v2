@@ -95,7 +95,18 @@ VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
             {"chembl_id":"CHEMBL_E2E_INPIPE","name":"E2E APPROVED DRUG","stage":"APPROVAL","modality":"Small molecule","mechanism":"E2E kinase inhibitor"},
             {"chembl_id":"CHEMBL_E2E_EXTERNAL","name":"E2E EXTERNAL DRUG","stage":"APPROVAL","modality":"Antibody","mechanism":null},
             {"chembl_id":"CHEMBL_E2E_CAND","name":"E2E CANDIDATE","stage":"PHASE_2","modality":"Small molecule","mechanism":null}]}'::jsonb,
-        'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now())
+        'ok', 'https://platform.opentargets.org/disease/MONDO_E2E_NSCLC', now()),
+       -- The trial-reality block (ClinicalTrials.gov, by condition). A TRUE count far above the
+       -- scanned sample (so the card's "over a sample" note is exercised), phase (with a combined
+       -- Phase-1/2 trial, so by_phase multi-count is proven) and status distributions, a
+       -- stopped-with-reasons count, and a query-side DACH count -- the whole card, DB -> API -> UI.
+       ('MONDO_E2E_NSCLC', 'trial_reality', 'clinicaltrials',
+        '{"condition":"E2E lung carcinoma","n_trials":8442,"n_trials_scanned":1000,
+          "by_phase":[{"phase":"PHASE1","count":283},{"phase":"PHASE2","count":440},{"phase":"PHASE3","count":120}],
+          "by_status":[{"status":"RECRUITING","count":153},{"status":"COMPLETED","count":362},{"status":"TERMINATED","count":143}],
+          "stopped":{"count":172,"reasons":[{"reason":"Slow accrual","count":12},{"reason":"Sponsor business decision","count":8}]},
+          "dach_recruiting":122}'::jsonb,
+        'ok', 'https://clinicaltrials.gov/search?cond=E2E+lung+carcinoma', now())
 ON CONFLICT (disease_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 

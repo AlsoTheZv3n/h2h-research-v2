@@ -120,6 +120,27 @@ test.describe('cancer catalog', () => {
     await expect(table).toContainText('E2E EXTERNAL DRUG')
   })
 
+  test('the trial-reality block shows the honest count, distributions and the DACH signal', async ({
+    page,
+  }) => {
+    // MONDO_E2E_NSCLC carries a seeded trial_reality fact (global-setup), so the block renders
+    // the real card from DB -> API -> UI without a live ClinicalTrials.gov fetch.
+    await page.goto('/cancers/MONDO_E2E_NSCLC')
+    const count = page.getByTestId('trial-count')
+    await expect(count).toBeVisible()
+    // The count reads as the TRUE total (8,442), never the scanned page -- with the sample noted.
+    await expect(count).toContainText('8,442')
+    await expect(page.getByTestId('trial-sample-note')).toContainText('1,000')
+    // Phase (rendered as counts, not shares) and status distributions.
+    await expect(page.getByTestId('trial-phase-distribution')).toContainText('Phase 2')
+    await expect(page.getByTestId('trial-status-distribution')).toContainText('Recruiting')
+    // The query-side DACH count and the stopped-with-reasons honesty angle.
+    await expect(page.getByTestId('trial-dach')).toContainText('122')
+    const stopped = page.getByTestId('trial-stopped')
+    await expect(stopped).toContainText('172')
+    await expect(stopped).toContainText('Slow accrual')
+  })
+
   test('the drug catalog still works, and its tab is active there', async ({ page }) => {
     // The expansion must not have broken the drug side.
     await page.goto('/')
