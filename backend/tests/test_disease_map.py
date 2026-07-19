@@ -58,6 +58,28 @@ class TestLoadDiseaseMap:
         # A second load upserts in place -- no duplicate rows (the PK is source+code).
         assert first == again == total
 
+    async def test_seer_survival_sites_extend_to_epi_only_entities(
+        self, session: AsyncSession
+    ) -> None:
+        await load(session)
+        await session.commit()
+        # Entities that had a Eurostat mortality site but no SEER survival site until the
+        # extension -> survival read "not available"; now they resolve to their own SEER site.
+        prostate = await _by_key(session, "seer", "66")
+        assert prostate is not None and prostate.mondo_id == "MONDO_0008315"
+        # Myeloma survival now resolves EXACT to its own site, not through the lymphoma rollup.
+        myeloma = await _by_key(session, "seer", "89")
+        assert myeloma is not None and myeloma.mondo_id == "MONDO_0009693"
+        # Hodgkin is mapped (no leukemia overlap)...
+        hodgkin = await _by_key(session, "seer", "83")
+        assert hodgkin is not None and hodgkin.mondo_id == "MONDO_0004952"
+        # ...but non-Hodgkin lymphoma is deliberately OMITTED: MONDO dual-classifies lymphoid
+        # leukemias (CLL, ALL) under BOTH leukemia and NHL, so an NHL site would tie them to
+        # UNMAPPED and silently drop their real leukemia survival. Guard against a re-add.
+        seer = (await load_source_maps(session))["seer"]
+        assert "MONDO_0018908" not in seer  # non-Hodgkin lymphoma
+        assert "MONDO_0005059" in seer  # leukemia kept -> CLL/ALL still roll up to survival
+
 
 class TestLoadSourceMaps:
     async def test_groups_by_source_by_mondo_and_skips_unmappable(

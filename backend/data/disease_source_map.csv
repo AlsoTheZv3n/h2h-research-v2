@@ -19,7 +19,7 @@ eurostat,C64,"Kidney, except renal pelvis (C64)",MONDO_0002367,"kidney cancer; r
 eurostat,C67,Bladder (C67),MONDO_0001187,urinary bladder cancer
 eurostat,C70-C72,Brain & central nervous system (C70-C72),MONDO_0002714,"CNS cancer; brain, brain glioma and glioblastoma roll up here (the narrower brain-cancer node excludes GBM)"
 eurostat,C73,Thyroid gland (C73),MONDO_0002108,
-eurostat,C81-C86,Hodgkin disease & lymphomas (C81-C86),MONDO_0005062,"lymphoma (Hodgkin + non-Hodgkin)"
+eurostat,C81-C86,Hodgkin disease & lymphomas (C81-C86),MONDO_0005062,"lymphoma (Hodgkin + non-Hodgkin). MONDO nests plasma cell myeloma under 'lymphoma', so myeloma rolls up to these figures for mortality (labelled as broader); Eurostat has no separate myeloma rate -- C90 sits in the unmappable C88_C90_C96 grab-bag"
 eurostat,C88_C90_C96,"Other lymphoid/haematopoietic (C88, C90, C96)",,"unmappable: an ICD grab-bag (myeloma C90 + immunoproliferative C88 + other C96) with no single MONDO entity -- a specific page must not claim these mixed figures"
 eurostat,C91-C95,Leukaemia (C91-C95),MONDO_0005059,"leukemia (all types)"
 seer,55,Breast,MONDO_0007254,
@@ -38,3 +38,11 @@ seer,53,Melanoma of the Skin,MONDO_0005105,cutaneous only (see the C43 note)
 seer,76,Brain and Other Nervous System,MONDO_0002714,"CNS cancer; GBM (SEER 661) resolves to its exact site via closest-wins"
 seer,661,Glioblastoma of the Brain and ONS,MONDO_0018177,"SEER carries a glioblastoma-specific site -> exact for glioblastoma"
 seer,40,Pancreas,MONDO_0009831,
+seer,3,Oral Cavity and Pharynx,MONDO_0005627,"head & neck; broader than the oral/pharynx sub-sites -- same over-claim as Eurostat C00-C14"
+seer,18,Stomach,MONDO_0001056,
+seer,61,Ovary,MONDO_0008170,
+seer,66,Prostate,MONDO_0008315,
+seer,71,Urinary Bladder (Invasive & In Situ),MONDO_0001187,
+seer,80,Thyroid,MONDO_0002108,
+seer,83,Hodgkin Lymphoma,MONDO_0004952,"Hodgkin lymphoma (no leukemia overlap). Non-Hodgkin lymphoma is deliberately NOT mapped: MONDO dual-classifies lymphoid leukemias (CLL, ALL) under BOTH leukemia and NHL, so an NHL site would tie them and drop their leukemia survival"
+seer,89,Myeloma,MONDO_0009693,"SEER carries a myeloma site -> exact survival for myeloma (Eurostat has no separate myeloma mortality)"

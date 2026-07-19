@@ -84,6 +84,22 @@ class TestResolve:
         r = resolve("MONDO_TIE", [BREAST, LUNG, ROOT], EUROSTAT, EUROSTAT_ANC)
         assert r.match_type is MatchType.UNMAPPED
 
+    def test_a_lymphoid_leukemia_keeps_its_leukemia_survival_because_nhl_is_unmapped(self) -> None:
+        # MONDO dual-classifies lymphoid leukemias (CLL, ALL) under BOTH leukemia AND non-Hodgkin
+        # lymphoma. If NHL were a mapped SEER category, such a cancer would hit two incomparable
+        # mapped ancestors -> a tie -> UNMAPPED, silently dropping its real leukemia survival.
+        cll, nhl = "MONDO_0004948", "MONDO_0018908"
+        # The real SEER map omits NHL, so leukemia is the only hit -> the CLL keeps its survival.
+        r = resolve(cll, [LEUKEMIA, nhl, ROOT], SEER, SEER_ANC)
+        assert r.match_type is MatchType.ROLLUP
+        assert r.source_code == "90"
+        # The contrapositive that justifies the omission: had NHL been mapped too, resolve() would
+        # see two incomparable leaves and (correctly, no silent pick) return UNMAPPED.
+        seer_with_nhl = {**SEER, nhl: ("86", "Non-Hodgkin Lymphoma")}
+        anc = {**SEER_ANC, nhl: frozenset()}
+        tied = resolve(cll, [LEUKEMIA, nhl, ROOT], seer_with_nhl, anc)
+        assert tied.match_type is MatchType.UNMAPPED
+
     def test_resolution_matches_ids_not_labels(self) -> None:
         # A map whose LABEL says "breast" but whose key is an unrelated MONDO. A cancer with
         # breast's real id (not in this map, no mapped ancestor) must be UNMAPPED -- proving
