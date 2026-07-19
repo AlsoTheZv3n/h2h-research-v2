@@ -27,6 +27,7 @@ from backend.services.briefs import BriefState
 from backend.services.cancer_briefs import get_or_start_cancer_brief
 
 OT = "https://api.platform.opentargets.org/api/v4/graphql"
+CTGOV = "https://clinicaltrials.gov/api/v2/studies"
 DISEASE = "MONDO_0005233"
 
 
@@ -65,6 +66,28 @@ def _landscape_response(*symbols: str) -> httpx.Response:
             }
         },
     )
+
+
+def _mock_ctgov(*, total: int, dach: int = 0, scanned: int = 3) -> None:
+    """Mock the trial-reality source's two CT.gov calls: the DACH sub-query (RECRUITING filter)
+    and the main condition page (a true totalCount + a small page of studies). With total=0 the
+    source returns EMPTY before the DACH call, so only the main call fires."""
+    studies = [
+        {
+            "protocolSection": {
+                "statusModule": {"overallStatus": "RECRUITING"},
+                "designModule": {"phases": ["PHASE2"]},
+            }
+        }
+        for _ in range(scanned)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if dict(request.url.params).get("filter.overallStatus") == "RECRUITING":
+            return httpx.Response(200, json={"totalCount": dach})
+        return httpx.Response(200, json={"totalCount": total, "studies": studies})
+
+    respx.get(CTGOV).mock(side_effect=handler)
 
 
 @pytest.fixture
@@ -112,6 +135,7 @@ class TestLazyFetch:
     ) -> None:
         """The feature: no upfront job, just open it and the target landscape arrives."""
         respx.post(OT).mock(return_value=_landscape_response("EGFR", "KRAS", "ALK"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         state = await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -147,6 +171,32 @@ class TestLazyFetch:
             assert cancer.last_enriched_at is not None
 
     @respx.mock
+    async def test_opening_a_never_enriched_cancer_produces_trial_reality(
+        self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
+    ) -> None:
+        """The trial-reality block arrives through the same lazy loop: the TRUE count (not the
+        scanned page) and the query-side DACH count land as an OK trial_reality fact."""
+        respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=8442, dach=122, scanned=3)
+        maker = async_sessionmaker(db_engine, expire_on_commit=False)
+
+        await get_or_start_cancer_brief(session, DISEASE, maker=maker)
+        await cancer_briefs._in_flight[DISEASE]
+
+        async with maker() as fresh:
+            rows = await CancerRepository(fresh).facts_for(DISEASE)
+            tr = {r.key: r for r in rows}.get("trial_reality")
+            assert tr is not None, "the trial-reality source never saved"
+            assert tr.source == "clinicaltrials"
+            assert tr.status is FactStatus.OK
+            assert tr.source_url and "clinicaltrials.gov" in tr.source_url
+            value = cast(dict[str, Any], tr.value)
+            # The count is the TRUE total, never the scanned page -- the "383 shown as 100" guard.
+            assert value["n_trials"] == 8442
+            assert value["n_trials_scanned"] == 3
+            assert value["dach_recruiting"] == 122
+
+    @respx.mock
     async def test_an_ot_outage_is_a_source_failed_fact_not_no_targets(
         self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
     ) -> None:
@@ -156,6 +206,7 @@ class TestLazyFetch:
         respx.post(OT).mock(
             return_value=httpx.Response(200, json={"errors": [{"message": "boom"}]})
         )
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -180,6 +231,7 @@ class TestLazyFetch:
         remapped). That is a lookup failure, not "no targets": no EMPTY fact is written,
         so the card never claims this cancer has zero druggable biology."""
         respx.post(OT).mock(return_value=httpx.Response(200, json={"data": {"disease": None}}))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -198,6 +250,7 @@ class TestLazyFetch:
         self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
     ) -> None:
         respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=0)  # one CT.gov call (EMPTY), so the per-enrich count is deterministic
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         states = await asyncio.gather(
@@ -206,19 +259,21 @@ class TestLazyFetch:
         assert all(s is BriefState.ENRICHING for s in states)
         assert len(cancer_briefs._in_flight) == 1
         await cancer_briefs._in_flight[DISEASE]
-        # The dedup that matters: ONE enrich, not five. One enrich makes exactly three OT calls
-        # here: landscape and pipeline query it directly; epidemiology and survival each need the
-        # cancer's ancestors, but SHARE one fetch via the per-run ancestor cache (then both
-        # resolve UNMAPPED against the unloaded disease map, so neither reaches Eurostat/SEER).
-        # Five enrichments would make five times this. (The in-flight dict length alone cannot
-        # catch a broken dedup -- five tasks under the same key still leave len == 1.)
-        assert respx.calls.call_count == 3
+        # The dedup that matters: ONE enrich, not five. One enrich makes exactly four external
+        # calls here: three to OT (landscape and pipeline directly; epidemiology and survival
+        # SHARE one ancestors fetch via the per-run cache, then both resolve UNMAPPED against the
+        # unloaded disease map, so neither reaches Eurostat/SEER) and one to CT.gov (the trial-
+        # reality condition query; total=0 returns EMPTY before the DACH sub-query). Five
+        # enrichments would make five times this. (The in-flight dict length alone cannot catch a
+        # broken dedup -- five tasks under the same key still leave len == 1.)
+        assert respx.calls.call_count == 4
 
     @respx.mock
     async def test_the_in_flight_marker_is_released(
         self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
     ) -> None:
         respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
         await cancer_briefs._in_flight[DISEASE]
@@ -236,6 +291,7 @@ class TestStaleWhileRevalidate:
     ) -> None:
         await self._set_enriched(session, days_ago=60)  # past the 30-day window
         respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         state = await get_or_start_cancer_brief(session, DISEASE, maker=maker)

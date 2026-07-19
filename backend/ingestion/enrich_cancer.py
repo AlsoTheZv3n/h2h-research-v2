@@ -23,13 +23,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
-from backend.ingestion import eurostat, seer
+from backend.ingestion import ctgov_cancer, eurostat, seer
 from backend.ingestion.base import Fact, SourceRecord, fact, failed, utcnow
 from backend.ingestion.http import build_client
 from backend.models import Cancer
@@ -728,6 +729,63 @@ def make_survival_source(
     return cancer_survival
 
 
+async def cancer_trial_reality(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
+    """Block D: the real registered-trial landscape from ClinicalTrials.gov v2, by condition.
+
+    Distinct from the pipeline block (an Open Targets drug roll-up): pipeline says which drugs are
+    in development for this cancer; trial reality says what trials actually exist and their state.
+    Queried by the cancer's NAME as condition text -- CT.gov keys diseases by condition string, not
+    MONDO -- so the match is soft, which the value owns via its `condition` field. Field paths and
+    the count/DACH design were verified live in the P1-T4.0 gate (issue #20); see ctgov_cancer.
+    """
+    source, key = "clinicaltrials", "trial_reality"
+    retrieved_at = utcnow()
+    condition = (cancer.name or "").strip()
+    url = f"https://clinicaltrials.gov/search?cond={quote(condition)}"
+    prov: dict[str, Any] = {"source_url": url, "retrieved_at": retrieved_at}
+    if not condition:
+        # A catalog row with no name -- nothing to query by. Skip (write no fact), the same
+        # lookup-miss branch the OT sources take: never a measured EMPTY ("no trials") for a
+        # cancer we could not even query.
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=False,
+            provenance=prov,
+            error="cancer has no name to query ClinicalTrials.gov by",
+        )
+    try:
+        data = await ctgov_cancer.fetch_trial_reality(client, condition)
+    except Exception as exc:
+        # Outage (network, 5xx, absent-count handled inside): the source failed, so its answer is
+        # unknown -- an amber source_failed fact, never "no trials".
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=False,
+            provenance=prov,
+            facts={key: failed(source, str(exc), source_url=url)},
+            error=str(exc),
+            outage=True,
+        )
+    if data is None:
+        # Resolved, zero registered trials -- a measured EMPTY, distinct from an outage.
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=True,
+            provenance=prov,
+            facts={key: fact(None, source, source_url=url, retrieved_at=retrieved_at)},
+        )
+    return SourceRecord(
+        source,
+        cancer.disease_id,
+        ok=True,
+        provenance=prov,
+        facts={key: fact(data, source, source_url=url, retrieved_at=retrieved_at)},
+    )
+
+
 async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
     """The cancer evidence sources, assembled. The disease-map-resolved sources (epidemiology,
     survival) capture their source's crosswalk, loaded once from the DB here."""
@@ -740,6 +798,7 @@ async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
         opentargets_pipeline,
         make_epidemiology_source(source_maps.get("eurostat", {}), ancestors_cache),
         make_survival_source(source_maps.get("seer", {}), ancestors_cache),
+        cancer_trial_reality,
     ]
 
 
