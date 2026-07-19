@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import utcnow
 from backend.ingestion.literature import Article, LiteratureRecord
-from backend.models import Cancer, Drug
+from backend.models import Cancer, Drug, Target
 from backend.repositories.literature import LiteratureRepository
 
 CHEMBL_ID = "CHEMBL_BOUNDARY"
@@ -32,6 +32,10 @@ CHEMBL_ID = "CHEMBL_BOUNDARY"
 # sweep must be able to fill, or it fails loudly (by design). The cancer detail carries
 # no abstract text today, but the sweep must cover it so it still does the day it might.
 DISEASE_ID = "MONDO_BOUNDARY"
+# A target for the sweep to reach: /targets/{ensembl_id} takes a path param it must be able
+# to fill, or it fails loudly. The target detail carries no abstract text today, but the sweep
+# must cover it so it still does the day it might.
+ENSEMBL_ID = "ENSG_BOUNDARY"
 
 # A sentence that exists nowhere else in this codebase, so finding it in a response
 # body can only mean it came out of the abstract table.
@@ -45,6 +49,9 @@ async def indexed_drug(session: AsyncSession) -> Drug:
     session.add(drug)
     # A catalog cancer so /cancers/{disease_id} is reachable by the route sweep below.
     session.add(Cancer(disease_id=DISEASE_ID, name="canary carcinoma", n_drugs=0, n_targets=0))
+    # A catalog target so /targets/{ensembl_id} is reachable too. last_enriched_at so the sweep
+    # reads a ready brief rather than firing a lazy enrichment at the real Open Targets.
+    session.add(Target(ensembl_id=ENSEMBL_ID, symbol="CANARY", last_enriched_at=utcnow()))
     await session.commit()
 
     await LiteratureRepository(session).save(
@@ -109,7 +116,11 @@ class TestNoAbstractTextIsServed:
         for path, operations in schema["paths"].items():
             if "get" not in operations:
                 continue
-            url = path.replace("{chembl_id}", CHEMBL_ID).replace("{disease_id}", DISEASE_ID)
+            url = (
+                path.replace("{chembl_id}", CHEMBL_ID)
+                .replace("{disease_id}", DISEASE_ID)
+                .replace("{ensembl_id}", ENSEMBL_ID)
+            )
             if "{" in url:
                 # A path param this sweep cannot fill. A FAILURE, not a silent skip:
                 # a future /abstracts/{pmid} must not slip through unchecked while the

@@ -206,3 +206,45 @@ class CancerDetail(BaseModel):
         "target absent here has no drug in OUR catalog, which is NOT 'unexploited' (the "
         "world's answer, from Open Targets); it just gets no link. Joined on Ensembl id.",
     )
+
+
+class TargetDetail(BaseModel):
+    """A target's evidence brief: the catalog row plus every fact we hold, with provenance.
+    The target-side twin of CancerDetail (the cancer page, run backwards).
+
+    `state` is not_analyzed until enrich_target has looked, enriching while it fetches, ready
+    once facts are stored -- never "ready with nothing", which would tell the reader a target
+    drives no cancers when the truth is we have not looked. `name` and `n_cancers` are null
+    until enriched (measured by the reverse query), never defaulted to 0.
+    """
+
+    ensembl_id: str
+    symbol: str
+    name: str | None = None
+    n_cancers: int | None = None
+    last_enriched_at: datetime | None = None
+
+    state: BriefState = BriefState.NOT_ANALYZED
+
+    refreshing: bool = False
+    """A READY brief whose facts aged past the freshness window, being revalidated in the
+    background (stale-while-revalidate). Stored facts are shown now; poll until it clears."""
+
+    facts: dict[str, list[SourcedFact]] = Field(
+        default_factory=dict,
+        description="Keyed by fact name (e.g. 'associated_cancers'); a list because sources "
+        "can disagree. Each carries its own source, status and provenance. Every cancer in the "
+        "associated_cancers fact is in our catalog by construction, so all are live links.",
+    )
+
+    unavailable: list[str] = Field(
+        default_factory=list,
+        description="Fact keys where every source failed. Hoisted so a client cannot mistake "
+        "an outage for an absence without looking.",
+    )
+
+    catalog_drugs: list[str] = Field(
+        default_factory=list,
+        description="ChEMBL ids of drugs in OUR catalog that act on this target (joined on the "
+        "Ensembl id). An empty list is 'no such drug in our catalog', NOT 'undruggable'.",
+    )

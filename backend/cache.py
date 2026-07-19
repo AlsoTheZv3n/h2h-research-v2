@@ -64,6 +64,26 @@ async def invalidate_cancer_detail(disease_id: str) -> None:
         logger.warning("cancer detail cache invalidation failed for %s: %s", disease_id, exc)
 
 
+# The target brief has its own shape and its own version, so a change to one entity's brief
+# cannot strand entries of another. v1: the first target detail -- associated_cancers (the
+# Open Targets reverse query, filtered to our cancer catalog) plus the drugs our catalog holds
+# against the target.
+_TARGET_DETAIL_SCHEMA_VERSION = "v1"
+
+
+def target_detail_cache_key(ensembl_id: str) -> str:
+    """The target-side twin of detail_cache_key."""
+    return f"target:detail:{_TARGET_DETAIL_SCHEMA_VERSION}:{ensembl_id}"
+
+
+async def invalidate_target_detail(ensembl_id: str) -> None:
+    """Drop a target's cached brief. Best-effort, like invalidate_detail."""
+    try:
+        await get_redis().delete(target_detail_cache_key(ensembl_id))
+    except Exception as exc:
+        logger.warning("target detail cache invalidation failed for %s: %s", ensembl_id, exc)
+
+
 async def close_redis() -> None:
     global _client
     if _client is not None:
