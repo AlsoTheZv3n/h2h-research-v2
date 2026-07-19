@@ -1,16 +1,19 @@
 import type { ReactNode } from 'react'
 
 export function Card({
+  id,
   title,
   children,
   note,
 }: {
+  /** Anchor target for the section nav. `scroll-mt` keeps the title clear of a sticky nav. */
+  id?: string
   title: string
   children: ReactNode
   note?: string
 }) {
   return (
-    <section className="rounded-lg border border-line bg-card p-4">
+    <section id={id} className="scroll-mt-20 rounded-lg border border-line bg-card p-4">
       <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
       {note && <p className="mt-0.5 text-xs text-ink-faint">{note}</p>}
       <div className="mt-2">{children}</div>

@@ -4,7 +4,7 @@ import type { PipelineData, SourcedFact } from '../api/types'
 import { formatCount } from '../format'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
-import { useBriefState } from './Fact'
+import { FactGate } from './FactGate'
 
 // Open Targets' maxClinicalStage enum, in human words. Most advanced first is the order
 // the backend already sorts by.
@@ -37,62 +37,32 @@ const PAGE_STEP = 25
  * chip, never an empty pipeline.
  */
 export function PipelineCard({
+  id,
   facts,
   catalogDrugIds,
 }: {
+  id?: string
   facts?: SourcedFact[]
   catalogDrugIds: string[]
 }) {
-  const briefState = useBriefState()
-  const fact = facts?.[0]
-
-  if (!fact) {
-    return (
-      <Card title="Pipeline">
-        {briefState !== 'ready' ? (
-          <p data-testid="fact-pending" className="text-sm text-ink-faint italic">
-            Waiting for sources…
-          </p>
-        ) : (
-          <p data-testid="fact-not-collected" className="text-sm text-ink-faint italic">
-            Not collected
-          </p>
-        )}
-      </Card>
-    )
-  }
-
-  if (fact.status === 'source_failed') {
-    return (
-      <Card title="Pipeline">
-        <p
-          data-testid="fact-source-failed"
-          className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
-                     text-xs font-medium text-partial"
-          title={fact.error ?? undefined}
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
-          {fact.source} unavailable
-        </p>
-      </Card>
-    )
-  }
-
-  const data = fact.value as PipelineData | null
-  if (fact.status === 'empty' || !data || !data.drugs?.length) {
-    return (
-      <Card title="Pipeline">
-        <p className="text-sm text-ink-faint">
-          No drug programmes indicated for this cancer
-          <CitationChip fact={fact} />
-        </p>
-      </Card>
-    )
-  }
-
   return (
-    <Card title="Pipeline">
-      <PipelineBody data={data} catalogDrugIds={catalogDrugIds} fact={fact} />
+    <Card id={id} title="Pipeline">
+      <FactGate facts={facts}>
+        {(fact) => {
+          const data = fact.value as PipelineData | null
+          // An outage never reaches here (FactGate renders the amber chip); this is the
+          // real empty -- the source looked and there is no programme -- carrying its chip.
+          if (fact.status === 'empty' || !data || !data.drugs?.length) {
+            return (
+              <p className="text-sm text-ink-faint">
+                No drug programmes indicated for this cancer
+                <CitationChip fact={fact} />
+              </p>
+            )
+          }
+          return <PipelineBody data={data} catalogDrugIds={catalogDrugIds} fact={fact} />
+        }}
+      </FactGate>
     </Card>
   )
 }

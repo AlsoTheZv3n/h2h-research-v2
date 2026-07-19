@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { getCancer, retryCancer } from '../api/client'
 import type { CancerDetail, TargetLandscape } from '../api/types'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { BriefStateProvider } from '../components/Fact'
-import { PipelineCard } from '../components/PipelineCard'
+import { SectionErrorBoundary } from '../components/SectionErrorBoundary'
+import { SectionNav } from '../components/SectionNav'
 import { SourceAdvisory } from '../components/SourceAdvisory'
-import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
 import { formatCount } from '../format'
+import { CANCER_SECTIONS } from './cancerSections'
 
 // Long enough not to hammer the API, short enough that a finished enrichment shows up
 // while the reader is still looking. Same cadence as the drug page.
@@ -64,6 +65,22 @@ export function CancerDetailPage() {
     }
   }, [diseaseId])
 
+  // Deep-link to a section: /cancers/MONDO_x#pipeline. The router does not scroll to a hash
+  // on its own, and the target section does not exist until `detail` renders -- so this runs
+  // again once data lands (detail in deps), when the anchor is finally in the DOM. But it must
+  // scroll only ONCE per hash: `detail` changes on every 2s poll while the brief enriches, and
+  // re-scrolling on each tick would yank a reader who has since scrolled away back to the
+  // anchor. The ref records the hash already honoured so later poll re-renders are no-ops.
+  const { hash } = useLocation()
+  const scrolledForHash = useRef<string | null>(null)
+  useEffect(() => {
+    if (!hash || scrolledForHash.current === hash) return
+    const target = document.getElementById(hash.slice(1))
+    if (!target) return // section not in the DOM yet; the next render (data landing) retries
+    target.scrollIntoView()
+    scrolledForHash.current = hash
+  }, [hash, detail])
+
   if (error) {
     return (
       <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
@@ -87,56 +104,60 @@ export function CancerDetailPage() {
 
   return (
     <BriefStateProvider value={detail.state}>
-      <article>
-        <nav className="mb-3 text-xs">
-          <Link to="/cancers" className="text-accent hover:underline">
-            ← All cancers
-          </Link>
-        </nav>
+      <article className="lg:grid lg:grid-cols-[11rem_1fr] lg:gap-8">
+        <SectionNav sections={CANCER_SECTIONS} />
 
-        <header className="mb-1 flex flex-wrap items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight text-ink">{detail.name}</h1>
-          <span className="font-mono text-xs text-ink-faint">{detail.disease_id}</span>
-          {detail.therapeutic_area && (
-            <span className="text-xs text-ink-faint">{detail.therapeutic_area}</span>
-          )}
-          {detail.refreshing && (
-            <span data-testid="refreshing" className="text-xs text-ink-faint italic">
-              refreshing…
-            </span>
-          )}
-        </header>
+        <div>
+          <nav className="mb-3 text-xs">
+            <Link to="/cancers" className="text-accent hover:underline">
+              ← All cancers
+            </Link>
+          </nav>
 
-        {/* Non-clinical disclaimer: this shows treatment evidence, not treatment advice. */}
-        <p className="mb-4 text-[11px] text-ink-faint" data-testid="non-clinical-disclaimer">
-          A research and drug-intelligence view of the evidence and trial record — not clinical
-          decision support, and not medical advice.
-        </p>
+          <header className="mb-1 flex flex-wrap items-baseline gap-3">
+            <h1 className="text-xl font-semibold tracking-tight text-ink">{detail.name}</h1>
+            <span className="font-mono text-xs text-ink-faint">{detail.disease_id}</span>
+            {detail.therapeutic_area && (
+              <span className="text-xs text-ink-faint">{detail.therapeutic_area}</span>
+            )}
+            {detail.refreshing && (
+              <span data-testid="refreshing" className="text-xs text-ink-faint italic">
+                refreshing…
+              </span>
+            )}
+          </header>
 
-        <AnalyzingNotice state={detail.state} />
+          {/* Non-clinical disclaimer: this shows treatment evidence, not treatment advice. */}
+          <p className="mb-4 text-[11px] text-ink-faint" data-testid="non-clinical-disclaimer">
+            A research and drug-intelligence view of the evidence and trial record — not clinical
+            decision support, and not medical advice.
+          </p>
 
-        {detail.unavailable.length > 0 && <SourceAdvisory onRetry={retry} retrying={retrying} />}
+          <AnalyzingNotice state={detail.state} />
 
-        <dl className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
-          <Stat label="Drugs & clinical candidates" value={formatCount(detail.n_drugs)} />
-          <TargetsStat strong={tl?.n_strong} threshold={tl?.threshold} total={detail.n_targets} />
-        </dl>
+          {detail.unavailable.length > 0 && <SourceAdvisory onRetry={retry} retrying={retrying} />}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <PipelineCard
-            facts={detail.facts['pipeline']}
-            catalogDrugIds={detail.catalog_drug_ids}
-          />
-          <TargetLandscapeCard
-            facts={detail.facts['target_landscape']}
-            catalogDrugByTarget={detail.target_catalog_drug}
-          />
+          <dl className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
+            <Stat label="Drugs & clinical candidates" value={formatCount(detail.n_drugs)} />
+            <TargetsStat strong={tl?.n_strong} threshold={tl?.threshold} total={detail.n_targets} />
+          </dl>
+
+          {/* Each section loads and fails on its own: it renders its own honest state from its
+              fact slice, and an error boundary keeps a render throw in one from blanking the
+              rest. Order, labels and anchors all come from the CANCER_SECTIONS registry. */}
+          <div className="space-y-4">
+            {CANCER_SECTIONS.map((s) => (
+              <SectionErrorBoundary key={s.id} id={s.id} title={s.label}>
+                {s.render(detail)}
+              </SectionErrorBoundary>
+            ))}
+          </div>
+
+          <p className="mt-4 text-[11px] text-ink-faint">
+            Target landscape from Open Targets (CC0). Pipeline, trial reality and biomarker
+            evidence are the next blocks. H2H surfaces evidence; it does not predict or advise.
+          </p>
         </div>
-
-        <p className="mt-4 text-[11px] text-ink-faint">
-          Target landscape from Open Targets (CC0). Pipeline, trial reality and biomarker evidence
-          are the next blocks. H2H surfaces evidence; it does not predict or advise.
-        </p>
       </article>
     </BriefStateProvider>
   )

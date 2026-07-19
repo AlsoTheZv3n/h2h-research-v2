@@ -1,6 +1,6 @@
 import type { PotencySummary, SourcedFact } from '../api/types'
 import { CitationChip } from './CitationChip'
-import { useBriefState } from './Fact'
+import { FactGate } from './FactGate'
 import { Card, NotApplicable } from './Card'
 import { formatNm } from '../format'
 
@@ -20,7 +20,6 @@ export function PotencyCard({
   facts?: SourcedFact[]
   isBiologic: boolean
 }) {
-  const briefState = useBriefState()
   if (isBiologic) {
     return (
       <Card title="Binding & potency">
@@ -29,58 +28,25 @@ export function PotencyCard({
     )
   }
 
-  const fact = facts?.[0]
+  return (
+    <Card title="Binding & potency" note="On-target IC50, excluding off-target assays">
+      <FactGate facts={facts}>{(fact) => <PotencyBody fact={fact} />}</FactGate>
+    </Card>
+  )
+}
 
-  if (!fact) {
-    // Absent means two opposite things, and only the brief's state tells them apart.
-    // This card branched on presence alone, so every not-yet-enriched drug -- which
-    // is every catalog drug on first open -- was told "not collected": a measured
-    // absence asserted before anyone had measured.
-    return (
-      <Card title="Binding & potency">
-        {briefState !== 'ready' ? (
-          <p data-testid="fact-pending" className="text-sm text-ink-faint italic">
-            Waiting for sources…
-          </p>
-        ) : (
-          <p data-testid="fact-not-collected" className="text-sm text-ink-faint italic">
-            Not collected
-          </p>
-        )}
-      </Card>
-    )
-  }
-
-  if (fact.status === 'source_failed') {
-    return (
-      <Card title="Binding & potency">
-        <p
-          data-testid="fact-source-failed"
-          className="inline-flex items-center gap-1.5 rounded bg-partial-bg px-1.5 py-0.5
-                     text-xs font-medium text-partial"
-          title={fact.error ?? undefined}
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-partial" />
-          {fact.source} unavailable
-        </p>
-      </Card>
-    )
-  }
-
+/** The measured potency, once a fact is present and the source did not fail. */
+function PotencyBody({ fact }: { fact: SourcedFact }) {
   const summary = fact.value as PotencySummary | null
   if (!summary) {
-    return (
-      <Card title="Binding & potency">
-        <p className="text-sm text-ink-faint">No activities found</p>
-      </Card>
-    )
+    return <p className="text-sm text-ink-faint">No activities found</p>
   }
 
   const discarded = summary.n_activities - summary.n_exact
   const offTarget = Object.entries(summary.off_target).sort((a, b) => b[1] - a[1])
 
   return (
-    <Card title="Binding & potency" note="On-target IC50, excluding off-target assays">
+    <>
       {summary.median_nm === null ? (
         // The honest case: without a known target there is no on/off-target split,
         // so no potency gets quoted. Reported, not silently averaged over everything.
@@ -147,6 +113,6 @@ export function PotencyCard({
           </ul>
         </details>
       )}
-    </Card>
+    </>
   )
 }
