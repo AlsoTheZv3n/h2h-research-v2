@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
 from backend.ingestion.base import utcnow
+from backend.ingestion.load_disease_map import load as load_disease_map
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,13 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     async with get_sessionmaker()() as session:
         drugs, facts = await seed(session)
-    print(f"seeded {drugs} drugs and {facts} facts from {FIXTURE.name}")
+        # The disease source->MONDO crosswalk is reference data, not a demo fixture, but this is
+        # the DB-setup hook every environment runs -- so load it here (idempotent) so the
+        # epidemiology and survival sources can actually resolve a cancer to Eurostat/SEER
+        # rather than reporting everything "not available" against an empty table.
+        crosswalk = await load_disease_map(session)
+        await session.commit()
+    print(f"seeded {drugs} drugs, {facts} facts, {crosswalk} disease-map rows from {FIXTURE.name}")
 
 
 if __name__ == "__main__":
