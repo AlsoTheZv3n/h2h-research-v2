@@ -53,7 +53,9 @@ test.describe('cancer catalog', () => {
       .getByTestId('facet-therapeutic-area')
       .locator('option')
       .filter({ hasText: /\(\d+\)/ })
-    expect(await counted.count()).toBeGreaterThan(0)
+    // Web-first + auto-retrying: the counts and the area options both come from SEPARATE fetches
+    // than the rows, so a one-shot count() could read 0 before they land. not.toHaveCount(0) waits.
+    await expect(counted).not.toHaveCount(0)
   })
 
   test('a row opens the cancer page, with the non-clinical disclaimer', async ({ page }) => {

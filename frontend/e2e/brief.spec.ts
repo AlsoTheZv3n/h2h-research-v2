@@ -94,7 +94,9 @@ test.describe('overview', () => {
       .getByTestId('facet-modality')
       .locator('option')
       .filter({ hasText: /\(\d+\)/ })
-    expect(await counted.count()).toBeGreaterThan(0)
+    // Web-first + auto-retrying: the counts arrive from a SEPARATE /drugs/facets fetch than the
+    // rows, so a one-shot count() could read 0 before it lands. not.toHaveCount(0) waits it out.
+    await expect(counted).not.toHaveCount(0)
   })
 
   test('a row click opens that drug’s brief', async ({ page }) => {
