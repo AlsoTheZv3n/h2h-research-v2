@@ -135,6 +135,7 @@ class TestLazyFetch:
     ) -> None:
         """The feature: no upfront job, just open it and the target landscape arrives."""
         respx.post(OT).mock(return_value=_landscape_response("EGFR", "KRAS", "ALK"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         state = await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -205,6 +206,7 @@ class TestLazyFetch:
         respx.post(OT).mock(
             return_value=httpx.Response(200, json={"errors": [{"message": "boom"}]})
         )
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -229,6 +231,7 @@ class TestLazyFetch:
         remapped). That is a lookup failure, not "no targets": no EMPTY fact is written,
         so the card never claims this cancer has zero druggable biology."""
         respx.post(OT).mock(return_value=httpx.Response(200, json={"data": {"disease": None}}))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
@@ -270,6 +273,7 @@ class TestLazyFetch:
         self, session: AsyncSession, catalogued: None, db_engine: AsyncEngine
     ) -> None:
         respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
         await get_or_start_cancer_brief(session, DISEASE, maker=maker)
         await cancer_briefs._in_flight[DISEASE]
@@ -287,6 +291,7 @@ class TestStaleWhileRevalidate:
     ) -> None:
         await self._set_enriched(session, days_ago=60)  # past the 30-day window
         respx.post(OT).mock(return_value=_landscape_response("EGFR"))
+        _mock_ctgov(total=0)  # the 5th source; mock it so respx's guard is not defeated
         maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
         state = await get_or_start_cancer_brief(session, DISEASE, maker=maker)

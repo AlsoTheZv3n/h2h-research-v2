@@ -93,6 +93,25 @@ class TestFetchTrialReality:
         assert data["stopped"]["reasons"] == [{"reason": "Slow accrual", "count": 2}]
 
     @respx.mock
+    async def test_by_phase_counts_a_combined_design_trial_in_each_phase(self) -> None:
+        # phases is multi-valued: a Phase 1/2 trial counts in BOTH PHASE1 and PHASE2 -- by design,
+        # so by_phase is trials-per-phase (not a partition) and can sum above n_trials_scanned.
+        combined = {
+            "protocolSection": {
+                "statusModule": {"overallStatus": "RECRUITING"},
+                "designModule": {"phases": ["PHASE1", "PHASE2"]},
+            }
+        }
+        _route(2, [combined, _study("RECRUITING", phase="PHASE2")])
+        data = await _fetch()
+        assert data is not None
+        assert data["n_trials_scanned"] == 2
+        by_phase = {d["phase"]: d["count"] for d in data["by_phase"]}
+        assert by_phase == {"PHASE1": 1, "PHASE2": 2}
+        # Not a partition: the combined trial is counted in both phases, so the sum exceeds scanned.
+        assert sum(by_phase.values()) == 3 > data["n_trials_scanned"]
+
+    @respx.mock
     async def test_zero_trials_returns_none_for_empty(self) -> None:
         _route(0, [])
         assert await _fetch() is None

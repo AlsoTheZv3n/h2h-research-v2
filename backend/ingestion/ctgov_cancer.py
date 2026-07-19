@@ -129,6 +129,10 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
     stopped = 0
     for s in studies:
         ps = s.get("protocolSection") or {}
+        # `phases` is a multi-valued array: a combined-design trial (e.g. ["PHASE1","PHASE2"], very
+        # common in oncology) counts in EACH of its phases. So by_phase is trials-PER-phase and
+        # need NOT sum to n_trials_scanned -- unlike by_status, whose overallStatus is single-valued
+        # and partitions the page. The card must render by_phase as counts, never as shares.
         for ph in (ps.get("designModule") or {}).get("phases") or []:
             phases[ph] += 1
         sm = ps.get("statusModule") or {}
