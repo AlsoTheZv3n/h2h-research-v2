@@ -154,8 +154,9 @@ export function CancerDetailPage() {
           </div>
 
           <p className="mt-4 text-[11px] text-ink-faint">
-            Target landscape from Open Targets (CC0). Pipeline, trial reality and biomarker
-            evidence are the next blocks. H2H surfaces evidence; it does not predict or advise.
+            Target landscape and pipeline from Open Targets (CC0), epidemiology from Eurostat,
+            survival from SEER, trial reality from ClinicalTrials.gov. The molecular profile is the
+            next block. H2H surfaces evidence; it does not predict or advise.
           </p>
         </div>
       </article>

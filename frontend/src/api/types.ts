@@ -367,3 +367,46 @@ export interface Survival extends Resolved {
   all_stages: { rate: number; ci_low: number | null; ci_high: number | null; n: number | null }
   by_stage: SurvivalStage[]
 }
+
+/** One phase bucket of a trial-reality fact. NB: a combined-design trial (e.g. Phase 1/2) counts
+ *  in EACH of its phases, so by_phase is trials-PER-phase and need not sum to n_trials_scanned --
+ *  render it as counts, never as shares. */
+export interface TrialPhase {
+  phase: string
+  count: number
+}
+
+/** One overall-status bucket. overallStatus is single-valued, so by_status partitions the page. */
+export interface TrialStatus {
+  status: string
+  count: number
+}
+
+/** One stated reason a trial stopped (whyStopped), with how many stopped trials gave it. */
+export interface TrialStopReason {
+  reason: string
+  count: number
+}
+
+/**
+ * The trial-reality fact's value: the real registered-trial landscape from ClinicalTrials.gov,
+ * queried by CONDITION TEXT (a soft match — `condition` is the exact text queried, so the card
+ * owns "trials mentioning this condition", not "trials of this cancer").
+ *
+ * `n_trials` is the TRUE total (countTotal); `by_phase`/`by_status`/`stopped` are distributions
+ * over the scanned page — a SAMPLE of n_trials for a big cancer, so `n_trials_scanned` travels
+ * beside it and the card labels the distribution as over a sample. The two nullables carry
+ * their own honest sub-state, and neither ever means zero:
+ *   n_trials null       — the count is unavailable (the source returned a page but no total).
+ *                         A true zero is an EMPTY fact, never a value, so null is unambiguous.
+ *   dach_recruiting null — the DACH sub-query failed (unknown), distinct from a real 0.
+ */
+export interface TrialReality {
+  condition: string
+  n_trials: number | null
+  n_trials_scanned: number
+  by_phase: TrialPhase[]
+  by_status: TrialStatus[]
+  stopped: { count: number; reasons: TrialStopReason[] }
+  dach_recruiting: number | null
+}

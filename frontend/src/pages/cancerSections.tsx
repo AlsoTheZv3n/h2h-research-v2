@@ -4,6 +4,7 @@ import { EpidemiologyCard } from '../components/EpidemiologyCard'
 import { PipelineCard } from '../components/PipelineCard'
 import { SurvivalCard } from '../components/SurvivalCard'
 import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
+import { TrialRealityCard } from '../components/TrialRealityCard'
 
 /**
  * One content section of the cancer detail page.
@@ -30,6 +31,11 @@ export const CANCER_SECTIONS: CancerSection[] = [
     render: (d) => (
       <PipelineCard id="pipeline" facts={d.facts['pipeline']} catalogDrugIds={d.catalog_drug_ids} />
     ),
+  },
+  {
+    id: 'trial-reality',
+    label: 'Trial reality',
+    render: (d) => <TrialRealityCard id="trial-reality" facts={d.facts['trial_reality']} />,
   },
   {
     id: 'target-landscape',
