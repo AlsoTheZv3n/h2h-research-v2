@@ -1,6 +1,6 @@
 # Data sources and attribution
 
-H2H aggregates evidence from four open databases. None requires a login or an API
+H2H aggregates evidence from six open databases. None requires a login or an API
 key. Every fact stored carries its `source_url` and `retrieved_at`, and the UI shows
 both on the citation chip beside the value — attribution is per fact, not just per
 project.
@@ -36,6 +36,33 @@ Drug modality, maximum clinical stage, mechanisms, targets, indications. Release
 into the public domain, attribution requested as good practice.
 
 Cite: Ochoa D, et al. *The Open Targets Platform.* Nucleic Acids Res.
+
+## Eurostat — EU reuse policy (source acknowledged)
+
+<https://ec.europa.eu/eurostat/>
+
+Age-standardised cancer mortality by country (dataset `hlth_cd_asdr2`), for the cancer
+epidemiology block. Eurostat data is free to reuse, commercially and non-commercially,
+provided the source is acknowledged (Commission Decision 2011/833/EU).
+
+> Eurostat has a policy of encouraging free re-use of its data, both for non-commercial
+> and commercial purposes.
+
+The block shows European **mortality** (deaths), not incidence: the global-incidence
+sources (GLOBOCAN, IHME-GBD, CI5) are all-rights-reserved or non-redistributable, so they
+are not used.
+
+## SEER — U.S. public domain
+
+<https://seer.cancer.gov/>
+
+Five-year relative survival by stage, for the cancer survival block, read from the published
+SEER\*Explorer statistics. SEER is a program of the U.S. National Cancer Institute; its
+published statistics are U.S. government works with no restriction on reuse. (This is the
+open aggregate output, not the access-controlled SEER research microdata.)
+
+Statistics courtesy of the U.S. National Cancer Institute; this project is not affiliated
+with or endorsed by the NCI, NIH or HHS.
 
 ## PubMed / NCBI E-utilities — read locally, never redistributed
 

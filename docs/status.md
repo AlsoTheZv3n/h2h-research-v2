@@ -27,7 +27,8 @@ Live on `main` (all merged):
 
 **Tags:** **`v2.0.0`** — "the cancer entity" — is the current release, tagged on the merged cancer
 expansion (Phase-0 spike → catalog → Gate 1 → Block C → Blocks A/B → SEER extension); `v1.0.0` was the
-drug-only app. Since v2.0.0, `main` also carries the change-feed (#30, PR #46) and the R4 follow-ups.
+drug-only app. Since v2.0.0, `main` also carries the change-feed (#30, PR #46); the R4 follow-ups
+(#31–33) are in the open PR that also carries this update, not yet on `main`.
 
 **Deploy note (not code):** run `python -m backend.refresh --once` after deploy so already-enriched
 cancers pick up their epidemiology/survival facts (or they read "not collected" until the next stale
@@ -120,12 +121,16 @@ Mirrors the README's known-gaps section, in more detail (the README refresh **#3
 
 ## Reconciliation — how the plan differed from reality
 
-The last planning list treated much of the cancer work as blocked/to-do. Verified against the repo:
+*Snapshot from when this map was first written (at #45). Later merges are tracked in "The order to work
+in" above, not here — so the "open"/"done" states below read as of that point, not today.*
+
+The last planning list treated much of the cancer work as blocked/to-do. Verified against the repo at
+the time:
 
 - **Done and merged (not open work):** R3 (#18), R4 flag (#19), Gate 1 (#25), Block C (#26), Blocks A/B
   epidemiology + survival (#27), SEER extension (#28). The "blocked by the R3 PR" / "Phase 2-B to build"
   framing is stale.
-- **Only one PR is open:** #29 (the backlog spike).
+- **One PR was open then:** #29 (the backlog spike) — since merged.
 - **P1-T4 (trial reality)** already had issues #20–24 from an earlier session — reused, not recreated.
 - **`phase-d-chat` branch** is 0 commits ahead of `main` (fully merged) — a deletable leftover, no lost
   work.
