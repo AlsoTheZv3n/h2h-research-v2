@@ -4,6 +4,8 @@ ASR, the EU aggregate read separately, absolute deaths a single EU headline."""
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 import respx
 
@@ -56,7 +58,7 @@ _ARO = {
 }
 
 
-def _mock(asdr2: dict = _ASDR2, aro: dict | None = _ARO) -> None:
+def _mock(asdr2: dict[str, Any] = _ASDR2, aro: dict[str, Any] | None = _ARO) -> None:
     respx.get(url__startswith=f"{API}/hlth_cd_asdr2").mock(
         return_value=httpx.Response(200, json=asdr2)
     )

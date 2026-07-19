@@ -476,10 +476,22 @@ async def opentargets_pipeline(client: httpx.AsyncClient, cancer: Cancer) -> Sou
 _ANCESTORS_QUERY = "query A($id: String!) { disease(efoId: $id) { id ancestors } }"
 
 
+class _DiseaseNotResolved(Exception):
+    """Open Targets answered but does not resolve this disease id (deprecated / remapped across
+    releases). NOT an outage, and NOT "unmapped": a lookup miss the sources must skip, exactly as
+    opentargets_target_landscape and opentargets_pipeline do -- never a settled "not available"."""
+
+
 async def _fetch_ancestors(client: httpx.AsyncClient, disease_id: str) -> list[str]:
-    """The cancer's MONDO ancestors from Open Targets -- the ontology path resolve() walks."""
+    """The cancer's MONDO ancestors from Open Targets -- the ontology path resolve() walks.
+
+    A disease OT cannot resolve raises _DiseaseNotResolved: its empty ancestry must not be read
+    as "no mapped category" (UNMAPPED), which would assert availability we never determined."""
     data = await _gql(client, _ANCESTORS_QUERY, {"id": disease_id})
-    return ((data.get("disease") or {}).get("ancestors")) or []
+    disease = data.get("disease")
+    if disease is None:
+        raise _DiseaseNotResolved(disease_id)
+    return disease.get("ancestors") or []
 
 
 async def _fetch_mapped_ancestors(
@@ -498,15 +510,25 @@ async def _fetch_mapped_ancestors(
 
 
 async def _resolve_cancer(
-    client: httpx.AsyncClient, disease_id: str, source_map: SourceMap
+    client: httpx.AsyncClient,
+    disease_id: str,
+    source_map: SourceMap,
+    ancestors_cache: dict[str, list[str]],
 ) -> Resolution:
     """Resolve one cancer against one source's map, fetching only the ontology it needs: nothing
     for an exact match, the cancer's ancestors otherwise, and the hits' ancestors only when two
-    or more mapped ancestors must be disambiguated. resolve() remains the single decision point."""
+    or more mapped ancestors must be disambiguated. resolve() remains the single decision point.
+
+    `ancestors_cache` is shared across the sources of one enrichment run, so a cancer's ancestors
+    are fetched from Open Targets ONCE even though both the epidemiology and survival sources
+    resolve it (against different maps)."""
     if disease_id in source_map:
         code, label = source_map[disease_id]
         return Resolution(MatchType.EXACT, disease_id, code, label)
-    ancestors = await _fetch_ancestors(client, disease_id)
+    ancestors = ancestors_cache.get(disease_id)
+    if ancestors is None:
+        ancestors = await _fetch_ancestors(client, disease_id)
+        ancestors_cache[disease_id] = ancestors
     hits = [a for a in ancestors if a in source_map]
     mapped_ancestors: dict[str, frozenset[str]] = {}
     if len(hits) >= 2:
@@ -533,10 +555,25 @@ def _unmapped_fact(source: str, retrieved_at: datetime) -> Fact:
     return fact({"match_type": MatchType.UNMAPPED.value}, source, retrieved_at=retrieved_at)
 
 
+def _not_resolved_record(source: str, disease_id: str, prov: dict[str, Any]) -> SourceRecord:
+    """A cancer whose id Open Targets does not resolve: a lookup miss, so NO fact is written --
+    the same skip opentargets_target_landscape / opentargets_pipeline make -- never a settled
+    "not available for this cancer" (which UNMAPPED asserts) for an id we could not look up."""
+    return SourceRecord(
+        source,
+        disease_id,
+        ok=False,
+        provenance=prov,
+        error="Open Targets did not resolve this disease id",
+    )
+
+
 _EUROSTAT_URL = "https://ec.europa.eu/eurostat/databrowser/view/hlth_cd_asdr2/default/table"
 
 
-def make_epidemiology_source(source_map: SourceMap) -> CancerSource:
+def make_epidemiology_source(
+    source_map: SourceMap, ancestors_cache: dict[str, list[str]]
+) -> CancerSource:
     """Block A: European mortality (Eurostat), attached via the disease map's eurostat vocab."""
 
     async def cancer_epidemiology(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
@@ -544,7 +581,11 @@ def make_epidemiology_source(source_map: SourceMap) -> CancerSource:
         retrieved_at = utcnow()
         prov: dict[str, Any] = {"source_url": _EUROSTAT_URL, "retrieved_at": retrieved_at}
         try:
-            resolution = await _resolve_cancer(client, cancer.disease_id, source_map)
+            resolution = await _resolve_cancer(
+                client, cancer.disease_id, source_map, ancestors_cache
+            )
+        except _DiseaseNotResolved:
+            return _not_resolved_record(source, cancer.disease_id, prov)
         except Exception as exc:
             # We could not even resolve the cancer (Open Targets ancestry fetch failed): an
             # outage, so an amber source_failed fact -- never a silent "not available".
@@ -609,7 +650,9 @@ def _seer_url(site: int) -> str:
     )
 
 
-def make_survival_source(source_map: SourceMap) -> CancerSource:
+def make_survival_source(
+    source_map: SourceMap, ancestors_cache: dict[str, list[str]]
+) -> CancerSource:
     """Block B: SEER 5-year relative survival, attached via the disease map's seer vocab."""
 
     async def cancer_survival(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
@@ -617,7 +660,11 @@ def make_survival_source(source_map: SourceMap) -> CancerSource:
         retrieved_at = utcnow()
         prov: dict[str, Any] = {"retrieved_at": retrieved_at}
         try:
-            resolution = await _resolve_cancer(client, cancer.disease_id, source_map)
+            resolution = await _resolve_cancer(
+                client, cancer.disease_id, source_map, ancestors_cache
+            )
+        except _DiseaseNotResolved:
+            return _not_resolved_record(source, cancer.disease_id, prov)
         except Exception as exc:
             return SourceRecord(
                 source,
@@ -685,11 +732,14 @@ async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
     """The cancer evidence sources, assembled. The disease-map-resolved sources (epidemiology,
     survival) capture their source's crosswalk, loaded once from the DB here."""
     source_maps = await load_source_maps(session)
+    # One ancestor cache shared by the two disease-map sources, so a cancer's Open Targets
+    # ancestors are fetched once even though epidemiology and survival both resolve it.
+    ancestors_cache: dict[str, list[str]] = {}
     return [
         opentargets_target_landscape,
         opentargets_pipeline,
-        make_epidemiology_source(source_maps.get("eurostat", {})),
-        make_survival_source(source_maps.get("seer", {})),
+        make_epidemiology_source(source_maps.get("eurostat", {}), ancestors_cache),
+        make_survival_source(source_maps.get("seer", {}), ancestors_cache),
     ]
 
 

@@ -70,6 +70,14 @@ describe('SurvivalCard', () => {
     expect(screen.getByText(/not a Kaplan–Meier curve/)).toBeInTheDocument()
   })
 
+  it('keeps the all-stages case count even when the CI is suppressed (capped rate)', () => {
+    // A ~100% rate suppresses the CI bounds, but the total N is still meaningful and must not
+    // vanish with the CI. Re-couple N to the CI conditional and this goes red.
+    const capped = { ...NON_STAGED, all_stages: { rate: 99.9, ci_low: null, ci_high: null, n: 50000 } }
+    renderCard([fact({ value: capped })])
+    expect(screen.getByText(/50,000 cases/)).toBeInTheDocument()
+  })
+
   it('shows only the all-stages figure for a non-staged cancer, with an honest note', () => {
     renderCard([fact({ value: NON_STAGED })])
     expect(screen.getByTestId('survival-all')).toHaveTextContent('68.6%')

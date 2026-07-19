@@ -29,16 +29,26 @@ from backend.config import get_settings
 from backend.db import dispose_engine, get_sessionmaker
 from backend.ingestion.base import utcnow
 from backend.ingestion.enrich import EnrichStats, enrich_catalog
+from backend.ingestion.enrich_cancer import CancerEnrichStats, enrich_cancer_catalog
 
 logger = logging.getLogger(__name__)
 
 
-async def refresh_once(*, limit: int | None = None) -> EnrichStats:
-    """One pass: enrich every never-touched drug, and re-enrich any gone stale."""
+async def refresh_once(*, limit: int | None = None) -> tuple[EnrichStats, CancerEnrichStats]:
+    """One pass over BOTH catalogs: enrich every never-touched drug and cancer, and re-enrich
+    any gone stale. Cancers ride the same fill+refresh query as drugs (last_enriched_at IS NULL
+    for fill, `< cutoff` for refresh), so a cancer enriched before a new block shipped picks up
+    its epidemiology/survival facts on the next pass rather than sitting on 'not collected'."""
     settings = get_settings()
     cutoff = utcnow() - timedelta(days=settings.freshness_days)
     async with get_sessionmaker()() as session:
-        return await enrich_catalog(session, only_unenriched=True, stale_before=cutoff, limit=limit)
+        drugs = await enrich_catalog(
+            session, only_unenriched=True, stale_before=cutoff, limit=limit
+        )
+        cancers = await enrich_cancer_catalog(
+            session, only_unenriched=True, stale_before=cutoff, limit=limit
+        )
+        return drugs, cancers
 
 
 async def refresh_forever() -> None:
@@ -51,17 +61,21 @@ async def refresh_forever() -> None:
     )
     while True:
         try:
-            stats = await refresh_once()
+            drugs, cancers = await refresh_once()
         except Exception:
-            # A pass must not take the service down: an unenriched or stale drug is a
+            # A pass must not take the service down: an unenriched or stale drug/cancer is a
             # state the system already handles honestly, so a failed pass just means the
             # next one retries. Log and carry on.
             logger.exception("refresh pass failed; retrying after the interval")
         else:
-            if stats.drugs == 0:
+            if drugs.drugs == 0 and cancers.cancers == 0:
                 logger.info("refresh: catalog is warm and fresh, nothing to do")
             else:
-                logger.info("refresh pass done -- %s", stats.report().replace("\n", " |"))
+                logger.info(
+                    "refresh pass done -- drugs: %s | cancers: %s",
+                    drugs.report().replace("\n", " |"),
+                    cancers.report().replace("\n", " |"),
+                )
         await asyncio.sleep(settings.refresh_interval_seconds)
 
 
@@ -81,9 +95,11 @@ async def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         if args.once:
-            stats = await refresh_once(limit=args.limit)
-            print("\n=== refresh ===")
-            print(stats.report())
+            drugs, cancers = await refresh_once(limit=args.limit)
+            print("\n=== refresh: drugs ===")
+            print(drugs.report())
+            print("\n=== refresh: cancers ===")
+            print(cancers.report())
         else:
             await refresh_forever()
     finally:

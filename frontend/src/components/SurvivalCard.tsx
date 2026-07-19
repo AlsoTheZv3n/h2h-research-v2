@@ -44,6 +44,12 @@ const pct = (x: number) => `${x.toFixed(1)}%`
 
 function SurvivalBody({ surv, fact }: { surv: Survival; fact: SourcedFact }) {
   const all = surv.all_stages
+  // The CI and the case count are independent: a capped rate (~100%) suppresses the CI bounds
+  // but the total N is still meaningful, so build the two parts separately and never let a null
+  // CI take the case count down with it.
+  const ci =
+    all.ci_low !== null && all.ci_high !== null ? `95% CI ${pct(all.ci_low)}–${pct(all.ci_high)}` : null
+  const cases = all.n !== null ? `${formatCount(all.n)} cases` : null
   return (
     <>
       <p className="flex flex-wrap items-baseline gap-x-1.5">
@@ -53,11 +59,8 @@ function SurvivalBody({ surv, fact }: { surv: Survival; fact: SourcedFact }) {
         <span className="text-sm text-ink-muted">5-year relative survival, all stages</span>
         <CitationChip fact={fact} />
       </p>
-      {all.ci_low !== null && all.ci_high !== null && (
-        <p className="mt-0.5 text-xs text-ink-faint">
-          95% CI {pct(all.ci_low)}–{pct(all.ci_high)}
-          {all.n !== null && <> · {formatCount(all.n)} cases</>}
-        </p>
+      {(ci || cases) && (
+        <p className="mt-0.5 text-xs text-ink-faint">{[ci, cases].filter(Boolean).join(' · ')}</p>
       )}
 
       {surv.staged ? (

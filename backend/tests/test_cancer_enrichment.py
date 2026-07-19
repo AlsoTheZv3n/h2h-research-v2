@@ -206,13 +206,13 @@ class TestLazyFetch:
         assert all(s is BriefState.ENRICHING for s in states)
         assert len(cancer_briefs._in_flight) == 1
         await cancer_briefs._in_flight[DISEASE]
-        # The dedup that matters: ONE enrich, not five. Each source makes one OT call here --
-        # landscape and pipeline query it directly; epidemiology and survival call it once for
-        # the cancer's ancestors and then resolve UNMAPPED (the disease map is unloaded in this
-        # test), so neither reaches Eurostat/SEER. Five enrichments would make five times the
-        # calls. (The in-flight dict length alone cannot catch a broken dedup -- five tasks under
-        # the same key still leave len == 1.)
-        assert respx.calls.call_count == len(await enrich_cancer.build_cancer_sources(session))
+        # The dedup that matters: ONE enrich, not five. One enrich makes exactly three OT calls
+        # here: landscape and pipeline query it directly; epidemiology and survival each need the
+        # cancer's ancestors, but SHARE one fetch via the per-run ancestor cache (then both
+        # resolve UNMAPPED against the unloaded disease map, so neither reaches Eurostat/SEER).
+        # Five enrichments would make five times this. (The in-flight dict length alone cannot
+        # catch a broken dedup -- five tasks under the same key still leave len == 1.)
+        assert respx.calls.call_count == 3
 
     @respx.mock
     async def test_the_in_flight_marker_is_released(

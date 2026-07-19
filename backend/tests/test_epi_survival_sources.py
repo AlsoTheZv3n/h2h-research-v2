@@ -11,7 +11,7 @@ import httpx
 import pytest
 import respx
 
-from backend.ingestion import enrich_cancer
+from backend.ingestion import eurostat, seer
 from backend.ingestion.base import FactStatus
 from backend.ingestion.enrich_cancer import make_epidemiology_source, make_survival_source
 from backend.models import Cancer
@@ -27,20 +27,22 @@ def _ancestors(*ids: str) -> httpx.Response:
 
 
 def _stub(monkeypatch: pytest.MonkeyPatch, source: str, fn: Any) -> None:
-    module = enrich_cancer.eurostat if source == "eurostat" else enrich_cancer.seer
-    name = "fetch_epidemiology" if source == "eurostat" else "fetch_survival"
-    monkeypatch.setattr(module, name, fn)
+    # Patch the adapter on its own module -- the same object the enrich_cancer closures call.
+    if source == "eurostat":
+        monkeypatch.setattr(eurostat, "fetch_epidemiology", fn)
+    else:
+        monkeypatch.setattr(seer, "fetch_survival", fn)
 
 
 async def _run_epi(source_map: dict[str, tuple[str, str]]) -> Any:
     async with httpx.AsyncClient() as client:
-        rec = await make_epidemiology_source(source_map)(client, CANCER)
+        rec = await make_epidemiology_source(source_map, {})(client, CANCER)
     return rec.facts["epidemiology"]
 
 
 async def _run_survival(source_map: dict[str, tuple[str, str]]) -> Any:
     async with httpx.AsyncClient() as client:
-        rec = await make_survival_source(source_map)(client, CANCER)
+        rec = await make_survival_source(source_map, {})(client, CANCER)
     return rec.facts["survival"]
 
 
@@ -111,6 +113,32 @@ class TestEpidemiologySource:
         # "not available for this cancer" (which would read as a settled answer).
         f = await _run_epi({"MONDO_UNRELATED": ("C50", "Breast")})
         assert f.status is FactStatus.SOURCE_FAILED
+
+    @respx.mock
+    async def test_an_unresolvable_disease_id_is_skipped_not_unmapped(self) -> None:
+        # OT answers but does not resolve the id (drift/deprecation). That is a lookup miss, not
+        # "not available for this cancer": no fact is written (the same skip landscape/pipeline
+        # make), so the card reads "not collected", never a false settled UNMAPPED.
+        respx.post(OT).mock(return_value=httpx.Response(200, json={"data": {"disease": None}}))
+        async with httpx.AsyncClient() as client:
+            rec = await make_epidemiology_source({"MONDO_UNRELATED": ("C50", "Breast")}, {})(
+                client, CANCER
+            )
+        assert "epidemiology" not in rec.facts
+        assert rec.error is not None and "did not resolve" in rec.error
+
+    @respx.mock
+    async def test_shared_cache_fetches_the_cancer_ancestors_once_across_both_sources(self) -> None:
+        route = respx.post(OT).mock(return_value=_ancestors("MONDO_ROOT"))
+        cache: dict[str, list[str]] = {}
+        async with httpx.AsyncClient() as client:
+            await make_epidemiology_source({"MONDO_OTHER": ("C50", "Breast")}, cache)(
+                client, CANCER
+            )
+            await make_survival_source({"MONDO_OTHER": ("47", "Lung")}, cache)(client, CANCER)
+        # Both sources resolved the same cancer against different maps, but its ancestors were
+        # fetched from Open Targets ONCE -- the shared cache absorbs the second lookup.
+        assert route.call_count == 1
 
 
 class TestSurvivalSource:

@@ -7,6 +7,7 @@ stay null."""
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
 import respx
@@ -14,7 +15,7 @@ import respx
 from backend.ingestion.seer import CONTENT_WRITERS, fetch_survival
 
 
-def _row(rate: str, se: str, lo: str | None, hi: str | None, n: int) -> dict:
+def _row(rate: str, se: str, lo: str | None, hi: str | None, n: int) -> dict[str, Any]:
     return {"data_series": [[rate, se, lo, hi, n]]}
 
 
@@ -35,7 +36,7 @@ _SOLID = {
 _LEUKEMIA = {"data": {"1_1_1_101_0_90": _row("68.6", "0.2", "68.2", "69.0", 118580)}}
 
 
-def _mock(payload: dict) -> None:
+def _mock(payload: dict[str, Any]) -> None:
     # The endpoint double-encodes (a JSON string whose content is JSON); json=json.dumps(...)
     # reproduces exactly that so the adapter's double-decode is exercised, not bypassed.
     respx.get(url__startswith=f"{CONTENT_WRITERS}/render_region_5.php").mock(
