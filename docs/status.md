@@ -27,8 +27,9 @@ Live on `main` (all merged):
 
 **Tags:** **`v2.0.0`** — "the cancer entity" — is the current release, tagged on the merged cancer
 expansion (Phase-0 spike → catalog → Gate 1 → Block C → Blocks A/B → SEER extension); `v1.0.0` was the
-drug-only app. Since v2.0.0, `main` also carries the change-feed (#30, PR #46); the R4 follow-ups
-(#31–33) are in the open PR that also carries this update, not yet on `main`.
+drug-only app. Since v2.0.0, `main` carries the change-feed (#30, PR #46), the R4 follow-ups (#31–33,
+PR #47) and the trial-reality backend (#21, PR #48). The trial-reality UI + e2e (#22, #23) are in the
+open PR that also carries this update.
 
 **Deploy note (not code):** run `python -m backend.refresh --once` after deploy so already-enriched
 cancers pick up their epidemiology/survival facts (or they read "not collected" until the next stale
@@ -38,42 +39,39 @@ refresh). New pages get the data lazily on first open.
 
 ## Open PRs (awaiting merge — Claude Code cannot merge)
 
-The R4 follow-ups (**#31** OT schema smoke coverage, **#32** demo E2E guard, **#33** README refresh)
-land as one PR, which also carries this status update. Nothing else is outstanding — the spike (#29),
-the bookkeeping (#45) and the change-feed (#46) are all merged.
+The trial-reality UI + e2e (**#22** `TrialRealityCard`, **#23** e2e sweep) land as one PR, which also
+carries this status update. Nothing else is outstanding — the spike (#29), bookkeeping (#45),
+change-feed (#46), R4 follow-ups (#47) and trial-reality backend (#48) are all merged.
 
 ---
 
 ## The order to work in
 
-**Done since this map was written:** the open PRs merged (#29, #45), **v2.0.0** tagged ("the cancer
-entity"), the **change-feed #30** shipped (PR #46), and the **R4 follow-ups #31 / #32 / #33** landed
-together (this PR). *(R4 itself was done earlier — merged as #19.)*
+**Done since this map was written:** #29 & #45 merged, **v2.0.0** tagged, the **change-feed #30** (PR
+#46), the **R4 follow-ups #31/#32/#33** (PR #47), and **P1-T4 trial reality** — gate #20 (GREEN),
+backend #21 (PR #48), with the UI #22 + e2e #23 in the open PR. *(R4 itself was done earlier as #19;
+P2-B Blocks A/B/C are complete.)* That finishes the cancer detail page's evidence blocks.
 
 Next, in order:
 
-1. **P1-T4 trial reality — #20 → #21 → #22 → #23** (gate → backend → frontend → e2e). Already scoped as
-   issues from an earlier session; the last cancer block still to build.
-2. **Frontend polish:** drug detail redesign **#34** → overview refinement **#35** → regenerate the GIF
+1. **Frontend polish:** drug detail redesign **#34** → overview refinement **#35** → regenerate the GIF
    **#36** *(blocked by #34)*.
-3. **Then, and only then — spike follow-ups + backlog:** S1 target page **#37**, S3 combinations **#38**,
+2. **Then, and only then — spike follow-ups + backlog:** S1 target page **#37**, S3 combinations **#38**,
    S4 sponsor **#39**, S5 modality **#40**; usability harness **#41**, MeSH/pub-types **#42**, cBioPortal
    **#43**, PubTator **#44**.
-
-*(P2-B Blocks A/B/C are complete — struck from the "to build" order.)*
 
 ---
 
 ## Issue index
 
-**Done (this session — #30 merged; #31–33 in the open R4-follow-ups PR)**
-- #30 — Change-feed event table ✓ merged (PR #46)
-- #31 — OT schema smoke test ✓ extended to the crosswalk (`ancestors`) + catalog (`descendants`, disease batch)
-- #32 — Demo recording `MONDO_E2E_*` guard ✓ (static Vitest guard + runtime leak-assertion)
-- #33 — docs: README known-gaps refresh ✓ (epi/survival shipped; S2/S4/S5 + licence-blocked epi + myeloma)
+**Done (recently)**
+- #30 — Change-feed event table ✓ (PR #46)
+- #31/#32/#33 — R4 follow-ups: OT schema smoke coverage, demo E2E guard, README refresh ✓ (PR #47)
 
-**P1-T4 — trial reality (the remaining cancer block; existing issues)**
-- #24 tracking · #20 gate (CT.gov fields, live) · #21 backend source · #22 `TrialRealityCard` · #23 e2e sweep
+**P1-T4 — trial reality (the last cancer-page evidence block)**
+- #20 gate ✓ GREEN (CT.gov fields verified live) · #21 backend source ✓ (PR #48)
+- #22 `TrialRealityCard` ✓ · #23 e2e sweep ✓ — in the open PR
+- #24 tracking — close when the UI PR merges
 
 **Frontend polish**
 - #34 — drug detail-page redesign
