@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import FactStatus, SourceRecord
 from backend.models import DataMaturity, Drug, DrugTarget, FactRow
+from backend.repositories.change_feed import log_fact_changes
 
 # Index columns the overview reads, and the source that owns each. ChEMBL owns
 # structure and physchem; Open Targets owns modality and target annotation.
@@ -86,6 +87,15 @@ class DrugRepository:
         Dropping it would leave the reader unable to tell an outage from a real gap,
         which is exactly the failure the spike caught.
         """
+        # Log real value/status changes before the upsert overwrites the previous value.
+        await log_fact_changes(
+            self.session,
+            entity_type="drug",
+            entity_id=chembl_id,
+            model=FactRow,
+            id_col=FactRow.drug_chembl_id,
+            facts=record.facts,
+        )
         for key, f in record.facts.items():
             stmt = insert(FactRow).values(
                 drug_chembl_id=chembl_id,

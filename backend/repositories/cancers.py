@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ingestion.base import SourceRecord
 from backend.models import Cancer, CancerFactRow, Drug, DrugTarget
+from backend.repositories.change_feed import log_fact_changes
 
 # The columns the overview's headers can sort by. Anything else falls back to n_drugs
 # rather than erroring on a bad ?sort= value. Default is n_drugs desc: in a drug-
@@ -68,6 +69,16 @@ class CancerRepository:
         other, so an outage lands on the record rather than being mistaken for an
         absence. Upserts on (disease, key, source), so re-enrichment refreshes in place.
         """
+        # Log real value/status changes BEFORE the upsert overwrites the previous value -- the
+        # delta a "what changed" feed needs, which the in-place refresh would otherwise discard.
+        await log_fact_changes(
+            self.session,
+            entity_type="cancer",
+            entity_id=disease_id,
+            model=CancerFactRow,
+            id_col=CancerFactRow.disease_id,
+            facts=record.facts,
+        )
         for key, f in record.facts.items():
             stmt = insert(CancerFactRow).values(
                 disease_id=disease_id,
