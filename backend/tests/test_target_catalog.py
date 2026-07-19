@@ -27,7 +27,7 @@ def _landscape(*targets: tuple[str, str | None]) -> dict[str, Any]:
     """A target_landscape fact value in the shape opentargets_target_landscape stores:
     a threshold, a strong count, and the display rows (ensembl_id + symbol are what the
     backfill reads)."""
-    rows = [
+    rows: list[dict[str, Any]] = [
         {
             "symbol": symbol,
             "ensembl_id": ensembl_id,
