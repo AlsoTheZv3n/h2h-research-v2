@@ -82,6 +82,28 @@ describe('Fact', () => {
     expect(screen.getByTestId('fact-not-collected')).toBeInTheDocument()
   })
 
+  it('renders a measured zero as the value when showZero is set (0 is not "None found")', () => {
+    // For a physical property -- 0 H-bond donors, 0 Lipinski violations -- a zero is the answer.
+    // The backend classifies 0 as EMPTY, so without showZero this field would read "None found",
+    // the exact 0-vs-None lie. With showZero the measured zero is shown as the value.
+    render(<Fact label="H-bond donors" facts={[fact({ value: 0, status: 'empty' })]} showZero />)
+    expect(screen.getByTestId('fact-ok')).toHaveTextContent('0')
+    expect(screen.queryByText(/none found/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('fact-empty')).not.toBeInTheDocument()
+  })
+
+  it('applies the render function to a showZero zero (so units survive)', () => {
+    render(
+      <Fact
+        label="Polar surface area"
+        facts={[fact({ value: 0, status: 'empty' })]}
+        render={(v) => `${v} Å²`}
+        showZero
+      />,
+    )
+    expect(screen.getByTestId('fact-ok')).toHaveTextContent('0 Å²')
+  })
+
   it('renders every source when they disagree', () => {
     render(
       <Fact
@@ -260,6 +282,15 @@ describe('PotencyCard', () => {
       />,
     )
     expect(screen.getByTestId('fact-source-failed')).toHaveTextContent(/unavailable/i)
+  })
+
+  it('names a non-small-molecule honestly, not a blanket "biologic"', () => {
+    // The prop is really !is_small_molecule -- true for oligonucleotides, proteins and
+    // Unknown-typed drugs, which are not antibodies/ADCs. The message must not misstate them.
+    render(<PotencyCard facts={undefined} isBiologic={true} />)
+    const na = screen.getByTestId('not-applicable')
+    expect(na).toHaveTextContent(/not a small molecule/i)
+    expect(na).not.toHaveTextContent(/biologic/i)
   })
 })
 

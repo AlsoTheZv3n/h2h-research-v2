@@ -23,7 +23,7 @@ export function PotencyCard({
   if (isBiologic) {
     return (
       <Card title="Binding & potency">
-        <NotApplicable reason="Not applicable — biologics have no small-molecule binding curve. Their data model is out of scope for v1." />
+        <NotApplicable reason="Not applicable — this drug is not a small molecule, so it has no small-molecule binding curve; that data model is out of scope for v1." />
       </Card>
     )
   }

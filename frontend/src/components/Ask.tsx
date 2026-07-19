@@ -169,8 +169,8 @@ function AnswerView({ answer }: { answer: Answer }) {
 function Citations({ citations }: { citations: Citation[] }) {
   return (
     <ul data-testid="answer-citations" className="flex flex-col gap-1 border-t border-line pt-2">
-      {citations.map((c) => (
-        <li key={c.pmid} className="text-xs">
+      {citations.map((c, i) => (
+        <li key={`${i}-${c.pmid}`} className="text-xs">
           <a
             href={c.url}
             target="_blank"
