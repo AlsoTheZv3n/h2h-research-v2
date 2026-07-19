@@ -94,6 +94,17 @@ export interface DrugList {
   offset: number
 }
 
+/** One facet option and how many rows match it, given the OTHER active filters -- shown as a
+ *  "(N)" beside the option so a reader sees what selecting it would narrow to. */
+export interface FacetCount {
+  value: string
+  count: number
+}
+
+/** Per-facet option counts, keyed by facet name ('modality', 'maturity', 'target_class',
+ *  'has_target' for drugs; 'therapeutic_area', 'has_drugs' for cancers). */
+export type FacetCounts = Record<string, FacetCount[]>
+
 /** The on-target potency answer -- not a raw count of activity rows. */
 export interface PotencySummary {
   target_chembl_ids: string[]

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
-from sqlalchemy import case, delete, func, or_, select
+from sqlalchemy import ColumnElement, case, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,6 +128,70 @@ class DrugRepository:
         )
         return result.scalars().all()
 
+    def _filters(
+        self,
+        *,
+        q: str | None = None,
+        target: str | None = None,
+        max_phase: int | None = None,
+        modality: str | None = None,
+        maturity: DataMaturity | None = None,
+        has_target: bool | None = None,
+        target_class: str | None = None,
+        include_out_of_scope: bool = False,
+        exclude: frozenset[str] = frozenset(),
+    ) -> list[ColumnElement[bool]]:
+        """The overview's WHERE clauses, as a list, shared by the listing and the facet counts.
+
+        `exclude` names facets whose own clause to drop: a per-facet count is over every OTHER
+        active filter, so an option's count reads as "what selecting it would give" and a facet
+        with a current selection still shows all its options. The scope clause is NOT a facet and
+        is never excluded -- it widens to include out-of-scope drugs rather than narrowing to a
+        subset, so counting a facet "as if unselected" must not also drop the scope boundary.
+        """
+        filters: list[ColumnElement[bool]] = []
+        if q and "q" not in exclude:
+            # Partial and case-insensitive, across the three things someone would actually type
+            # into a search box. An exact match was unusable: people type one character at a time,
+            # so every keystroke but the last returned nothing, which reads as broken not strict.
+            pattern = f"%{q.strip()}%"
+            filters.append(
+                or_(
+                    Drug.pref_name.ilike(pattern),
+                    Drug.chembl_id.ilike(pattern),
+                    Drug.primary_target.ilike(pattern),
+                )
+            )
+        if target and "target" not in exclude:
+            # Exact-but-case-insensitive: a facet ("show me the KRAS programs"), set from a value.
+            filters.append(func.lower(Drug.primary_target) == target.strip().lower())
+        if max_phase is not None and "max_phase" not in exclude:
+            filters.append(Drug.max_phase >= max_phase)
+        if modality and "modality" not in exclude:
+            filters.append(func.lower(Drug.drug_type) == modality.strip().lower())
+        if maturity is not None and "maturity" not in exclude:
+            filters.append(Drug.maturity == maturity)
+        if has_target is not None and "has_target" not in exclude:
+            # "Has an annotated target" vs "does not". A real facet: many catalog rows have no
+            # target resolved yet, and excluding them is the difference between a findable table
+            # and a wall.
+            filters.append(
+                Drug.primary_target.isnot(None) if has_target else Drug.primary_target.is_(None)
+            )
+        if target_class and "target_class" not in exclude:
+            # "unclassified" is the facet's name for target_class IS NULL -- the rows with no class
+            # recorded, a real selectable group. Every other value is an exact family match.
+            if target_class.strip().lower() == UNCLASSIFIED:
+                filters.append(Drug.target_class.is_(None))
+            else:
+                filters.append(func.lower(Drug.target_class) == target_class.strip().lower())
+        if not include_out_of_scope:
+            # The default catalog is oncology. `IS NOT FALSE` keeps NULL (not yet judged) and True,
+            # hiding only drugs positively marked out of scope -- so an unfinished scoping pass
+            # hides nothing it has not actually ruled on.
+            filters.append(Drug.in_scope.isnot(False))
+        return filters
+
     async def list_drugs(
         self,
         *,
@@ -152,50 +217,16 @@ class DrugRepository:
         the bug where a page length read as the total and osimertinib's 383 trials
         showed as 100.
         """
-        filters = []
-        if q:
-            # Partial and case-insensitive, across the three things someone would
-            # actually type into a search box. An exact match was unusable: people
-            # type one character at a time, so every keystroke but the last returned
-            # nothing, which reads as a broken field rather than a strict one.
-            pattern = f"%{q.strip()}%"
-            filters.append(
-                or_(
-                    Drug.pref_name.ilike(pattern),
-                    Drug.chembl_id.ilike(pattern),
-                    Drug.primary_target.ilike(pattern),
-                )
-            )
-        if target:
-            # Exact-but-case-insensitive: this one is a facet ("show me the KRAS
-            # programs"), not a search box, and it is set from a known value.
-            filters.append(func.lower(Drug.primary_target) == target.strip().lower())
-        if max_phase is not None:
-            filters.append(Drug.max_phase >= max_phase)
-        if modality:
-            filters.append(func.lower(Drug.drug_type) == modality.strip().lower())
-        if maturity is not None:
-            filters.append(Drug.maturity == maturity)
-        if has_target is not None:
-            # "Has an annotated target" vs "does not". A real facet: many catalog rows
-            # have no target resolved yet, and letting the reader exclude them is the
-            # difference between a findable table and a wall.
-            filters.append(
-                Drug.primary_target.isnot(None) if has_target else Drug.primary_target.is_(None)
-            )
-        if target_class:
-            # "unclassified" is the facet's name for target_class IS NULL -- the rows
-            # with no class recorded, which are a real, selectable group. Every other
-            # value is an exact, case-insensitive family match ("Kinase").
-            if target_class.strip().lower() == UNCLASSIFIED:
-                filters.append(Drug.target_class.is_(None))
-            else:
-                filters.append(func.lower(Drug.target_class) == target_class.strip().lower())
-        if not include_out_of_scope:
-            # The default catalog is oncology. `IS NOT FALSE` keeps NULL (not yet judged)
-            # and True, hiding only drugs positively marked out of scope -- so an
-            # unfinished scoping pass hides nothing it has not actually ruled on.
-            filters.append(Drug.in_scope.isnot(False))
+        filters = self._filters(
+            q=q,
+            target=target,
+            max_phase=max_phase,
+            modality=modality,
+            maturity=maturity,
+            has_target=has_target,
+            target_class=target_class,
+            include_out_of_scope=include_out_of_scope,
+        )
 
         total = await self.session.scalar(select(func.count()).select_from(Drug).where(*filters))
 
@@ -214,6 +245,65 @@ class DrugRepository:
             .offset(offset)
         )
         return rows.scalars().all(), int(total or 0)
+
+    async def facet_counts(
+        self,
+        *,
+        q: str | None = None,
+        target: str | None = None,
+        max_phase: int | None = None,
+        modality: str | None = None,
+        maturity: DataMaturity | None = None,
+        has_target: bool | None = None,
+        target_class: str | None = None,
+        include_out_of_scope: bool = False,
+    ) -> dict[str, list[tuple[str, int]]]:
+        """Per-facet option counts for the overview: for each categorical/boolean facet, how many
+        drugs match every OTHER active filter, grouped by that facet's values (its own clause
+        excluded, so an option's count is what selecting it would give and a facet keeps all its
+        options while one is chosen). The free-text search and the cumulative phase range are not
+        enumerable this way, so they carry no counts. Returns {facet: [(value, count), ...]}.
+        """
+
+        async def grouped(facet: str, col: Any) -> list[tuple[Any, int]]:
+            filters = self._filters(
+                q=q,
+                target=target,
+                max_phase=max_phase,
+                modality=modality,
+                maturity=maturity,
+                has_target=has_target,
+                target_class=target_class,
+                include_out_of_scope=include_out_of_scope,
+                exclude=frozenset({facet}),
+            )
+            rows = await self.session.execute(
+                select(col, func.count())
+                .where(*filters)
+                .group_by(col)
+                .order_by(func.count().desc())
+            )
+            return [(v, int(n)) for v, n in rows.all()]
+
+        return {
+            # Raw drug_type strings; the NULL bucket (no type recorded) is not a selectable one.
+            "modality": [(str(v), n) for v, n in await grouped("modality", Drug.drug_type) if v],
+            "maturity": [
+                (v.value if isinstance(v, DataMaturity) else str(v), n)
+                for v, n in await grouped("maturity", Drug.maturity)
+                if v is not None
+            ],
+            # NULL is the real "unclassified" group, folded to the facet's sentinel token.
+            "target_class": [
+                (v if v is not None else UNCLASSIFIED, n)
+                for v, n in await grouped("target_class", Drug.target_class)
+            ],
+            # A boolean facet -> true/false option counts.
+            "has_target": [
+                ("true" if v else "false", n)
+                for v, n in await grouped("has_target", Drug.primary_target.isnot(None))
+            ],
+        }
 
     async def distinct_target_classes(self) -> list[str]:
         """The target-class facet's options: classes actually present, most-common first.

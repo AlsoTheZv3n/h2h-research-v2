@@ -44,6 +44,20 @@ test.describe('cancer catalog', () => {
     )
   })
 
+  test('the therapeutic-area facet shows per-option counts from the API', async ({ page }) => {
+    // The counts flow DB -> API -> UI on the cancer overview too: at least one area option carries
+    // a "(N)". A count-less list would mean the page never fetched /cancers/facets.
+    await page.goto('/cancers')
+    await expect(page.getByTestId('cancer-row').first()).toBeVisible()
+    const counted = page
+      .getByTestId('facet-therapeutic-area')
+      .locator('option')
+      .filter({ hasText: /\(\d+\)/ })
+    // Web-first + auto-retrying: the counts and the area options both come from SEPARATE fetches
+    // than the rows, so a one-shot count() could read 0 before they land. not.toHaveCount(0) waits.
+    await expect(counted).not.toHaveCount(0)
+  })
+
   test('a row opens the cancer page, with the non-clinical disclaimer', async ({ page }) => {
     await page.goto('/cancers?sort=drugs&order=desc')
     const first = page.getByTestId('cancer-row').first()

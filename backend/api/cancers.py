@@ -20,7 +20,7 @@ from backend.config import get_settings
 from backend.db import get_session
 from backend.ingestion.base import FactStatus
 from backend.repositories.cancers import CancerRepository
-from backend.schemas import CancerDetail, CancerList, CancerSummary, SourcedFact
+from backend.schemas import CancerDetail, CancerList, CancerSummary, FacetCount, SourcedFact
 from backend.services.briefs import BriefState
 from backend.services.cancer_briefs import (
     get_or_start_cancer_brief,
@@ -85,6 +85,30 @@ async def list_cancers(
 async def list_therapeutic_areas(session: SessionDep) -> list[str]:
     """Declared before /{disease_id}, or a path param would swallow "therapeutic-areas"."""
     return await CancerRepository(session).distinct_therapeutic_areas()
+
+
+@router.get(
+    "/facets",
+    response_model=dict[str, list[FacetCount]],
+    summary="Per-facet option counts for the cancer overview, given the current filters",
+)
+async def cancer_facets(
+    session: SessionDep,
+    q: Annotated[str | None, Query(description="Same free-text search as the listing")] = None,
+    therapeutic_area: Annotated[str | None, Query()] = None,
+    has_drugs: Annotated[bool | None, Query()] = None,
+) -> dict[str, list[FacetCount]]:
+    """For each facet, how many cancers match every OTHER active filter, grouped by that facet's
+    values (its own selection excluded). Drives the "(N)" beside each option. Declared before
+    /{disease_id} so the path parameter does not swallow "facets".
+    """
+    counts = await CancerRepository(session).facet_counts(
+        q=q, therapeutic_area=therapeutic_area, has_drugs=has_drugs
+    )
+    return {
+        facet: [FacetCount(value=v, count=n) for v, n in options]
+        for facet, options in counts.items()
+    }
 
 
 @router.get(

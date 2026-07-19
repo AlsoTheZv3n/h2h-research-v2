@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { listDrugs, listTargetClasses } from '../api/client'
-import type { DataMaturity, DrugList, SortField, SortOrder } from '../api/types'
+import { listDrugFacets, listDrugs, listTargetClasses } from '../api/client'
+import type { DataMaturity, DrugList, FacetCounts, SortField, SortOrder } from '../api/types'
+import { Facet } from '../components/Facet'
 import { MaturityPill, PhasePill } from '../components/MaturityPill'
 import { Pagination } from '../components/Pagination'
 import { countLabel, formatCount } from '../format'
@@ -60,6 +61,7 @@ export function OverviewPage() {
   const [data, setData] = useState<DrugList | null>(null)
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
   const [targetClasses, setTargetClasses] = useState<string[]>([])
+  const [facetCounts, setFacetCounts] = useState<FacetCounts>({})
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -131,6 +133,28 @@ export function OverviewPage() {
       .then(setTargetClasses)
       .catch(() => setTargetClasses([]))
   }, [])
+
+  // The per-facet option counts, refetched whenever a FILTER changes -- not on sort/order/offset,
+  // which do not change what matches. A failure just leaves the options count-less (a "(N)" is
+  // an aid, not the filter itself). Each facet's counts exclude its own selection, server-side.
+  useEffect(() => {
+    let cancelled = false
+    listDrugFacets({
+      q: q || undefined,
+      target: target || undefined,
+      max_phase: maxPhase ? Number(maxPhase) : undefined,
+      modality: modality || undefined,
+      maturity: (maturity || undefined) as DataMaturity | undefined,
+      has_target: hasTarget === '' ? undefined : hasTarget === 'true',
+      target_class: targetClass || undefined,
+      include_out_of_scope: includeOutOfScope || undefined,
+    })
+      .then((f) => !cancelled && setFacetCounts(f))
+      .catch(() => !cancelled && setFacetCounts({}))
+    return () => {
+      cancelled = true
+    }
+  }, [q, target, maxPhase, modality, maturity, hasTarget, targetClass, includeOutOfScope])
 
   useEffect(() => {
     let cancelled = false
@@ -239,6 +263,7 @@ export function OverviewPage() {
           value={modality}
           onChange={(v) => update({ modality: v })}
           options={MODALITIES.map((m) => [m, m])}
+          counts={facetCounts.modality}
         />
         <Facet
           name="Data completeness"
@@ -250,6 +275,7 @@ export function OverviewPage() {
             ['partial', 'Partial'],
             ['index_only', 'Index only'],
           ]}
+          counts={facetCounts.maturity}
         />
         <Facet
           name="Minimum phase"
@@ -272,6 +298,7 @@ export function OverviewPage() {
             ['true', 'Has target'],
             ['false', 'No target'],
           ]}
+          counts={facetCounts.has_target}
         />
         <Facet
           name="Target class"
@@ -284,6 +311,7 @@ export function OverviewPage() {
             ...targetClasses.map((c): [string, string] => [c, c]),
             [UNCLASSIFIED, 'Unclassified'],
           ]}
+          counts={facetCounts.target_class}
         />
         <label className="flex items-center gap-1.5 text-xs text-ink-muted">
           <input
@@ -414,46 +442,6 @@ export function OverviewPage() {
         </div>
       )}
     </section>
-  )
-}
-
-/**
- * A facet dropdown whose first option clears it.
- *
- * `name` is the accessible name and the testid basis; `placeholder` is the empty
- * option's text. They are separate on purpose: the phase facet reads "Any phase" but
- * is named "Minimum phase" (what it does), and conflating the two renamed the
- * accessible label out from under an existing E2E.
- */
-function Facet({
-  name,
-  placeholder,
-  value,
-  onChange,
-  options,
-}: {
-  name: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-  options: [string, string][]
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={name}
-      data-testid={`facet-${name.toLowerCase().replace(/\s+/g, '-')}`}
-      className="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-ink
-                 focus:border-accent focus:outline-none"
-    >
-      <option value="">{placeholder}</option>
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
   )
 }
 

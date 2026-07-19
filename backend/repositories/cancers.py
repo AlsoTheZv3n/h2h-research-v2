@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import ColumnElement, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -146,6 +147,72 @@ class CancerRepository:
         )
         return {ensembl_id: chembl_id for ensembl_id, chembl_id in rows.all()}
 
+    def _filters(
+        self,
+        *,
+        q: str | None = None,
+        therapeutic_area: str | None = None,
+        has_drugs: bool | None = None,
+        exclude: frozenset[str] = frozenset(),
+    ) -> list[ColumnElement[bool]]:
+        """The overview's WHERE clauses, shared by the listing and the facet counts. `exclude`
+        names facets whose own clause to drop -- a per-facet count is over every OTHER active
+        filter, so an option's count reads as "what selecting it would give". See DrugRepository.
+        """
+        filters: list[ColumnElement[bool]] = []
+        if q and "q" not in exclude:
+            # Partial, case-insensitive, across the cancer's name or its disease id.
+            pattern = f"%{q.strip()}%"
+            filters.append(or_(Cancer.name.ilike(pattern), Cancer.disease_id.ilike(pattern)))
+        if therapeutic_area and "therapeutic_area" not in exclude:
+            # A facet set from a known value: exact but case-insensitive.
+            filters.append(func.lower(Cancer.therapeutic_area) == therapeutic_area.strip().lower())
+        if has_drugs is not None and "has_drugs" not in exclude:
+            # "Has a drug programme" vs not -- narrows the catalog to cancers with therapeutics.
+            filters.append(Cancer.n_drugs > 0 if has_drugs else Cancer.n_drugs == 0)
+        return filters
+
+    async def facet_counts(
+        self,
+        *,
+        q: str | None = None,
+        therapeutic_area: str | None = None,
+        has_drugs: bool | None = None,
+    ) -> dict[str, list[tuple[str, int]]]:
+        """Per-facet option counts for the cancer overview: therapeutic_area (categorical) and
+        has_drugs (boolean), each over every OTHER active filter (its own clause excluded, so an
+        option's count is what selecting it would give). The free-text search carries no counts.
+        See DrugRepository.facet_counts.
+        """
+
+        async def grouped(facet: str, col: Any) -> list[tuple[Any, int]]:
+            filters = self._filters(
+                q=q,
+                therapeutic_area=therapeutic_area,
+                has_drugs=has_drugs,
+                exclude=frozenset({facet}),
+            )
+            rows = await self.session.execute(
+                select(col, func.count())
+                .where(*filters)
+                .group_by(col)
+                .order_by(func.count().desc())
+            )
+            return [(v, int(n)) for v, n in rows.all()]
+
+        return {
+            # Areas actually present; the NULL bucket (no area) is not a selectable option.
+            "therapeutic_area": [
+                (str(v), n)
+                for v, n in await grouped("therapeutic_area", Cancer.therapeutic_area)
+                if v
+            ],
+            "has_drugs": [
+                ("true" if v else "false", n)
+                for v, n in await grouped("has_drugs", Cancer.n_drugs > 0)
+            ],
+        }
+
     async def list_cancers(
         self,
         *,
@@ -164,20 +231,7 @@ class CancerRepository:
         overview holds, and the same bug it refuses -- a page length mistaken for a
         total.
         """
-        filters = []
-        if q:
-            # Partial, case-insensitive, across the two things someone types: the
-            # cancer's name or its disease id. Substring, because a search box is used
-            # one keystroke at a time and an exact match reads as broken until the last.
-            pattern = f"%{q.strip()}%"
-            filters.append(or_(Cancer.name.ilike(pattern), Cancer.disease_id.ilike(pattern)))
-        if therapeutic_area:
-            # A facet set from a known value: exact but case-insensitive.
-            filters.append(func.lower(Cancer.therapeutic_area) == therapeutic_area.strip().lower())
-        if has_drugs is not None:
-            # "Has a drug programme" vs not -- the facet that turns the full catalog
-            # (targets or drugs) into just the cancers with therapeutics.
-            filters.append(Cancer.n_drugs > 0 if has_drugs else Cancer.n_drugs == 0)
+        filters = self._filters(q=q, therapeutic_area=therapeutic_area, has_drugs=has_drugs)
 
         total = await self.session.scalar(select(func.count()).select_from(Cancer).where(*filters))
 

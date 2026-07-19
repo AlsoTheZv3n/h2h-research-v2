@@ -82,6 +82,12 @@ async def _page(api: httpx.AsyncClient, **params: object) -> tuple[set[str], int
     return set(order), body["total"], order
 
 
+async def _facets(api: httpx.AsyncClient, **params: object) -> dict[str, dict[str, int]]:
+    r = await api.get("/drugs/facets", params={k: str(v) for k, v in params.items()})
+    assert r.status_code == 200, r.text
+    return {facet: {o["value"]: o["count"] for o in opts} for facet, opts in r.json().items()}
+
+
 class TestFilters:
     async def test_modality_narrows_to_only_that_type(
         self, api: httpx.AsyncClient, catalog: None
@@ -169,6 +175,61 @@ class TestTargetClassFacet:
         r = await api.get("/drugs/target-classes")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+
+class TestFacetCounts:
+    async def test_counts_reflect_the_default_in_scope_view(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # Over the 4 in-scope drugs (the out-of-scope E is hidden by default, so it is not counted).
+        f = await _facets(api)
+        assert f["modality"] == {"Small molecule": 3, "Antibody": 1}
+        assert f["maturity"] == {"index_only": 2, "full": 1, "partial": 1}
+        # NULL target_class is the real "unclassified" bucket (the antibody), folded to the token.
+        assert f["target_class"] == {"Hydrolase": 2, "Kinase": 1, "unclassified": 1}
+        assert f["has_target"] == {"true": 3, "false": 1}
+
+    async def test_a_facet_excludes_its_own_selection(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # The load-bearing semantics: with modality=Antibody selected, the MODALITY facet still
+        # shows ALL modalities (as if unselected, so a reader can switch), while the OTHER facets
+        # are counted among antibodies only (just the antibody CHEMBL_C).
+        f = await _facets(api, modality="Antibody")
+        assert f["modality"] == {"Small molecule": 3, "Antibody": 1}  # own clause excluded
+        assert f["target_class"] == {"unclassified": 1}  # among antibodies
+        assert f["has_target"] == {"false": 1}
+        assert f["maturity"] == {"index_only": 1}
+
+    async def test_another_facet_narrows_the_counts(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # target_class=Hydrolase -> the two Hydrolase rows (A, D, both Small molecule, both with a
+        # target). The MODALITY and HAS_TARGET facets reflect that filter; the TARGET_CLASS facet
+        # (its own clause excluded) still shows every class. If facet_counts ignored other filters,
+        # modality would read the whole catalog; if it did not exclude its own, target_class would
+        # collapse to just Hydrolase.
+        f = await _facets(api, target_class="Hydrolase")
+        assert f["modality"] == {"Small molecule": 2}
+        assert f["has_target"] == {"true": 2}
+        assert f["target_class"] == {"Hydrolase": 2, "Kinase": 1, "unclassified": 1}
+
+    async def test_out_of_scope_is_counted_only_when_included(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # The scope boundary is NOT a facet and is never excluded: E (out of scope, Small molecule)
+        # is absent by default and joins the Small-molecule count only with include_out_of_scope.
+        assert (await _facets(api))["modality"]["Small molecule"] == 3
+        f = await _facets(api, include_out_of_scope="true")
+        assert f["modality"] == {"Small molecule": 4, "Antibody": 1}
+
+    async def test_facets_route_is_not_swallowed_by_the_id_route(
+        self, api: httpx.AsyncClient, catalog: None
+    ) -> None:
+        # /drugs/facets must not resolve as /drugs/{chembl_id="facets"} (declaration-order guard).
+        r = await api.get("/drugs/facets")
+        assert r.status_code == 200
+        assert isinstance(r.json(), dict) and "modality" in r.json()
 
 
 class TestScopeFilter:

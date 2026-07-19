@@ -7,6 +7,7 @@ import type {
   DrugDetail,
   DrugList,
   DrugListParams,
+  FacetCounts,
 } from './types'
 
 /**
@@ -73,6 +74,25 @@ export function listTargetClasses(): Promise<string[]> {
   return get<string[]>('/drugs/target-classes')
 }
 
+/**
+ * Per-facet option counts for the drug overview, given the current FILTERS. Only the filter
+ * params matter -- sort/order/offset do not change what matches, so they are omitted. Each
+ * facet's counts exclude its own selection (server-side), so an option's "(N)" reads as what
+ * picking it would give.
+ */
+export function listDrugFacets(params: DrugListParams = {}): Promise<FacetCounts> {
+  return get<FacetCounts>('/drugs/facets', {
+    q: params.q,
+    target: params.target,
+    max_phase: params.max_phase,
+    modality: params.modality,
+    maturity: params.maturity,
+    has_target: params.has_target === undefined ? undefined : String(params.has_target),
+    target_class: params.target_class,
+    include_out_of_scope: params.include_out_of_scope ? 'true' : undefined,
+  })
+}
+
 export function getDrug(chemblId: string): Promise<DrugDetail> {
   return get<DrugDetail>(`/drugs/${encodeURIComponent(chemblId)}`)
 }
@@ -93,6 +113,15 @@ export function listCancers(params: CancerListParams = {}): Promise<CancerList> 
 /** The therapeutic-area facet's options: areas present in the catalog, most common first. */
 export function listTherapeuticAreas(): Promise<string[]> {
   return get<string[]>('/cancers/therapeutic-areas')
+}
+
+/** Per-facet option counts for the cancer overview, given the current filters. See listDrugFacets. */
+export function listCancerFacets(params: CancerListParams = {}): Promise<FacetCounts> {
+  return get<FacetCounts>('/cancers/facets', {
+    q: params.q,
+    therapeutic_area: params.therapeutic_area,
+    has_drugs: params.has_drugs === undefined ? undefined : String(params.has_drugs),
+  })
 }
 
 export function getCancer(diseaseId: string): Promise<CancerDetail> {
