@@ -5,6 +5,7 @@ import type { DrugDetail, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { Ask } from '../components/Ask'
+import { CombinationsCard } from '../components/CombinationsCard'
 import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { PotencyCard } from '../components/PotencyCard'
@@ -280,6 +281,12 @@ export function DetailPage() {
               />
             </dl>
           </Card>
+        </div>
+
+        {/* Full width below the grid: the observed-combinations card carries example lists that
+            want the room. Reads the `combinations` fact (ClinicalTrials.gov arm structure). */}
+        <div className="mt-4">
+          <CombinationsCard facts={pick(detail, 'combinations')} />
         </div>
 
         <p className="mt-4 text-[11px] text-ink-faint">

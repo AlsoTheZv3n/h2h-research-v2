@@ -31,6 +31,7 @@ from backend.db import get_sessionmaker
 from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, failed, utcnow
 from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
+from backend.ingestion.clinicaltrials_combinations import ClinicalTrialsCombinationsAdapter
 from backend.ingestion.http import build_client
 from backend.ingestion.literature import LiteratureFetcher
 from backend.ingestion.opentargets import OpenTargetsAdapter
@@ -82,6 +83,7 @@ def build_adapters(client: httpx.AsyncClient) -> list[SourceAdapter]:
     return [
         ChEMBLAdapter(client),
         ClinicalTrialsAdapter(client),
+        ClinicalTrialsCombinationsAdapter(client),
         OpenTargetsAdapter(client),
         PubMedAdapter(
             client,

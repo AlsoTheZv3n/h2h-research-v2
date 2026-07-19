@@ -460,3 +460,29 @@ export interface TrialReality {
   stopped: { count: number; reasons: TrialStopReason[] }
   dach_recruiting: number | null
 }
+
+/** One example trial in a drug's observed-combinations fact. `drugs` are the drugs the arm
+ *  structure names -- the combination arm's members, or the single-drug arms being compared. */
+export interface CombinationExample {
+  nct_id: string
+  drugs: string[]
+}
+
+/**
+ * A drug's OBSERVED combinations vs comparisons, classified from ClinicalTrials.gov ARM
+ * structure (a single arm with >=2 drugs = a combination; >=2 arms each a single drug = a
+ * comparison). The multi-drug trials with no arm-level assignment are AMBIGUOUS and dropped,
+ * never guessed -- `n_ambiguous` carries how many, for honesty, never acted on. Counts are over
+ * `n_scanned` trials (a capped sample of the drug's `n_total`), matched by drug name (a soft
+ * match the card owns in words).
+ */
+export interface Combinations {
+  n_total: number | null
+  n_scanned: number
+  n_multi_drug: number
+  n_combination: number
+  n_comparison: number
+  n_ambiguous: number
+  combination_examples: CombinationExample[]
+  comparison_examples: CombinationExample[]
+}

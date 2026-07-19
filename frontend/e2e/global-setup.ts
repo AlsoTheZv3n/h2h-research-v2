@@ -39,7 +39,17 @@ VALUES ('CHEMBL_E2E_FAILURE', 'moa', 'chembl', NULL, 'source_failed',
         'https://www.ebi.ac.uk/chembl/', now(),
         'mechanism: 500 Internal Server Error'),
        ('CHEMBL_E2E_FAILURE', 'n_trials', 'clinicaltrials', '0'::jsonb, 'empty',
-        'https://clinicaltrials.gov/', now(), NULL)
+        'https://clinicaltrials.gov/', now(), NULL),
+       -- The observed-combinations fact (S3): combination vs comparison from arm structure, with
+       -- example NCTs and the dropped-ambiguous count. A seeded OK fact so the card renders the
+       -- whole thing DB -> API -> UI on a stable synthetic drug (a re-enriched real drug would
+       -- overwrite it from live CT.gov).
+       ('CHEMBL_E2E_FAILURE', 'combinations', 'clinicaltrials',
+        '{"n_total":420,"n_scanned":300,"n_multi_drug":95,"n_combination":80,"n_comparison":15,
+          "n_ambiguous":7,
+          "combination_examples":[{"nct_id":"NCT_E2E_COMBO","drugs":["E2E FIXTURE DRUG","pembrolizumab"]}],
+          "comparison_examples":[{"nct_id":"NCT_E2E_COMPARE","drugs":["E2E FIXTURE DRUG","docetaxel"]}]}'::jsonb,
+        'ok', 'https://clinicaltrials.gov/search?intr=E2E+FIXTURE+DRUG', now(), NULL)
 ON CONFLICT (drug_chembl_id, key, source) DO UPDATE
    SET status = excluded.status, value = excluded.value, error = excluded.error;
 
