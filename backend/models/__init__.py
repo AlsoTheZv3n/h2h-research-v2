@@ -11,6 +11,8 @@ from backend.models.disease_source_map import DiseaseSourceMap
 from backend.models.drug import DataMaturity, Drug
 from backend.models.drug_target import DrugTarget
 from backend.models.fact import FactRow
+from backend.models.target import Target
+from backend.models.target_fact import TargetFactRow
 
 __all__ = [
     "Abstract",
@@ -24,4 +26,6 @@ __all__ = [
     "DrugAbstract",
     "DrugTarget",
     "FactRow",
+    "Target",
+    "TargetFactRow",
 ]
