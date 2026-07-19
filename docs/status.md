@@ -28,8 +28,8 @@ Live on `main` (all merged):
 **Tags:** **`v2.0.0`** — "the cancer entity" — is the current release, tagged on the merged cancer
 expansion (Phase-0 spike → catalog → Gate 1 → Block C → Blocks A/B → SEER extension); `v1.0.0` was the
 drug-only app. Since v2.0.0, `main` carries the change-feed (#30, PR #46), the R4 follow-ups (#31–33,
-PR #47) and the trial-reality backend (#21, PR #48). The trial-reality UI + e2e (#22, #23) are in the
-open PR that also carries this update.
+PR #47) and P1-T4 trial reality in full (#21 PR #48, #22/#23 PR #49). The drug-page bug-fixes (which
+close #34) are in the open PR that also carries this update.
 
 **Deploy note (not code):** run `python -m backend.refresh --once` after deploy so already-enriched
 cancers pick up their epidemiology/survival facts (or they read "not collected" until the next stale
@@ -39,9 +39,10 @@ refresh). New pages get the data lazily on first open.
 
 ## Open PRs (awaiting merge — Claude Code cannot merge)
 
-The trial-reality UI + e2e (**#22** `TrialRealityCard`, **#23** e2e sweep) land as one PR, which also
-carries this status update. Nothing else is outstanding — the spike (#29), bookkeeping (#45),
-change-feed (#46), R4 follow-ups (#47) and trial-reality backend (#48) are all merged.
+The **drug-page bug-fixes** (closing #34 — the redesign already shipped in b3f833a; a bug-hunt's
+findings fixed) land as one PR, which also carries this status update. Nothing else is outstanding —
+the spike (#29), bookkeeping (#45), change-feed (#46), R4 follow-ups (#47) and all of P1-T4 trial
+reality (#48, #49) are merged.
 
 ---
 

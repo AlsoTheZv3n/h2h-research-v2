@@ -38,8 +38,8 @@ date**, and gaps are shown honestly instead of papered over.
 - Binding is distilled to a **decision-grade potency** — on-target median + range over exact
   measurements — not a raw dump of every activity.
 - Biologics and other non-small-molecule drugs are handled honestly: they appear in the catalog, but
-  the structure/binding cards say *"not applicable — … is not a small molecule"* (naming the actual
-  modality) rather than showing empty panels.
+  the structure and binding cards say *"not applicable — … is not a small molecule"* (the structure
+  card naming the actual modality) rather than showing empty panels.
 - **Ask a question about the drug** and get an answer built only from that drug's facts and
   abstracts, with every source linked — see below.
 - **Browse cancers, not just drugs.** Open any cancer → its **drug pipeline** as a phase distribution
