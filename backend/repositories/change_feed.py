@@ -1,6 +1,13 @@
 """The change feed: append a fact's value/status changes as enrichment writes them, and read
 them back. The write side is called by the drug and cancer save paths just before their upsert,
-while the previous value is still in the table."""
+while the previous value is still in the table.
+
+Best-effort, not exactly-once: enrichment is deduped per entity (one run at a time via the
+in-flight guard), so concurrent writes to one fact are rare -- but the feed carries no unique
+constraint, so a race could in principle double-log a transition or skip a middle one. That is
+acceptable for an append-only "what changed" log; the value is capturing the delta at all, which
+the in-place refresh would otherwise discard. Demo/fixture seeding (seed_demo) writes facts
+directly and is deliberately NOT fed here -- re-seeding a fixture is not a source change."""
 
 from __future__ import annotations
 
