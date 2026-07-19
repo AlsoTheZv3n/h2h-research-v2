@@ -17,6 +17,9 @@ import { chromium } from '@playwright/test'
  *   6. NSCLC: the honest targets metric (strong count above a threshold, not the
  *      whole-genome total), EGFR leading the landscape, and the pipeline as a
  *      phase distribution + a table that links only the drugs we actually hold
+ *   7. the sourced evidence blocks below -- the registered-trial landscape
+ *      (ClinicalTrials.gov), European mortality by country (Eurostat) and 5-year
+ *      survival by stage (SEER), each honest about a roll-up or a gap
  *
  * Not a test. There are no assertions and the pauses are deliberately generous --
  * this is paced for a human reading a loop, not for a machine checking a condition.
@@ -127,6 +130,20 @@ await page.waitForTimeout(2200)
 // live link into its brief -- osimertinib among them.
 await page.getByTestId('pipeline-filter-catalog').check()
 await page.getByTestId('pipeline-table').scrollIntoViewIfNeeded()
+await page.waitForTimeout(2600)
+
+// 7. The blocks that make this a cancer-intelligence view, not just a drug list -- and every one
+//    sourced and honest about a roll-up or a gap:
+//    - the real registered-trial landscape (ClinicalTrials.gov, by condition): a true count with
+//      the scanned sample beside it, a phase/status split, stopped-with-reasons, DACH recruiting;
+await page.locator('#trial-reality').scrollIntoViewIfNeeded()
+await page.getByTestId('trial-count').waitFor()
+await page.waitForTimeout(2600)
+//    - European mortality by country (Eurostat), labelled as the broader ICD-10 rollup it is;
+await page.locator('#epidemiology').scrollIntoViewIfNeeded()
+await page.waitForTimeout(2600)
+//    - and 5-year relative survival by stage (SEER), the same honest-rollup discipline.
+await page.locator('#survival').scrollIntoViewIfNeeded()
 await page.waitForTimeout(2600)
 
 await context.close()
