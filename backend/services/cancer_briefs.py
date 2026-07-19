@@ -31,8 +31,9 @@ _in_flight: dict[str, asyncio.Task[None]] = {}
 
 _INTERACTIVE_TIMEOUT = 30.0
 _INTERACTIVE_ATTEMPTS = 2
-# Four sources now (Open Targets landscape + pipeline, Eurostat mortality, SEER survival), each
-# a few seconds; 90s leaves headroom for the slower stat endpoints without stalling the page.
+# Five sources now (Open Targets landscape + pipeline, Eurostat mortality, SEER survival,
+# ClinicalTrials.gov trial reality), each a few seconds; 90s leaves headroom for the slower stat
+# endpoints and CT.gov's two requests without stalling the page.
 _ENRICH_DEADLINE = 90.0
 
 
