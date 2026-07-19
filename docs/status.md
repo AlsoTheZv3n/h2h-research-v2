@@ -11,14 +11,18 @@ last planning list disagreed with reality, this file follows reality — see *Re
 
 Live on `main` (all merged):
 
-- **Two entities, one spine.** Drugs (ChEMBL-derived, ~3,900) and cancers (Open Targets disease spine,
-  ~1,320), a `Drugs | Cancers` nav.
+- **Three entities, one spine.** Drugs (ChEMBL-derived, ~3,900) and cancers (Open Targets disease spine,
+  ~1,320) each have a catalog + a `Drugs | Cancers` nav tab; **targets** (genes, #37) are the third
+  first-class entity — no overview, reached by clicking a symbol in a cancer's target landscape.
 - **Drug page:** structure, binding & potency (median + range over exact on-target measurements, not a
   raw count), mechanism, clinical status, chat/ask box.
 - **Cancer page:** target landscape (association score, tractability, **drugged / in dev / unexploited /
-  unknown** flag), pipeline (phase distribution + filterable table), **epidemiology** (Eurostat
-  age-standardised mortality by country) and **survival** (SEER 5-year relative survival by stage) — each
-  section loads and fails independently (Block C), attached via the Gate-1 MONDO crosswalk.
+  unknown** flag; each symbol links to its target page), pipeline (phase distribution + filterable table),
+  **epidemiology** (Eurostat age-standardised mortality by country) and **survival** (SEER 5-year relative
+  survival by stage) — each section loads and fails independently (Block C), attached via the Gate-1 MONDO
+  crosswalk.
+- **Target page:** the cancer page run backwards — the cancers a gene is associated with (Open Targets
+  reverse query, filtered to the catalog, each a live link) plus the catalog drugs against it.
 - **Honest states everywhere:** ok / empty (measured-none) / source_failed (amber) / not-collected /
   pending, plus the cancer-mapping states **unmapped** ("not available for this cancer") and **rollup**
   (names the broader entity, e.g. "lung cancer — broader than NSCLC").
@@ -58,9 +62,9 @@ PR adds the one missing piece — per-facet option counts — and closes it.
 
 Next, in order:
 
-1. **Spike follow-ups + backlog** (frontend polish and the usability harness are done): S1 target page
-   **#37**, S3 combinations **#38**, S4 sponsor **#39**, S5 modality **#40**; MeSH/pub-types **#42**,
-   cBioPortal **#43**, PubTator **#44**.
+1. **Spike follow-ups + backlog** (the target entity #37 is done; so are the frontend polish and the
+   usability harness): S3 combinations **#38**, S4 sponsor **#39**, S5 modality **#40**; MeSH/pub-types
+   **#42**, cBioPortal **#43**, PubTator **#44**.
 
 ---
 
@@ -75,13 +79,15 @@ Next, in order:
   option counts added in PR #51)
 - #36 — regenerate `docs/demo.gif` ✓ (all five cancer blocks, PR #52)
 - #41 — usability & comprehension harness ✓ (`frontend/eval/usability/`; first report + human triage,
-  PR — this change)
+  PR #53)
+- #37 — target detail page ✓, the third first-class entity (catalog PR #54, enrichment+API #55,
+  frontend — this change): the cancer page run backwards, a target's associated cancers from the OT
+  reverse query filtered to the catalog, reached by clicking a landscape symbol
 
 **Frontend polish (remaining)**
 - _none — all shipped (#34, #35, #36)._
 
 **Spike follow-ups (verdicts measured — `experiment/spike-backlog/REPORT.md`)**
-- #37 — S1 green: target detail page (OT reverse query, joined by ID)
 - #38 — S3 green: observed combinations (arm structure, drop the ~4% ambiguous)
 - #39 — S4 amber: sponsor dimension (curated top-50–100, labelled normalised)
 - #40 — S5 amber: modality badge/filter (reliable for ADC/antibody/cell, honest about vaccines)

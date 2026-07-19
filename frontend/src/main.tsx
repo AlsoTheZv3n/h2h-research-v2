@@ -7,6 +7,7 @@ import { CancerDetailPage } from './pages/CancerDetailPage'
 import { CancerOverviewPage } from './pages/CancerOverviewPage'
 import { DetailPage } from './pages/DetailPage'
 import { OverviewPage } from './pages/OverviewPage'
+import { TargetDetailPage } from './pages/TargetDetailPage'
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: 'drugs/:chemblId', element: <DetailPage /> },
       { path: 'cancers', element: <CancerOverviewPage /> },
       { path: 'cancers/:diseaseId', element: <CancerDetailPage /> },
+      { path: 'targets/:ensemblId', element: <TargetDetailPage /> },
     ],
   },
 ])

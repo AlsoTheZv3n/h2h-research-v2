@@ -9,7 +9,18 @@ import type { BriefState } from '../api/types'
  * arriving here in its newest disguise. So the page says what is true: we are
  * looking right now, this takes a moment, ChEMBL is slow.
  */
-export function AnalyzingNotice({ state }: { state: BriefState }) {
+export function AnalyzingNotice({
+  state,
+  noun = 'drug',
+  sources = 'ChEMBL, ClinicalTrials.gov, Open Targets and PubMed',
+}: {
+  state: BriefState
+  /** The entity being analyzed, for the not-analyzed line. Defaults to the drug page's wording. */
+  noun?: string
+  /** The sources actually queried, named honestly -- a target brief only touches Open Targets,
+   *  so it must not claim to be gathering from ChEMBL or PubMed it never asks. */
+  sources?: string
+}) {
   if (state === 'ready') return null
 
   return (
@@ -23,8 +34,8 @@ export function AnalyzingNotice({ state }: { state: BriefState }) {
         className="size-1.5 animate-pulse rounded-full bg-accent"
       />
       {state === 'enriching'
-        ? 'Gathering evidence from ChEMBL, ClinicalTrials.gov, Open Targets and PubMed. This takes a few seconds — the page fills in as facts arrive.'
-        : 'This drug has not been analyzed yet. Fetching its evidence now.'}
+        ? `Gathering evidence from ${sources}. This takes a few seconds — the page fills in as facts arrive.`
+        : `This ${noun} has not been analyzed yet. Fetching its evidence now.`}
     </p>
   )
 }

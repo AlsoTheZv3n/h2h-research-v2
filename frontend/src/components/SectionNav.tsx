@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { CancerSection } from '../pages/cancerSections'
 
 /**
  * In-page navigation for the detail sections.
@@ -9,8 +8,11 @@ import type { CancerSection } from '../pages/cancerSections'
  * section is reflected ONLY through aria-current + styling -- it is never written back into
  * the URL, which would spam history and fight the router's own hash handling. Deep-linking
  * (arriving at /cancers/x#pipeline) is the page's job, not this component's.
+ *
+ * Typed to the minimal { id, label } it actually reads, so it serves any entity's section
+ * registry (cancer, target, ...) without coupling to one detail shape.
  */
-export function SectionNav({ sections }: { sections: CancerSection[] }) {
+export function SectionNav({ sections }: { sections: readonly { id: string; label: string }[] }) {
   const [activeId, setActiveId] = useState('')
 
   useEffect(() => {

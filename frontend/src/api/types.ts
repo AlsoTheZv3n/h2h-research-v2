@@ -276,6 +276,45 @@ export interface CancerDetail {
   target_catalog_drug: Record<string, string>
 }
 
+/** One cancer a target is associated with, in the target brief's associated_cancers fact.
+ *  Every entry is in our catalog by construction, so disease_id is always a live link. */
+export interface AssociatedCancer {
+  disease_id: string
+  name: string
+  /** Open Targets association score, 0–1. */
+  score: number
+}
+
+/** The associated_cancers fact value: the count of catalog cancers this target is associated
+ *  with, plus the top displayed slice (by score). n_cancers may exceed cancers.length. */
+export interface AssociatedCancers {
+  n_cancers: number
+  cancers: AssociatedCancer[]
+}
+
+/**
+ * A target's evidence brief: the catalog row plus every fact we hold, with provenance. The
+ * target-side twin of CancerDetail (the cancer page, run backwards). `name` and `n_cancers`
+ * are null until enriched -- measured by the reverse query, never defaulted to 0.
+ */
+export interface TargetDetail {
+  ensembl_id: string
+  symbol: string
+  name: string | null
+  n_cancers: number | null
+  last_enriched_at: string | null
+  state: BriefState
+  /** A ready brief being revalidated in the background (stale-while-revalidate). */
+  refreshing: boolean
+  /** Keyed by fact name, e.g. 'associated_cancers'. A list because sources disagree. */
+  facts: Record<string, SourcedFact[]>
+  /** Fact keys where every source failed -- an outage, not an absence. */
+  unavailable: string[]
+  /** ChEMBL ids of catalog drugs that act on this target (joined on the Ensembl id). Empty is
+   *  "no such drug in our catalog", NOT "undruggable". */
+  catalog_drugs: string[]
+}
+
 /** One drug/candidate in a cancer's pipeline, at its most advanced stage. */
 export interface PipelineDrug {
   chembl_id: string

@@ -8,6 +8,7 @@ import type {
   DrugList,
   DrugListParams,
   FacetCounts,
+  TargetDetail,
 } from './types'
 
 /**
@@ -132,6 +133,23 @@ export function getCancer(diseaseId: string): Promise<CancerDetail> {
  *  the caller polls getCancer until it is `ready`, as on the drug side. */
 export async function retryCancer(diseaseId: string): Promise<{ state: BriefState }> {
   const response = await fetch(`${BASE}/cancers/${encodeURIComponent(diseaseId)}/retry`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    throw new ApiError(`${response.status} ${response.statusText}`, response.status)
+  }
+  return response.json() as Promise<{ state: BriefState }>
+}
+
+export function getTarget(ensemblId: string): Promise<TargetDetail> {
+  return get<TargetDetail>(`/targets/${encodeURIComponent(ensemblId)}`)
+}
+
+/** Re-fetch Open Targets for a target whose brief has failures. Returns the new state; the
+ *  caller polls getTarget until it is `ready`, as on the drug and cancer sides. */
+export async function retryTarget(ensemblId: string): Promise<{ state: BriefState }> {
+  const response = await fetch(`${BASE}/targets/${encodeURIComponent(ensemblId)}/retry`, {
     method: 'POST',
     headers: { Accept: 'application/json' },
   })
