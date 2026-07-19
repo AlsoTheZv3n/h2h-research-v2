@@ -1,0 +1,40 @@
+source,source_code,source_label,mondo_id,note
+eurostat,C,Malignant neoplasms (C00-C97),,"aggregate of all cancers, not a specific entity -- must never attach to an entity page"
+eurostat,C00-D48,Neoplasms (C00-D48),,"aggregate incl. benign, not an entity"
+eurostat,C00-C14,"Head & neck (lip, oral cavity, pharynx; C00-C14)",MONDO_0005627,"head and neck cancer, broader than the source: nasal-cavity, eye, ear, skull & salivary-gland cancers roll up but are NOT in C00-C14 figures; larynx (C32) is mapped separately"
+eurostat,C15,Oesophagus (C15),MONDO_0007576,
+eurostat,C16,Stomach (C16),MONDO_0001056,
+eurostat,C18-C21,"Colon, rectum, anus (C18-C21)",MONDO_0005575,
+eurostat,C22,Liver & intrahepatic bile ducts (C22),MONDO_0002691,"includes intrahepatic bile ducts; HCC and other liver cancers roll up here"
+eurostat,C25,Pancreas (C25),MONDO_0009831,"malignant pancreatic neoplasm (broad); all pancreatic subtypes roll up"
+eurostat,C32,Larynx (C32),MONDO_0002358,"laryngeal carcinoma (no broader laryngeal-cancer MONDO node exists)"
+eurostat,C33_C34,"Trachea, bronchus & lung (C33-C34)",MONDO_0008903,"lung cancer; pools NSCLC and SCLC (whose prognosis differs) -- rollup pages must say so"
+eurostat,C43,Malignant melanoma of skin (C43),MONDO_0005105,"all-melanoma node; C43 is cutaneous only (>90% of melanoma). Mucosal/uveal melanoma would roll up here despite being outside the source"
+eurostat,C50,Breast (C50),MONDO_0007254,
+eurostat,C53,Cervix uteri (C53),MONDO_0002974,
+eurostat,C54_C55,"Uterus, corpus & other parts (C54-C55)",MONDO_0002715,"uterine cancer; endometrial + carcinosarcoma/sarcoma roll up. The MONDO node also subsumes cervix, but closest-wins keeps cervix on C53"
+eurostat,C56,Ovary (C56),MONDO_0008170,
+eurostat,C61,Prostate (C61),MONDO_0008315,
+eurostat,C64,"Kidney, except renal pelvis (C64)",MONDO_0002367,"kidney cancer; renal cell carcinoma rolls up here"
+eurostat,C67,Bladder (C67),MONDO_0001187,urinary bladder cancer
+eurostat,C70-C72,Brain & central nervous system (C70-C72),MONDO_0002714,"CNS cancer; brain, brain glioma and glioblastoma roll up here (the narrower brain-cancer node excludes GBM)"
+eurostat,C73,Thyroid gland (C73),MONDO_0002108,
+eurostat,C81-C86,Hodgkin disease & lymphomas (C81-C86),MONDO_0005062,"lymphoma (Hodgkin + non-Hodgkin)"
+eurostat,C88_C90_C96,"Other lymphoid/haematopoietic (C88, C90, C96)",,"unmappable: an ICD grab-bag (myeloma C90 + immunoproliferative C88 + other C96) with no single MONDO entity -- a specific page must not claim these mixed figures"
+eurostat,C91-C95,Leukaemia (C91-C95),MONDO_0005059,"leukemia (all types)"
+seer,55,Breast,MONDO_0007254,
+seer,57,Cervix Uteri,MONDO_0002974,
+seer,20,Colon and Rectum,MONDO_0005575,
+seer,58,"Corpus and Uterus, NOS",MONDO_0002715,"uterine cancer (corpus; incl. sarcomas/carcinosarcoma)"
+seer,17,Esophagus,MONDO_0007576,
+seer,72,Kidney and Renal Pelvis,MONDO_0002367,
+seer,46,Larynx,MONDO_0002358,
+seer,90,Leukemia,MONDO_0005059,
+seer,96,Acute Myeloid Leukemia (AML),MONDO_0018874,"SEER carries an AML-specific site -> exact for AML, not a leukaemia rollup"
+seer,97,Chronic Myeloid Leukemia (CML),MONDO_0011996,"SEER CML-specific; but leukaemia has no localized/regional/distant stage decomposition (structural, per the spike)"
+seer,35,Liver and Intrahepatic Bile Duct,MONDO_0002691,
+seer,47,Lung and Bronchus,MONDO_0008903,"pools NSCLC and SCLC"
+seer,53,Melanoma of the Skin,MONDO_0005105,cutaneous only (see the C43 note)
+seer,76,Brain and Other Nervous System,MONDO_0002714,"CNS cancer; GBM (SEER 661) resolves to its exact site via closest-wins"
+seer,661,Glioblastoma of the Brain and ONS,MONDO_0018177,"SEER carries a glioblastoma-specific site -> exact for glioblastoma"
+seer,40,Pancreas,MONDO_0009831,
