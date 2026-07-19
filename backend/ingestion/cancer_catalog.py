@@ -62,6 +62,12 @@ _DISEASE_FRAGMENT = (
     "targets:associatedTargets(page:{{index:0,size:1}}){{ count }} }}"
 )
 
+# The one query that enumerates the oncology universe. Named (like _DISEASE_FRAGMENT) so the
+# live OT schema smoke test can post the exact string this loader sends and fail loudly if
+# `descendants` ever drifts -- the same silent EFO->MONDO migration the CANCER_ROOT note above
+# already records once, which would seed an empty catalog on a fresh deploy with no error.
+_DESCENDANTS_QUERY = f'{{ disease(efoId:"{CANCER_ROOT}") {{ descendants }} }}'
+
 
 @dataclass
 class LoadStats:
@@ -105,7 +111,7 @@ async def _gql(client: httpx.AsyncClient, query: str) -> dict[str, Any]:
 
 async def fetch_descendants(client: httpx.AsyncClient) -> list[str]:
     """Every disease id under the cancer root, in one call."""
-    data = await _gql(client, f'{{ disease(efoId:"{CANCER_ROOT}") {{ descendants }} }}')
+    data = await _gql(client, _DESCENDANTS_QUERY)
     disease = data.get("disease") or {}
     return list(disease.get("descendants") or [])
 

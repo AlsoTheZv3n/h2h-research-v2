@@ -98,6 +98,14 @@ await page.evaluate(() => {
     if (row.textContent?.includes('MONDO_E2E_')) row.remove()
   }
 })
+// Guard the one leak point. The cancer list is the only view that renders every catalog row,
+// so it is the only place a fixture can enter the shot; every other step navigates to a pinned
+// real id. If a future change ever lets an MONDO_E2E_* row survive the strip above, fail the
+// recording loudly rather than publish a GIF with a synthetic fixture in it.
+const leaked = await page
+  .locator('[data-testid="cancer-row"]', { hasText: 'MONDO_E2E_' })
+  .count()
+if (leaked > 0) throw new Error(`demo recording leaked ${leaked} E2E fixture row(s) into the shot`)
 await page.waitForTimeout(1800)
 
 // 6. NSCLC -- the disease osimertinib treats. Land on the honest targets metric: the
