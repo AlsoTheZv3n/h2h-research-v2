@@ -47,6 +47,28 @@ const formatFold = (f: number) => (f >= 10 ? String(Math.round(f)) : f.toFixed(1
  *  narrow track the way "10000×" would. */
 const formatFoldTick = (f: number) => (f >= 1000 ? `${f / 1000}k×` : `${f}×`)
 
+// A4 — the documented exclusion-rate threshold. If at least this share of the drug's TARGET-
+// BINDING measurements could not be ranked (a single-measurement target, or a censored / non-nM
+// value), the headline rests on the minority and is flagged provisional. The denominator is the
+// binding rows ONLY, never the total: cell-line and unassigned rows are a different assay kind
+// (A3), not dropped evidence, so a cell-line-heavy but well-measured drug (imatinib, osimertinib)
+// must not trip this. A judgement about trust, disclosed with its counts -- not a measurement.
+const HIGH_BINDING_EXCLUSION = 0.75
+
+/** Whether the ranking rests on too few of the target-binding rows to trust the headline, with the
+ *  counts to say so. null = trustworthy, or a pre-A3 fact where binding cannot be isolated. */
+function highExclusionCaveat(
+  p: SelectivityProfile,
+): { shown: number; total: number; pct: number } | null {
+  if (p.n_binding_nonexact_rows === undefined) return null // pre-A3 fact: cannot isolate binding
+  const unusable = p.n_uncorroborated_targets + p.n_binding_nonexact_rows
+  const total = p.n_protein_rows + unusable
+  if (total === 0) return null
+  const rate = unusable / total
+  if (rate < HIGH_BINDING_EXCLUSION) return null
+  return { shown: p.n_protein_rows, total, pct: Math.round(rate * 100) }
+}
+
 /** The decades 1, 10, 100 … up to the axis max -- the log ticks. */
 function decades(max: number): number[] {
   const out: number[] = []
@@ -84,6 +106,7 @@ function SelectivityBody({ fact }: { fact: SourcedFact }) {
   const pos = (fold: number) => (Math.log10(Math.max(fold, 1)) / logMax) * 100
   const thresholdPct = pos(threshold_fold)
   const grid = 'grid grid-cols-[minmax(6rem,9rem)_4.5rem_1fr_3rem] items-center gap-x-2'
+  const caveat = highExclusionCaveat(profile)
 
   return (
     <>
@@ -101,6 +124,18 @@ function SelectivityBody({ fact }: { fact: SourcedFact }) {
         </span>
         <CitationChip fact={fact} />
       </p>
+
+      {/* A4: a trust caveat when the headline rests on few of the target-binding rows. States the
+          counts, never just a flag. Amber (a caution token, not a good/bad traffic light). */}
+      {caveat && (
+        <p
+          data-testid="exclusion-warning"
+          className="mt-1.5 rounded-md bg-partial-bg px-2 py-1 text-[11px] text-partial"
+        >
+          ⚠ Provisional — the ranking rests on {caveat.shown} of {caveat.total} target-binding
+          measurements; {caveat.pct}% could not be ranked (single-measurement or non-exact).
+        </p>
+      )}
 
       {/* Ranked, log-scaled. Each row: target, median nM (linear label), a log-fold bar with the
           100× threshold marked, the fold. Targets beyond the threshold are faded -- incidental. */}

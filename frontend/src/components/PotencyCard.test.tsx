@@ -131,6 +131,37 @@ describe('PotencyCard', () => {
     expect(screen.getByTestId('assay-kind-unassigned')).toHaveTextContent('80')
   })
 
+  it('warns when the headline rests on few of the target-binding rows (A4), with counts', () => {
+    // 2 ranked of 37 target-binding rows -- 5 measured once + 30 non-exact = 35 unusable (95%).
+    const fragile: SelectivityProfile = {
+      ...selective,
+      n_protein_rows: 2,
+      n_uncorroborated_targets: 5,
+      n_binding_nonexact_rows: 30,
+    }
+    render(<PotencyCard facts={[fact({ value: fragile })]} isBiologic={false} />)
+    const warn = screen.getByTestId('exclusion-warning')
+    expect(warn).toHaveTextContent(/Provisional/)
+    // The caveat states the counts, never just a flag.
+    expect(warn).toHaveTextContent('2 of 37 target-binding measurements')
+    expect(warn).toHaveTextContent('95%')
+  })
+
+  it('does NOT warn when the binding evidence is solid, however many cell-line rows exist', () => {
+    // The prove-fail other direction: osimertinib is 154 ranked of 171 binding (10% unusable) with
+    // 450 cell-line rows. A total-based rate would scream "78% excluded"; the binding-only rate
+    // (the honest one) does not fire -- the headline is trustworthy.
+    render(<PotencyCard facts={[fact({ value: selective })]} isBiologic={false} />)
+    expect(screen.queryByTestId('exclusion-warning')).not.toBeInTheDocument()
+  })
+
+  it('does not warn on a pre-A3 fact, where binding rows cannot be isolated', () => {
+    const preA3 = { ...selective }
+    delete (preA3 as Partial<SelectivityProfile>).n_binding_nonexact_rows
+    render(<PotencyCard facts={[fact({ value: preA3 })]} isBiologic={false} />)
+    expect(screen.queryByTestId('exclusion-warning')).not.toBeInTheDocument()
+  })
+
   it('falls back to a single set-aside line for a pre-A3 fact (no kind counts)', () => {
     // A fact stored before A3 lacks the kind fields -> the card must still render honestly,
     // with the old single line, never crash on the missing counts.
