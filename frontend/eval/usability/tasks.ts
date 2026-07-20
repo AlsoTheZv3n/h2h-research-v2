@@ -121,6 +121,38 @@ async function targetPage(page: Page, base: string, id: string): Promise<Capture
   return { url: `${base}/targets/${id}`, text: `${header}\n\n${cancers}\n\n${drugs}` }
 }
 
+/** The orientation surface (D2): what a first-time visitor sees in three minutes -- the
+ *  landing/overview (the tagline, the Drugs|Cancers nav, the searchable catalog) plus one detail
+ *  page, where the purpose is concrete and the "not for" boundary is stated (per-fact provenance and
+ *  the "surfaces evidence; does not predict" footer). Deliberately broad: unlike the card tasks, the
+ *  chrome (tagline, nav) IS the signal being tested -- can the reader say what the tool is for. */
+async function orientationSurface(page: Page, base: string): Promise<Capture> {
+  await page.goto(`${base}/`, { waitUntil: 'networkidle' })
+  await page.getByTestId('drug-row').first().waitFor({ timeout: 30_000 })
+  const banner = await page
+    .locator('header, [role="banner"]')
+    .first()
+    .innerText()
+    .catch(() => '')
+  const overview = await page
+    .locator('main')
+    .first()
+    .innerText()
+    .catch(() => '')
+  await page.goto(`${base}/drugs/${OSIMERTINIB}`, { waitUntil: 'networkidle' })
+  await page.getByText(/Selectivity & potency/).first().waitFor({ timeout: 30_000 })
+  await page.waitForTimeout(400)
+  const detail = await page
+    .locator('article')
+    .first()
+    .innerText()
+    .catch(() => '')
+  return {
+    url: `${base}/ + /drugs/${OSIMERTINIB}`,
+    text: `LANDING / OVERVIEW:\n${banner}\n\n${overview}\n\nONE DETAIL PAGE (a drug):\n${detail}`,
+  }
+}
+
 export const TASKS: Task[] = [
   {
     id: 'kras-crowded',
@@ -298,5 +330,43 @@ export const TASKS: Task[] = [
       'the conclusion is supported: approved targets, pipeline size, unexploited high-association targets',
     ],
     capture: (page, base) => cancerPage(page, base, NSCLC),
+  },
+  // D2/D3 (Epic D, #75/#76): usefulness beyond labels. Unlike every task above, these have NO
+  // checkable expected answer -- the `expected` field is a HYPOTHESIS for human triage of what a
+  // well-oriented / appropriately-sceptical reader SHOULD say, never an auto-pass/fail. The harness
+  // is a report for a human here even more than usual; the value is the reader's own answer.
+  {
+    id: 'orientation',
+    question:
+      'First time seeing this tool. After three minutes on it, what is this tool FOR -- and what is it NOT for? Answer in your own words, as if telling a colleague whether to open it.',
+    // HYPOTHESIS (triage, not ground truth): a well-oriented reader should name BOTH the purpose and
+    // the boundary. Purpose: a research / evidence-intelligence view of oncology -- sourced,
+    // provenance-linked facts about drugs, cancers (and targets) from ChEMBL, Open Targets,
+    // ClinicalTrials.gov and PubMed, with a page-level synthesis. NOT for: clinical decision support,
+    // medical advice, or prediction/ranking of treatments -- it surfaces evidence, it does not predict.
+    expected:
+      'HYPOTHESIS (human triage): the tool is a research / drug-intelligence view of oncology evidence -- sourced, provenance-linked facts about drugs, cancers and targets, with a page-level synthesis of them. It is NOT clinical decision support, NOT medical advice, and does not predict or rank treatments (it "surfaces evidence; it does not predict"). Passes if the reader names both the purpose and the not-for boundary; fails if the tool reads as a treatment recommender or a clinical tool.',
+    labels: [
+      'the product tagline + the Drugs|Cancers scope = what the tool is for',
+      'the "surfaces evidence; does not predict" / "not clinical decision support" boundary = what it is NOT for',
+    ],
+    capture: (page, base) => orientationSurface(page, base),
+  },
+  {
+    id: 'trust',
+    question:
+      'Looking at this drug page, what here would you NOT trust, and why? Does anything make you doubt the tool itself -- or is it being candid about what it does and does not have?',
+    // HYPOTHESIS (triage, not ground truth): this is the project's core bet -- that visible gaps read
+    // as CANDOUR, not as "unfinished/broken". The afatinib page shows almost no data because a source
+    // (ChEMBL) failed, surfaced as a calm amber advisory with a retry. A reader should read that as
+    // the tool being honest about a pipeline gap (NOT evidence the drug lacks a mechanism, NOT the
+    // tool being broken). The bet FAILS if the honest gap reads as "half-built" or untrustworthy.
+    expected:
+      'HYPOTHESIS (human triage): the amber "source unavailable" advisory should read as CANDOUR -- the tool being honest that ChEMBL was down (a pipeline gap, with a retry), not as the tool being broken or the drug lacking a mechanism. A sceptical reader may rightly say a source_failed section is not evidence of absence, and that empties mean "measured none / not yet gathered". Passes if the gaps read as the tool being candid about its provenance; FAILS (feeds back into copy) if they read as "unfinished", "half-built" or a reason to distrust the tool itself.',
+    labels: [
+      'the amber "source unavailable" advisory = candour about a pipeline gap, not "broken"',
+      'source_failed / empty shown honestly = trust-building, not "unfinished"',
+    ],
+    capture: (page, base) => drugPage(page, base, AFATINIB, /couldn.t be reached|unavailable|gather/i),
   },
 ]
