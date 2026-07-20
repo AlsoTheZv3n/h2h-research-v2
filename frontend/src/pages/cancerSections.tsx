@@ -17,6 +17,19 @@ import { TrialRealityCard } from '../components/TrialRealityCard'
  *
  * `id` is a stable hand-authored slug, not a generated id: it is the URL anchor
  * (/cancers/MONDO_x#pipeline), so it must be human, stable and unique.
+ *
+ * ORDER is the demotion discipline (C4): a block earns its place by feeding a conclusion, so the
+ * synthesis's evidence leads and inert decoration sinks. The block -> conclusion map:
+ *
+ *   target-landscape  -> the druggable-biology + unexploited-opportunity statements, and the TDL
+ *                        verdicts (C1/C3). The richest decision source -> first.
+ *   pipeline          -> the crowded-vs-sparse-field statement (C1).
+ *   trial-reality     -> the notable-attrition statement (C1).
+ *   survival          -> the outcomes-hinge-on-stage statement + the prognosis read (C1).
+ *   epidemiology      -> NO synthesis statement: mortality-by-geography is context, not a
+ *                        therapeutic or druggability decision for this tool. DEMOTED to last --
+ *                        kept (nothing sourced is deleted; its honest states stand), just not
+ *                        allowed to sit above the blocks a reader actually acts on.
  */
 export interface CancerSection {
   id: string
@@ -25,18 +38,6 @@ export interface CancerSection {
 }
 
 export const CANCER_SECTIONS: CancerSection[] = [
-  {
-    id: 'pipeline',
-    label: 'Pipeline',
-    render: (d) => (
-      <PipelineCard id="pipeline" facts={d.facts['pipeline']} catalogDrugIds={d.catalog_drug_ids} />
-    ),
-  },
-  {
-    id: 'trial-reality',
-    label: 'Trial reality',
-    render: (d) => <TrialRealityCard id="trial-reality" facts={d.facts['trial_reality']} />,
-  },
   {
     id: 'target-landscape',
     label: 'Target landscape',
@@ -50,15 +51,28 @@ export const CANCER_SECTIONS: CancerSection[] = [
     ),
   },
   {
-    id: 'epidemiology',
-    label: 'Epidemiology',
+    id: 'pipeline',
+    label: 'Pipeline',
     render: (d) => (
-      <EpidemiologyCard id="epidemiology" facts={d.facts['epidemiology']} cancerName={d.name} />
+      <PipelineCard id="pipeline" facts={d.facts['pipeline']} catalogDrugIds={d.catalog_drug_ids} />
     ),
+  },
+  {
+    id: 'trial-reality',
+    label: 'Trial reality',
+    render: (d) => <TrialRealityCard id="trial-reality" facts={d.facts['trial_reality']} />,
   },
   {
     id: 'survival',
     label: 'Survival',
     render: (d) => <SurvivalCard id="survival" facts={d.facts['survival']} cancerName={d.name} />,
+  },
+  // Demoted (C4): feeds no synthesis statement -- context, not a decision. Last, never deleted.
+  {
+    id: 'epidemiology',
+    label: 'Epidemiology',
+    render: (d) => (
+      <EpidemiologyCard id="epidemiology" facts={d.facts['epidemiology']} cancerName={d.name} />
+    ),
   },
 ]
