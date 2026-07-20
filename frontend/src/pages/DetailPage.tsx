@@ -1,19 +1,33 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getDrug, retryDrug, structureUrl } from '../api/client'
-import type { DrugDetail, SourcedFact } from '../api/types'
+import type { DrugDetail, SelectivityProfile, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { Ask } from '../components/Ask'
 import { CombinationsCard } from '../components/CombinationsCard'
 import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
+import { MechanismsFact } from '../components/MechanismsFact'
 import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
+import { lipinskiReading } from '../physchem'
+import { orderTargetsByPotency } from '../targets'
+import { chooseTitleFacts } from '../titles'
+import { formatCount } from '../format'
 
 /** Facts for a key, from whichever source(s) asserted it. */
 function pick(detail: DrugDetail, key: string): SourcedFact[] | undefined {
   return detail.facts[key]
+}
+
+/** The numeric value of a fact, or null when it was not measured. A source_failed fact is null
+ *  (an outage, not a value); a measured 0 (status empty under this codebase's fact() classifier)
+ *  is kept as 0 -- the showZero discipline -- so a real 0 violations reads as a 0, not as missing. */
+function num(detail: DrugDetail, key: string): number | null {
+  const f = pick(detail, key)?.[0]
+  if (!f || f.status === 'source_failed') return null
+  return typeof f.value === 'number' ? f.value : null
 }
 
 const list = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v))
@@ -176,8 +190,30 @@ export function DetailPage() {
                   </>
                 ) : null}
 
-                <dl className="mt-3 border-t border-line pt-2">
-                  <Fact label="Molecular weight" facts={pick(detail, 'mw')} render={(v) => `${v} Da`} />
+                <div className="mt-3 border-t border-line pt-2">
+                  {/* B1: the block leads with a one-line reading of what the numbers imply (which
+                      property drives the Lipinski violation), Open Targets' summary→detail shape.
+                      Withheld when the count is missing; a caution reading is muted amber, never a
+                      red/green verdict -- Ro5 is a rough heuristic, not a pass/fail on the drug. */}
+                  {(() => {
+                    const reading = lipinskiReading({
+                      mw: num(detail, 'mw'),
+                      alogp: num(detail, 'alogp'),
+                      hbd: num(detail, 'hbd'),
+                      hba: num(detail, 'hba'),
+                      ro5_violations: num(detail, 'ro5_violations'),
+                    })
+                    return reading ? (
+                      <p
+                        data-testid="lipinski-reading"
+                        className={`mb-2 text-xs ${reading.tone === 'caution' ? 'text-partial' : 'text-ink-muted'}`}
+                      >
+                        {reading.text}
+                      </p>
+                    ) : null
+                  })()}
+                  <dl>
+                    <Fact label="Molecular weight" facts={pick(detail, 'mw')} render={(v) => `${v} Da`} />
                   {/* showZero: a measured 0 is the value for these properties (0 H-bond donors,
                       LogP 0, 0 Lipinski violations), never the "None found" that reads as no data. */}
                   <Fact label="LogP" facts={pick(detail, 'alogp')} showZero />
@@ -189,13 +225,14 @@ export function DetailPage() {
                     render={(v) => `${v} Å²`}
                     showZero
                   />
-                  <Fact
-                    label="Lipinski violations"
-                    facts={pick(detail, 'ro5_violations')}
-                    render={(v) => (Number(v) === 0 ? '0 — passes all four' : String(v))}
-                    showZero
-                  />
-                </dl>
+                    <Fact
+                      label="Lipinski violations"
+                      facts={pick(detail, 'ro5_violations')}
+                      render={(v) => (Number(v) === 0 ? '0 — passes all four' : String(v))}
+                      showZero
+                    />
+                  </dl>
+                </div>
               </>
             )}
           </Card>
@@ -210,16 +247,22 @@ export function DetailPage() {
                 emptyLabel="No mechanism annotated"
               />
               <Fact label="Action type" facts={pick(detail, 'action_type')} />
-              <Fact
-                label="All mechanisms"
-                facts={pick(detail, 'all_moas')}
-                render={list}
-                emptyLabel="None annotated"
-              />
+              {/* Deduped across ChEMBL + Open Targets (B2): one set, each mechanism with its
+                  source chips, instead of the same list repeated once per source. */}
+              <MechanismsFact facts={pick(detail, 'all_moas')} />
+              {/* Ordered by the selectivity profile's potency ranking (B3), so the target list
+                  and the potency card tell the same story -- no target is "primary" here and
+                  "off-target" there. Falls back to source order when the ranking is unavailable. */}
               <Fact
                 label="Targets"
                 facts={pick(detail, 'targets')}
-                render={list}
+                render={(v) => {
+                  if (!Array.isArray(v)) return String(v)
+                  const profile = pick(detail, 'selectivity_profile')?.[0]?.value as
+                    | SelectivityProfile
+                    | null
+                  return orderTargetsByPotency(v as string[], profile?.targets ?? []).join(', ')
+                }}
                 emptyLabel="None annotated"
               />
               <Fact label="Target (ChEMBL)" facts={pick(detail, 'target_chembl_id')} />
@@ -268,18 +311,31 @@ export function DetailPage() {
                 facts={pick(detail, 'n_pubmed')}
                 emptyLabel="No publications found"
               />
-              <Fact
-                label="Recent titles"
-                facts={pick(detail, 'sample_titles')}
-                emptyLabel="None"
-                render={(v) => {
-                  const titles = v as string[]
-                  return (
+              {/* B4: the shown titles are ranked by relevance to oncology (relevant_titles),
+                  falling back to PubMed's recency order (sample_titles) if the rerank was
+                  unavailable or stale -- so the sample is worth reading, not led by an off-topic
+                  paper, and a source_failed outage is never masked by a leftover ranked list. */}
+              {(() => {
+                const { facts: titleFacts, ranked } = chooseTitleFacts(
+                  pick(detail, 'sample_titles'),
+                  pick(detail, 'relevant_titles'),
+                )
+                return (
+                  <Fact
+                    label="Key papers"
+                    facts={titleFacts}
+                    emptyLabel="None"
+                    render={(v) => {
+                      const titles = v as string[]
+                      const total = num(detail, 'n_pubmed')
+                      // A sample, labelled: the N most relevant OF the M PubMed hits above.
+                      const ofTotal =
+                        total !== null && total > titles.length ? ` of ${formatCount(total)}` : ''
+                      return (
                     <>
-                      {/* Explicitly a sample: the N most recent, not the whole literature (the
-                          count of which is the PubMed hits above). */}
                       <span className="text-[11px] text-ink-faint">
-                        the {titles.length} most recent
+                        the {titles.length} {ranked ? 'most relevant' : 'most recent'}
+                        {ofTotal}
                       </span>
                       <ul className="mt-0.5 space-y-0.5">
                         {/* keyed by index+title: two records can share a title (errata, duplicate
@@ -291,9 +347,11 @@ export function DetailPage() {
                         ))}
                       </ul>
                     </>
-                  )
-                }}
-              />
+                      )
+                    }}
+                  />
+                )
+              })()}
             </dl>
           </Card>
         </div>

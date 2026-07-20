@@ -98,6 +98,10 @@ class SelectivityTarget:
     """median_nm / the reference target's median_nm. 1.0 for the reference itself."""
     is_target: bool
     """Within SELECTIVITY_THRESHOLD_FOLD of the reference -- a real target, not incidental."""
+    gene_symbol: str | None = None
+    """The target's HGNC gene symbol (KDR for VEGFR2), resolved by the adapter after ranking so
+    the mechanism card's symbol list can be ordered by this same potency ranking (B3). None when
+    the symbol lookup was unavailable -- the ranking degrades, it does not break."""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -107,6 +111,7 @@ class SelectivityTarget:
             "n": self.n,
             "fold_vs_reference": round(self.fold_vs_reference, 2),
             "is_target": self.is_target,
+            "gene_symbol": self.gene_symbol,
         }
 
 

@@ -240,6 +240,7 @@
             "n": 151,
             "is_target": true,
             "median_nm": 8.807,
+            "gene_symbol": "EGFR",
             "target_chembl_id": "CHEMBL203",
             "target_pref_name": "Epidermal growth factor receptor",
             "fold_vs_reference": 1.0
@@ -248,6 +249,7 @@
             "n": 3,
             "is_target": false,
             "median_nm": 3980.0,
+            "gene_symbol": "KDM1A",
             "target_chembl_id": "CHEMBL6136",
             "target_pref_name": "Lysine-specific histone demethylase 1A",
             "fold_vs_reference": 451.91
@@ -258,6 +260,7 @@
           "n": 151,
           "is_target": true,
           "median_nm": 8.807,
+          "gene_symbol": "EGFR",
           "target_chembl_id": "CHEMBL203",
           "target_pref_name": "Epidermal growth factor receptor",
           "fold_vs_reference": 1.0
@@ -588,6 +591,22 @@
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=OSIMERTINIB",
       "error": null,
       "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
+      "source": "pubmed",
+      "value": [
+        "Acquired resistance mechanisms to osimertinib: The constant battle.",
+        "A tumor-derived lactate/ENO1 lactylation feedback loop facilitates osimertinib resistance of lung adenocarcinoma.",
+        "Targeting WEE1 to Overcome ARID1A Mutation-Driven Osimertinib Resistance in EGFR-Mutant Lung Cancer.",
+        "CD105 blockade restores osimertinib sensitivity in drug-resistant EGFR-mutant non-small cell lung cancer.",
+        "Dauricine Overcomes Osimertinib Resistance in Lung Cancer by Inducing Ferroptosis via Stabilizing SAT1."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=OSIMERTINIB",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
     },
     {
       "drug_chembl_id": "CHEMBL4297844",
@@ -1027,6 +1046,22 @@
       "confidence": null
     },
     {
+      "drug_chembl_id": "CHEMBL4297844",
+      "source": "pubmed",
+      "value": [
+        "Trastuzumab deruxtecan in patients with solid tumours harbouring specific activating HER2 mutations (DESTINY-PanTumor01): an international, phase 2 study.",
+        "Trastuzumab deruxtecan in patients with metastatic non-small-cell lung cancer (DESTINY-Lung01): primary results of the HER2-overexpressing cohorts from a single-arm, phase 2 trial.",
+        "Efficacy and Safety of Trastuzumab Deruxtecan in Patients With HER2-Expressing Solid Tumors: Primary Results From the DESTINY-PanTumor02 Phase II Trial.",
+        "Trastuzumab deruxtecan in breast cancer.",
+        "Trastuzumab Deruxtecan in HER2-Mutant Non-Small-Cell Lung Cancer."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=TRASTUZUMAB DERUXTECAN",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
+    },
+    {
       "drug_chembl_id": "CHEMBL4535757",
       "key": "action_type",
       "source": "chembl",
@@ -1139,6 +1174,7 @@
             "n": 2,
             "is_target": true,
             "median_nm": 3754.83,
+            "gene_symbol": "KRAS",
             "target_chembl_id": "CHEMBL2189121",
             "target_pref_name": "GTPase KRas",
             "fold_vs_reference": 1.0
@@ -1149,6 +1185,7 @@
           "n": 2,
           "is_target": true,
           "median_nm": 3754.83,
+          "gene_symbol": "KRAS",
           "target_chembl_id": "CHEMBL2189121",
           "target_pref_name": "GTPase KRas",
           "fold_vs_reference": 1.0
@@ -1472,6 +1509,22 @@
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=SOTORASIB",
       "error": null,
       "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
+      "source": "pubmed",
+      "value": [
+        "Sotorasib for Lung Cancers with KRAS p.G12C Mutation.",
+        "Sotorasib: a treatment for non-small cell lung cancer with the KRAS G12C mutation.",
+        "KRAS mutation: from undruggable to druggable in cancer.",
+        "Molecular determinants of sotorasib clinical efficacy in KRASG12C-mutated non-small-cell lung cancer.",
+        "KRASG12C Inhibition with Sotorasib in Advanced Solid Tumors."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=SOTORASIB",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
     },
     {
       "drug_chembl_id": "CHEMBL4594350",
@@ -1893,6 +1946,22 @@
       "confidence": null
     },
     {
+      "drug_chembl_id": "CHEMBL4594350",
+      "source": "pubmed",
+      "value": [
+        "KRAS mutation: from undruggable to druggable in cancer.",
+        "Adagrasib in Advanced Solid Tumors Harboring a KRASG12C Mutation.",
+        "Adagrasib in the Treatment of KRAS p.G12C Positive Advanced NSCLC: Design, Development and Place in Therapy.",
+        "First-in-Human Phase I/IB Dose-Finding Study of Adagrasib (MRTX849) in Patients With Advanced KRASG12C Solid Tumors (KRYSTAL-1).",
+        "Adagrasib with or without Cetuximab in Colorectal Cancer with Mutated KRAS G12C."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=ADAGRASIB",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
+    },
+    {
       "drug_chembl_id": "CHEMBL5095236",
       "key": "action_type",
       "source": "chembl",
@@ -2285,6 +2354,22 @@
       "confidence": null
     },
     {
+      "drug_chembl_id": "CHEMBL5095236",
+      "source": "pubmed",
+      "value": [
+        "Targeting KRAS G12C Mutation in Colorectal Cancer, A Review: New Arrows in the Quiver.",
+        "Circulating Tumor DNA Dynamics Reveal KRAS G12C Mutation Heterogeneity and Response to Treatment with the KRAS G12C Inhibitor Divarasib in Solid Tumors.",
+        "Recent advances in therapeutic targeting of the KRAS pathway in cancer.",
+        "Single-Agent Divarasib (GDC-6036) in Solid Tumors with a KRAS G12C Mutation.",
+        "The structure of KRASG12C bound to divarasib highlights features of potent switch-II pocket engagement."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=DIVARASIB",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
+    },
+    {
       "drug_chembl_id": "CHEMBL5314518",
       "key": "action_type",
       "source": "chembl",
@@ -2386,6 +2471,7 @@
             "n": 2,
             "is_target": true,
             "median_nm": 2.0,
+            "gene_symbol": "KRAS",
             "target_chembl_id": "CHEMBL2189121",
             "target_pref_name": "GTPase KRas",
             "fold_vs_reference": 1.0
@@ -2396,6 +2482,7 @@
           "n": 2,
           "is_target": true,
           "median_nm": 2.0,
+          "gene_symbol": "KRAS",
           "target_chembl_id": "CHEMBL2189121",
           "target_pref_name": "GTPase KRas",
           "fold_vs_reference": 1.0
@@ -2699,6 +2786,22 @@
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=GLECIRASIB",
       "error": null,
       "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "source": "pubmed",
+      "value": [
+        "The dynamic evolution of circulating tumor cells during glecirasib treatment predicts survival and resistance in gastrointestinal tumors with KRASG12C mutation.",
+        "Efficacy and safety of glecirasib in solid tumors with KRAS G12C mutation: A pooled analysis of two phase I/II trials.",
+        "[Advances in Diagnosis and Targeted Therapy of KRASG12C Mutant  Non-small Cell Lung Cancer].",
+        "Glecirasib with or without cetuximab in previously treated locally advanced or metastatic colorectal cancer with KRASG12C mutation (JAB-21822-1002 and JAB-21822-1007): two open-label, non-randomised phase 1/2 trials.",
+        "Small molecules for Kirsten rat sarcoma viral oncogene homolog mutant cancers: Past, present, and future."
+      ],
+      "status": "ok",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/?term=GLECIRASIB",
+      "error": null,
+      "confidence": null,
+      "key": "relevant_titles"
     },
     {
       "drug_chembl_id": "CHEMBL3353410",

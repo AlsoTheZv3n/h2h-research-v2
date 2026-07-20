@@ -3,6 +3,7 @@ import type { AssociatedCancers, SourcedFact } from '../api/types'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
+import { associationStrength, STRONG_ASSOCIATION } from '../association'
 
 /**
  * The cancers a target is associated with -- the cancer target-landscape run backwards. Open
@@ -19,7 +20,7 @@ export function AssociatedCancersCard({ id, facts }: { id?: string; facts?: Sour
     <Card
       id={id}
       title="Associated cancers"
-      note="Cancers this target is associated with · Open Targets association score, filtered to the catalog"
+      note={`Cancers this target is associated with · Open Targets association strength, filtered to the catalog (strong = score ≥ ${STRONG_ASSOCIATION})`}
     >
       <FactGate facts={facts}>
         {(fact) => {
@@ -48,8 +49,19 @@ export function AssociatedCancersCard({ id, facts }: { id?: string; facts?: Sour
                     data-testid="associated-cancer-row"
                     className="flex items-center gap-2 py-1.5 text-sm"
                   >
-                    <span className="w-10 shrink-0 tabular-nums text-xs text-ink-muted">
-                      {c.score.toFixed(2)}
+                    {/* B5: lead with the qualitative strength (no evidence-type breakdown on the
+                        reverse query, so strength-only); the 0-1 score is faint detail. */}
+                    <span className="w-24 shrink-0 text-xs" title="Open Targets association strength">
+                      <span
+                        className={
+                          associationStrength(c.score) === 'strong' ? 'text-ink' : 'text-ink-muted'
+                        }
+                      >
+                        {associationStrength(c.score)}
+                      </span>{' '}
+                      <span className="text-[10px] tabular-nums text-ink-faint">
+                        {c.score.toFixed(2)}
+                      </span>
                     </span>
                     <Link
                       to={`/cancers/${c.disease_id}`}

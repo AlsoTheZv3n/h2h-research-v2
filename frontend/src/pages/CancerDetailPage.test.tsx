@@ -21,6 +21,8 @@ describe('TargetsStat', () => {
     // ...and it never travels without the threshold: this is the assertion that fails if
     // the number is ever shown bare.
     expect(stat).toHaveTextContent(/score ≥ 0\.5/)
+    // B5: the cut is named ("strong association"), not a bare threshold to decode.
+    expect(stat).toHaveTextContent(/strong association \(score ≥ 0\.5\)/)
     // The raw total is present, but only ever framed as "with any evidence".
     expect(stat).toHaveTextContent(/17,064 with any evidence/)
   })

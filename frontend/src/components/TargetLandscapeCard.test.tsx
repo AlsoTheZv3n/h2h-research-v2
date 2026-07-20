@@ -58,6 +58,19 @@ describe('TargetLandscapeCard', () => {
     expect(screen.getByTestId('source-info')).toBeInTheDocument()
   })
 
+  it('reads the association score qualitatively (B5): strength leads, evidence in words', () => {
+    renderCard({ facts: [fact({ value: landscape })] })
+    const rows = screen.getAllByTestId('landscape-row')
+    const egfr = rows.find((r) => within(r).queryByText('EGFR'))!
+    // The strength word leads; the 0-1 score travels as detail, not a bare number to decode.
+    expect(egfr).toHaveTextContent('strong')
+    expect(egfr).toHaveTextContent('0.89')
+    // Contributing evidence types render in reader words (somatic_mutation -> "somatic mutation").
+    const stk11 = rows.find((r) => within(r).queryByText('STK11'))!
+    expect(stk11).toHaveTextContent(/somatic mutation/)
+    expect(stk11).not.toHaveTextContent(/somatic_mutation/)
+  })
+
   it('renders each drugged state with its own distinct marker', () => {
     renderCard({ facts: [fact({ value: landscape })] })
     const states = ['approved', 'clinical', 'unexploited', 'unknown']

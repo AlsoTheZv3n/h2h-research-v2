@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from backend.domain.potency import summarize_ic50
-from backend.domain.selectivity import compute_selectivity
+from backend.domain.selectivity import SelectivityProfile, compute_selectivity
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 
 BASE = "https://www.ebi.ac.uk/chembl/api/data"
@@ -210,7 +210,11 @@ class ChEMBLAdapter:
             # only honest read for a multi-target drug -- vatalanib is a VEGFR inhibitor whose
             # most potent target was being dumped as off-target.
             facts["ic50_summary"] = ok(summarize_ic50(activities, target_ids).as_dict())
-            facts["selectivity_profile"] = ok(compute_selectivity(activities).as_dict())
+            profile = compute_selectivity(activities)
+            # Resolve each ranked target's gene symbol so the mechanism card's symbol list can be
+            # ordered by this same potency ranking (B3). Degradable: a failure leaves symbols None.
+            await self._attach_gene_symbols(profile)
+            facts["selectivity_profile"] = ok(profile.as_dict())
         except Exception as exc:
             for key in _ACTIVITY_KEYS:
                 facts[key] = failed(self.name, f"activity: {exc}", source_url=url)
@@ -228,6 +232,42 @@ class ChEMBLAdapter:
             facts=facts,
             provenance={"source_url": url, "retrieved_at": retrieved_at},
         )
+
+    async def _attach_gene_symbols(self, profile: SelectivityProfile) -> None:
+        """Set each ranked target's HGNC gene symbol (KDR for VEGFR2) in place.
+
+        One bulk target lookup for the whole ranked set. Deliberately best-effort: the symbols
+        only ORDER the mechanism card's target list against the potency ranking (B3), so on any
+        failure they stay None and that list falls back to its source order -- the selectivity
+        profile itself is already computed and never at risk here.
+        """
+        ids = [t.target_chembl_id for t in profile.targets]
+        if not ids:
+            return
+        try:
+            r = await self.client.get(
+                f"{BASE}/target.json",
+                params={"target_chembl_id__in": ",".join(ids), "limit": len(ids)},
+            )
+            r.raise_for_status()
+            targets = r.json().get("targets", [])
+        except Exception:
+            return
+
+        symbols: dict[str, str] = {}
+        for tgt in targets:
+            tid = tgt.get("target_chembl_id")
+            for comp in tgt.get("target_components") or []:
+                syms = [
+                    s["component_synonym"]
+                    for s in comp.get("target_component_synonyms") or []
+                    if s.get("syn_type") == "GENE_SYMBOL" and s.get("component_synonym")
+                ]
+                if tid and syms:
+                    symbols[tid] = syms[0]
+                    break  # first component's symbol; a single-protein target has just the one
+        for target in profile.targets:
+            target.gene_symbol = symbols.get(target.target_chembl_id)
 
 
 def _as_float(value: Any) -> float | None:

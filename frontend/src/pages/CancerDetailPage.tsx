@@ -198,8 +198,10 @@ export function TargetsStat({
       </dd>
       <dd className="mt-0.5 text-[11px] text-ink-faint">
         {hasStrong ? (
+          // B5: name what the cut MEANS ("strong association") rather than showing a bare "≥ 0.5",
+          // and frame the raw total as the whole-genome-sized "any evidence" number beside it.
           <>
-            score ≥ {threshold} · {formatCount(total)} with any evidence
+            strong association (score ≥ {threshold}) · {formatCount(total)} with any evidence
           </>
         ) : (
           'with any evidence'
