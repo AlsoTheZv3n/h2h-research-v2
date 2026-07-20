@@ -137,7 +137,9 @@ function TargetLandscapeBody({
             </option>
           ))}
         </select>
-        <span className="text-[11px] text-ink-faint">status is against the target, any indication</span>
+        <span className="text-[11px] text-ink-faint">
+          Drug status: is there a drug against this target anywhere? (Open Targets, any indication)
+        </span>
       </div>
 
       <ul className="divide-y divide-line" data-testid="target-landscape">
