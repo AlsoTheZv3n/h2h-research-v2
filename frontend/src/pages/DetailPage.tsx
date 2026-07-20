@@ -8,6 +8,7 @@ import { Ask } from '../components/Ask'
 import { CombinationsCard } from '../components/CombinationsCard'
 import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
+import { MechanismsFact } from '../components/MechanismsFact'
 import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
@@ -243,12 +244,9 @@ export function DetailPage() {
                 emptyLabel="No mechanism annotated"
               />
               <Fact label="Action type" facts={pick(detail, 'action_type')} />
-              <Fact
-                label="All mechanisms"
-                facts={pick(detail, 'all_moas')}
-                render={list}
-                emptyLabel="None annotated"
-              />
+              {/* Deduped across ChEMBL + Open Targets (B2): one set, each mechanism with its
+                  source chips, instead of the same list repeated once per source. */}
+              <MechanismsFact facts={pick(detail, 'all_moas')} />
               <Fact
                 label="Targets"
                 facts={pick(detail, 'targets')}
