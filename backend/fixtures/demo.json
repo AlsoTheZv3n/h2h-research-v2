@@ -232,6 +232,52 @@
     },
     {
       "drug_chembl_id": "CHEMBL3353410",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [
+          {
+            "n": 151,
+            "is_target": true,
+            "median_nm": 8.807,
+            "target_chembl_id": "CHEMBL203",
+            "target_pref_name": "Epidermal growth factor receptor",
+            "fold_vs_reference": 1.0
+          },
+          {
+            "n": 3,
+            "is_target": false,
+            "median_nm": 3980.0,
+            "target_chembl_id": "CHEMBL6136",
+            "target_pref_name": "Lysine-specific histone demethylase 1A",
+            "fold_vs_reference": 451.91
+          }
+        ],
+        "n_targets": 1,
+        "reference": {
+          "n": 151,
+          "is_target": true,
+          "median_nm": 8.807,
+          "target_chembl_id": "CHEMBL203",
+          "target_pref_name": "Epidermal growth factor receptor",
+          "fold_vs_reference": 1.0
+        },
+        "n_protein_rows": 154,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 540,
+        "n_cell_based_rows": 450,
+        "n_unassigned_rows": 80,
+        "n_measured_targets": 2,
+        "n_binding_nonexact_rows": 10,
+        "n_uncorroborated_targets": 7
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3353410/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL3353410",
       "key": "max_phase",
       "source": "chembl",
       "value": 4,
@@ -625,6 +671,28 @@
           "CHEMBL1781",
           "CHEMBL1824"
         ]
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4297844",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [],
+        "n_targets": 0,
+        "reference": null,
+        "n_protein_rows": 0,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 0,
+        "n_cell_based_rows": 0,
+        "n_unassigned_rows": 0,
+        "n_measured_targets": 0,
+        "n_binding_nonexact_rows": 0,
+        "n_uncorroborated_targets": 0
       },
       "status": "ok",
       "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4297844/",
@@ -1063,6 +1131,44 @@
     },
     {
       "drug_chembl_id": "CHEMBL4535757",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [
+          {
+            "n": 2,
+            "is_target": true,
+            "median_nm": 3754.83,
+            "target_chembl_id": "CHEMBL2189121",
+            "target_pref_name": "GTPase KRas",
+            "fold_vs_reference": 1.0
+          }
+        ],
+        "n_targets": 1,
+        "reference": {
+          "n": 2,
+          "is_target": true,
+          "median_nm": 3754.83,
+          "target_chembl_id": "CHEMBL2189121",
+          "target_pref_name": "GTPase KRas",
+          "fold_vs_reference": 1.0
+        },
+        "n_protein_rows": 2,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 55,
+        "n_cell_based_rows": 50,
+        "n_unassigned_rows": 4,
+        "n_measured_targets": 1,
+        "n_binding_nonexact_rows": 1,
+        "n_uncorroborated_targets": 0
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4535757/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4535757",
       "key": "max_phase",
       "source": "chembl",
       "value": 4,
@@ -1468,6 +1574,28 @@
     },
     {
       "drug_chembl_id": "CHEMBL4594350",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [],
+        "n_targets": 0,
+        "reference": null,
+        "n_protein_rows": 0,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 30,
+        "n_cell_based_rows": 25,
+        "n_unassigned_rows": 5,
+        "n_measured_targets": 0,
+        "n_binding_nonexact_rows": 0,
+        "n_uncorroborated_targets": 0
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL4594350",
       "key": "max_phase",
       "source": "chembl",
       "value": 4,
@@ -1850,6 +1978,28 @@
     },
     {
       "drug_chembl_id": "CHEMBL5095236",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [],
+        "n_targets": 0,
+        "reference": null,
+        "n_protein_rows": 0,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 2,
+        "n_cell_based_rows": 0,
+        "n_unassigned_rows": 2,
+        "n_measured_targets": 0,
+        "n_binding_nonexact_rows": 0,
+        "n_uncorroborated_targets": 0
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5095236/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5095236",
       "key": "max_phase",
       "source": "chembl",
       "value": 2,
@@ -2220,6 +2370,44 @@
         "other_units": {},
         "n_activities": 13,
         "target_chembl_ids": []
+      },
+      "status": "ok",
+      "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",
+      "error": null,
+      "confidence": null
+    },
+    {
+      "drug_chembl_id": "CHEMBL5314518",
+      "key": "selectivity_profile",
+      "source": "chembl",
+      "value": {
+        "targets": [
+          {
+            "n": 2,
+            "is_target": true,
+            "median_nm": 2.0,
+            "target_chembl_id": "CHEMBL2189121",
+            "target_pref_name": "GTPase KRas",
+            "fold_vs_reference": 1.0
+          }
+        ],
+        "n_targets": 1,
+        "reference": {
+          "n": 2,
+          "is_target": true,
+          "median_nm": 2.0,
+          "target_chembl_id": "CHEMBL2189121",
+          "target_pref_name": "GTPase KRas",
+          "fold_vs_reference": 1.0
+        },
+        "n_protein_rows": 2,
+        "threshold_fold": 100.0,
+        "n_excluded_rows": 9,
+        "n_cell_based_rows": 4,
+        "n_unassigned_rows": 3,
+        "n_measured_targets": 1,
+        "n_binding_nonexact_rows": 2,
+        "n_uncorroborated_targets": 2
       },
       "status": "ok",
       "source_url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL5314518/",

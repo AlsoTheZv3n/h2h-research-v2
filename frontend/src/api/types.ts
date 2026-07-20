@@ -105,7 +105,8 @@ export interface FacetCount {
  *  'has_target' for drugs; 'therapeutic_area', 'has_drugs' for cancers). */
 export type FacetCounts = Record<string, FacetCount[]>
 
-/** The on-target potency answer -- not a raw count of activity rows. */
+/** The on-target potency answer -- not a raw count of activity rows. Superseded on the drug
+ *  page by SelectivityProfile (the `selectivity_profile` fact); still produced by the backend. */
 export interface PotencySummary {
   target_chembl_ids: string[]
   n_activities: number
@@ -118,6 +119,57 @@ export interface PotencySummary {
   units: string
   off_target: Record<string, number>
   other_units: Record<string, number>
+}
+
+/** One molecular target in a drug's selectivity profile, placed relative to the most-potent
+ *  (reference) target. */
+export interface SelectivityTarget {
+  target_chembl_id: string
+  target_pref_name: string
+  /** Median of this target's exact single-protein nM IC50s. */
+  median_nm: number
+  /** Exact measurements the median is over (always >= the corroboration minimum). */
+  n: number
+  /** median_nm / the reference target's median_nm; 1.0 for the reference itself. */
+  fold_vs_reference: number
+  /** Within threshold_fold of the reference -- a real target, not incidental. */
+  is_target: boolean
+}
+
+/**
+ * A drug's measured molecular targets, ranked by potency, relative to the most potent
+ * (reference). The field's selectivity read: it declares no primary target -- the reference
+ * is whichever single-protein target the drug binds most potently, and every other target is a
+ * fold-difference from it. `n_uncorroborated_targets` (measured only once) and `n_excluded_rows`
+ * (cell-based / censored / non-nM) are the data set aside from the ranking -- counted, never
+ * hidden. `reference` is null exactly when nothing corroborated could be ranked.
+ */
+export interface SelectivityProfile {
+  targets: SelectivityTarget[]
+  reference: SelectivityTarget | null
+  /** Targets within threshold_fold of the reference -- the selectivity count (fewer = more
+   *  selective), the reference included. */
+  n_targets: number
+  /** All ranked (corroborated) targets, within threshold or beyond it. */
+  n_measured_targets: number
+  threshold_fold: number
+  /** Exact single-protein nM measurements the ranking is built from. */
+  n_protein_rows: number
+  /** Rows set aside from the ranking, total (= the three kind counts below, when present). */
+  n_excluded_rows: number
+  /** Molecular targets seen but measured fewer than the minimum, so not ranked. */
+  n_uncorroborated_targets: number
+  /**
+   * The A3 assay-kind split. Optional: facts stored before A3 lack them, and the card falls back
+   * to the single set-aside line then.
+   *   n_cell_based_rows      cell-line readouts (cell response, not target binding).
+   *   n_unassigned_rows      neither single-protein binding nor a cell line (organism/tissue/
+   *                          complex/multi-protein/unspecified format).
+   *   n_binding_nonexact_rows single-protein binding rows that could not rank (censored/non-nM).
+   */
+  n_cell_based_rows?: number
+  n_unassigned_rows?: number
+  n_binding_nonexact_rows?: number
 }
 
 /**

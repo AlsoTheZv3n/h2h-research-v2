@@ -133,14 +133,14 @@ export const TASKS: Task[] = [
   {
     id: 'osimertinib-potency',
     question:
-      'What is the on-target potency of osimertinib, and how reliable is that number? State the value and explain what it is measured over.',
+      'What does osimertinib mainly target, and how selective is it? Read the potency card and say which target it is most potent on and how you can tell how selectively it acts.',
     expected:
-      'A median (12.66 nM) with a range over the EXACT on-target measurements (62), off-target and censored rows excluded -- a decision-grade summary, NOT a raw count of all activities.',
+      'SELECTIVE for EGFR: EGFR is its most potent target (the reference, ~8.8 nM) and no other measured target is within 100× of it (the next, LSD1/KDM1A, is ~450× weaker). The card ranks single-protein BINDING measurements on a log scale; cell-line readouts (a cell response, not target binding) are counted in a separate section, never folded into the selectivity read.',
     labels: [
-      'the potency summary: median + range over exact on-target measurements',
-      '"N of M rows excluded" (off-target / censored)',
+      'the selectivity verdict: "Selective" vs "Multi-target" — targets within 100× of the most potent',
+      'assay kinds kept distinct: "Target-binding" vs "Cell-line" (a cell response, not binding)',
     ],
-    capture: (page, base) => drugPage(page, base, OSIMERTINIB, /Binding & potency/),
+    capture: (page, base) => drugPage(page, base, OSIMERTINIB, /Selectivity & potency/),
   },
   {
     id: 'unexploited-targets',

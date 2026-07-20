@@ -200,7 +200,7 @@ export function DetailPage() {
             )}
           </Card>
 
-          <PotencyCard facts={pick(detail, 'ic50_summary')} isBiologic={isBiologic} />
+          <PotencyCard facts={pick(detail, 'selectivity_profile')} isBiologic={isBiologic} />
 
           <Card title="Mechanism & target">
             <dl>
