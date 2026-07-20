@@ -286,7 +286,7 @@ export function DetailPage() {
         {/* Full width below the grid: the observed-combinations card carries example lists that
             want the room. Reads the `combinations` fact (ClinicalTrials.gov arm structure). */}
         <div className="mt-4">
-          <CombinationsCard facts={pick(detail, 'combinations')} />
+          <CombinationsCard id="combinations" facts={pick(detail, 'combinations')} />
         </div>
 
         <p className="mt-4 text-[11px] text-ink-faint">
