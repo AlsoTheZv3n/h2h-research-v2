@@ -302,6 +302,13 @@ export interface TargetLandscape {
   targets: TargetLandscapeEntry[]
 }
 
+/** One page-level synthesis line (Epic C): a derived reading and the anchor id of the block it was
+ *  derived from, so the reader can jump to the evidence behind it. */
+export interface SynthesisStatement {
+  text: string
+  block: string
+}
+
 /**
  * A cancer's evidence brief: the catalog facts plus every fact we hold, with
  * provenance. `state` is enriching while the brief is built, ready once stored --
@@ -329,6 +336,9 @@ export interface CancerDetail {
    *  -- the drugged flag's separate, weaker catalog-link. A target absent here has no drug
    *  in our catalog (NOT "unexploited", which is the world's answer); it gets no link. */
   target_catalog_drug: Record<string, string>
+  /** The page-level "so what" (C1): derived threshold statements over the facts, each linking to
+   *  its block. Empty when no rule's inputs are present. Optional: absent on pre-C1 payloads. */
+  synthesis?: SynthesisStatement[]
 }
 
 /** One cancer a target is associated with, in the target brief's associated_cancers fact.

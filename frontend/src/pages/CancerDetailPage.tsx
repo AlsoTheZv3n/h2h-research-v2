@@ -6,6 +6,7 @@ import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { BriefStateProvider } from '../components/Fact'
 import { SectionErrorBoundary } from '../components/SectionErrorBoundary'
 import { SectionNav } from '../components/SectionNav'
+import { SynthesisPanel } from '../components/SynthesisPanel'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { formatCount } from '../format'
 import { CANCER_SECTIONS } from './cancerSections'
@@ -141,6 +142,10 @@ export function CancerDetailPage() {
             <Stat label="Drugs & clinical candidates" value={formatCount(detail.n_drugs)} />
             <TargetsStat strong={tl?.n_strong} threshold={tl?.threshold} total={detail.n_targets} />
           </dl>
+
+          {/* C1: the page-level "so what" leads the evidence -- derived statements, each linking to
+              the block it came from. Absent (renders nothing) when no rule's inputs are present. */}
+          <SynthesisPanel synthesis={detail.synthesis} />
 
           {/* Each section loads and fails on its own: it renders its own honest state from its
               fact slice, and an error boundary keeps a render throw in one from blanking the

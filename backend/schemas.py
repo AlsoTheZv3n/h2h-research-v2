@@ -158,6 +158,14 @@ class CancerList(BaseModel):
     offset: int
 
 
+class SynthesisStatement(BaseModel):
+    """One page-level synthesis line (Epic C): a derived reading and the anchor id of the block it
+    was derived from, so the reader can jump to and check the evidence behind it."""
+
+    text: str
+    block: str
+
+
 class CancerDetail(BaseModel):
     """A cancer's evidence brief: the catalog row plus every fact we hold, with
     provenance. The disease-side twin of DrugDetail.
@@ -205,6 +213,13 @@ class CancerDetail(BaseModel):
         "that acts on it -- the drugged flag's separate, weaker catalog-link signal. A "
         "target absent here has no drug in OUR catalog, which is NOT 'unexploited' (the "
         "world's answer, from Open Targets); it just gets no link. Joined on Ensembl id.",
+    )
+
+    synthesis: list[SynthesisStatement] = Field(
+        default_factory=list,
+        description="The page-level 'so what' (C1): derived threshold statements over the facts "
+        "above, each linking to the block it came from. Empty when no rule's inputs are present -- "
+        "computed here so the client renders, never invents, the reading.",
     )
 
 
