@@ -50,6 +50,9 @@ const selective: SelectivityProfile = {
   n_protein_rows: 154,
   n_excluded_rows: 540,
   n_uncorroborated_targets: 7,
+  n_cell_based_rows: 450,
+  n_unassigned_rows: 80,
+  n_binding_nonexact_rows: 10,
 }
 
 // Imatinib-shaped: several targets within 100× of PDGFRα -> multi-target.
@@ -66,6 +69,9 @@ const multiTarget: SelectivityProfile = {
   n_protein_rows: 40,
   n_excluded_rows: 916,
   n_uncorroborated_targets: 11,
+  n_cell_based_rows: 800,
+  n_unassigned_rows: 116,
+  n_binding_nonexact_rows: 0,
 }
 
 describe('PotencyCard', () => {
@@ -101,12 +107,40 @@ describe('PotencyCard', () => {
     )
   })
 
-  it('discloses the ranking rule and the set-aside counts, never hiding them', () => {
+  it('discloses the ranking rule, never hiding it', () => {
     render(<PotencyCard facts={[fact({ value: selective })]} isBiologic={false} />)
-    const note = screen.getByTestId('selectivity-setaside')
-    expect(note).toHaveTextContent('most potent = reference, within 100× = a target')
-    expect(note).toHaveTextContent('7 measured once (not ranked)')
-    expect(note).toHaveTextContent('540 rows set aside')
+    expect(screen.getByTestId('selectivity-setaside')).toHaveTextContent(
+      'most potent = reference, within 100× = a target',
+    )
+  })
+
+  it('splits the measurements into distinct assay-kind sections (A3)', () => {
+    render(<PotencyCard facts={[fact({ value: selective })]} isBiologic={false} />)
+    // Target-binding is the profile above (154 ranked + 7 measured once + 10 not exact = 171).
+    const binding = screen.getByTestId('assay-kind-binding')
+    expect(binding).toHaveTextContent('Target-binding')
+    expect(binding).toHaveTextContent('171')
+    expect(binding).toHaveTextContent('154 ranked')
+    // Cell-line is its own section, explicitly NOT target binding -- the category error the split
+    // exists to prevent. 450 rows, none of which touched the selectivity profile.
+    const cell = screen.getByTestId('assay-kind-cell')
+    expect(cell).toHaveTextContent('Cell-line')
+    expect(cell).toHaveTextContent('450')
+    expect(cell).toHaveTextContent(/not target binding/)
+    // Unassigned rows are shown, not silently dropped.
+    expect(screen.getByTestId('assay-kind-unassigned')).toHaveTextContent('80')
+  })
+
+  it('falls back to a single set-aside line for a pre-A3 fact (no kind counts)', () => {
+    // A fact stored before A3 lacks the kind fields -> the card must still render honestly,
+    // with the old single line, never crash on the missing counts.
+    const preA3 = { ...selective }
+    delete (preA3 as Partial<SelectivityProfile>).n_cell_based_rows
+    delete (preA3 as Partial<SelectivityProfile>).n_unassigned_rows
+    delete (preA3 as Partial<SelectivityProfile>).n_binding_nonexact_rows
+    render(<PotencyCard facts={[fact({ value: preA3 })]} isBiologic={false} />)
+    expect(screen.queryByTestId('assay-kinds')).not.toBeInTheDocument()
+    expect(screen.getByTestId('selectivity-setaside')).toHaveTextContent('540 rows set aside')
   })
 
   it('a profile with nothing corroborated says WHY, not a bare "no data"', () => {
@@ -125,6 +159,26 @@ describe('PotencyCard', () => {
       /measured only once — too few to rank/,
     )
     expect(screen.queryByTestId('selectivity-profile')).not.toBeInTheDocument()
+  })
+
+  it('when every row was a cell line, the kind breakdown IS the explanation', () => {
+    const allCell: SelectivityProfile = {
+      reference: null,
+      targets: [],
+      n_targets: 0,
+      n_measured_targets: 0,
+      threshold_fold: 100,
+      n_protein_rows: 0,
+      n_excluded_rows: 12,
+      n_uncorroborated_targets: 0,
+      n_cell_based_rows: 12,
+      n_unassigned_rows: 0,
+      n_binding_nonexact_rows: 0,
+    }
+    render(<PotencyCard facts={[fact({ value: allCell })]} isBiologic={false} />)
+    expect(screen.getByTestId('selectivity-empty')).toHaveTextContent(/No single-protein binding/)
+    // The reader sees WHY there is no profile: all 12 rows were cell-line readouts.
+    expect(screen.getByTestId('assay-kind-cell')).toHaveTextContent('12')
   })
 
   it('renders an outage as a calm unavailable chip, never "no potency"', () => {

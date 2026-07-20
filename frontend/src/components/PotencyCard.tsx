@@ -127,7 +127,7 @@ function SelectivityBody({ fact }: { fact: SourcedFact }) {
         </li>
       </ul>
 
-      <ProfileFootnote profile={profile} nProteinRows={n_protein_rows} beyondHidden={beyondHidden} />
+      <ProfileFooter profile={profile} nProteinRows={n_protein_rows} beyondHidden={beyondHidden} />
     </>
   )
 }
@@ -174,9 +174,9 @@ function TargetRow({
   )
 }
 
-/** The disclosed set-aside line: what did not rank, and the rule the ranking followed. A2 shows
- *  the counts plainly; A4 escalates a dominant exclusion into a warning. */
-function ProfileFootnote({
+/** The disclosed rule the ranking followed, plus the A3 assay-kind breakdown of every other row.
+ *  A4 escalates a dominant exclusion into a warning. */
+function ProfileFooter({
   profile,
   nProteinRows,
   beyondHidden,
@@ -185,22 +185,102 @@ function ProfileFootnote({
   nProteinRows: number
   beyondHidden: number
 }) {
-  const parts: string[] = []
-  if (beyondHidden > 0) parts.push(`${beyondHidden} more beyond 100× (incidental)`)
-  if (profile.n_uncorroborated_targets > 0)
-    parts.push(`${profile.n_uncorroborated_targets} measured once (not ranked)`)
-  if (profile.n_excluded_rows > 0)
-    parts.push(`${profile.n_excluded_rows} rows set aside (cell-based, censored, non-nM)`)
-
   return (
-    <p
+    <div
       className="mt-2 border-t border-line pt-1.5 text-[11px] text-ink-faint"
       data-testid="selectivity-setaside"
     >
-      Ranking over {nProteinRows} exact single-protein measurement{nProteinRows === 1 ? '' : 's'};
-      most potent = reference, within 100× = a target.
-      {parts.length > 0 && <> Set aside: {parts.join(' · ')}.</>}
-    </p>
+      <p>
+        Ranking over {nProteinRows} exact single-protein measurement{nProteinRows === 1 ? '' : 's'};
+        most potent = reference, within 100× = a target.
+        {beyondHidden > 0 && ` +${beyondHidden} more beyond 100× (incidental).`}
+      </p>
+      <AssayKinds profile={profile} />
+    </div>
+  )
+}
+
+/**
+ * A3: every IC50 row this drug has, split by assay KIND -- so a cell-line readout (a cell
+ * response) is never read as a target potency, and the unassigned rows are shown, not dropped.
+ * Falls back to a single set-aside line for facts stored before A3 (no kind counts).
+ */
+function AssayKinds({ profile }: { profile: SelectivityProfile }) {
+  if (profile.n_cell_based_rows === undefined) {
+    // Pre-A3 fact: the kinds were not broken out. Keep the honest single line.
+    return profile.n_excluded_rows > 0 || profile.n_uncorroborated_targets > 0 ? (
+      <p className="mt-1">
+        Set aside:{' '}
+        {[
+          profile.n_uncorroborated_targets > 0 &&
+            `${profile.n_uncorroborated_targets} measured once (not ranked)`,
+          profile.n_excluded_rows > 0 &&
+            `${profile.n_excluded_rows} rows set aside (cell-based, censored, non-nM)`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+        .
+      </p>
+    ) : null
+  }
+
+  const cell = profile.n_cell_based_rows
+  const unassigned = profile.n_unassigned_rows ?? 0
+  const nonexact = profile.n_binding_nonexact_rows ?? 0
+  const bindingTotal = profile.n_protein_rows + profile.n_uncorroborated_targets + nonexact
+  const bindingDetail = [
+    `${profile.n_protein_rows} ranked`,
+    profile.n_uncorroborated_targets > 0 && `${profile.n_uncorroborated_targets} measured once`,
+    nonexact > 0 && `${nonexact} not an exact nM value`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  // Target-binding is always shown (it is the profile above); a cell-line or unassigned section
+  // appears only when it has rows -- but when it does, it is never folded into the binding read.
+  const kinds: { key: string; label: string; n: number; detail: string; title: string }[] = [
+    {
+      key: 'binding',
+      label: 'Target-binding',
+      n: bindingTotal,
+      detail: bindingDetail,
+      title: 'Single-protein biochemical assays — the selectivity profile above is built from these.',
+    },
+  ]
+  if (cell > 0)
+    kinds.push({
+      key: 'cell',
+      label: 'Cell-line',
+      n: cell,
+      detail: 'a cell response, not target binding — never in the profile',
+      title:
+        'Cell-line readouts (A549, HT-29, HUVEC): they measure a cell response, not affinity for a target, so they cannot be read as a target potency.',
+    })
+  if (unassigned > 0)
+    kinds.push({
+      key: 'unassigned',
+      label: 'Unassigned',
+      n: unassigned,
+      detail: 'organism / tissue / complex / unspecified format',
+      title: 'Neither a single-protein binding assay nor a cell line — shown, never silently dropped.',
+    })
+
+  return (
+    <dl className="mt-1.5" data-testid="assay-kinds">
+      <dt className="sr-only">Measurements by assay kind</dt>
+      {kinds.map((k) => (
+        <dd
+          key={k.key}
+          data-testid={`assay-kind-${k.key}`}
+          className="flex items-baseline gap-1.5"
+          title={k.title}
+        >
+          <span className="w-24 shrink-0 font-medium text-ink-muted">{k.label}</span>
+          <span className="w-8 shrink-0 text-right tabular-nums text-ink-muted">{k.n}</span>
+          <span className="min-w-0 flex-1 truncate">— {k.detail}</span>
+        </dd>
+      ))}
+    </dl>
   )
 }
 
@@ -214,9 +294,17 @@ function NoProfile({ profile, fact }: { profile: SelectivityProfile | null; fact
         ? `No single-protein binding measurements to rank; ${profile.n_excluded_rows} row${profile.n_excluded_rows === 1 ? '' : 's'} set aside (cell-based, censored, or non-nM).`
         : 'No single-protein potency to rank.'
   return (
-    <p className="text-sm text-ink-muted" data-testid="selectivity-empty">
-      {reason}
-      <CitationChip fact={fact} />
-    </p>
+    <div data-testid="selectivity-empty">
+      <p className="text-sm text-ink-muted">
+        {reason}
+        <CitationChip fact={fact} />
+      </p>
+      {/* The kind breakdown IS the explanation here -- e.g. "all rows were cell-line readouts". */}
+      {profile && (
+        <div className="mt-2 border-t border-line pt-1.5 text-[11px] text-ink-faint">
+          <AssayKinds profile={profile} />
+        </div>
+      )}
+    </div>
   )
 }

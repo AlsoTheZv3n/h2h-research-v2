@@ -45,9 +45,31 @@ from backend.domain.potency import CENSORED_RELATIONS, NANOMOLAR, _to_float
 # a 2 nM IC50 (`protein format`, n=2) which, admitted, outranks EGFR's own 8.8 nM (n=152) and
 # headlines the profile with a "target" that is not a single protein. "protein complex format",
 # "cell-based format", "organism-based format" and the generic "assay format" are set aside for
-# the same reason (their fuller separation is A3). Matched on the ontology label, not the
-# free-text target name, because a cell line sits in target_pref_name just like a protein does.
+# the same reason (A3 sections them by kind). Matched on the ontology label, not the free-text
+# target name, because a cell line sits in target_pref_name just like a protein does.
 PROTEIN_FORMATS = frozenset({"single protein format"})
+
+# A cell-based readout measures a CELL RESPONSE (viability, proliferation on A549 / HT-29 /
+# HUVEC), not a drug's affinity for a target. Folding it into an on/off-target potency is a
+# category error, so it is sectioned out (A3) and never enters the binding selectivity.
+CELL_BASED_FORMAT = "cell-based format"
+
+
+def _assay_kind(activity: dict[str, Any]) -> str:
+    """Which of the three assay kinds a row is -- the A3 split, so each number means what it says.
+
+    binding      single-protein biochemical assay -- the selectivity profile is built from these.
+    cell_based   a cell-line readout (cell response, not target binding).
+    unassigned   everything else: organism-/tissue-/complex-/multi-protein or unspecified format --
+                 neither single-protein binding nor a cell line. Shown, never silently dropped.
+    """
+    label = activity.get("bao_label") or ""
+    if label in PROTEIN_FORMATS:
+        return "binding"
+    if label == CELL_BASED_FORMAT:
+        return "cell_based"
+    return "unassigned"
+
 
 # How far below the reference a target may sit and still count as a real target. 100x is the
 # field's usual cut (the imatinib example). A judgement, disclosed -- not a measurement.
@@ -100,11 +122,24 @@ class SelectivityProfile:
     n_protein_rows: int = 0
     """Exact nM single-protein binding rows the ranking is built from (over ranked targets)."""
     n_excluded_rows: int = 0
-    """Rows set aside: cell-based / organism / other format, censored, or non-nM. Reported so a
-    profile built from a fraction of the rows says so (A4 warns when this dominates)."""
+    """Rows set aside from the ranking, total: cell-based + unassigned + non-exact binding. The
+    sum of the three A3 kind-counts below; reported so a profile built from a fraction of the rows
+    says so (A4 warns when this dominates)."""
     n_uncorroborated_targets: int = 0
     """Molecular targets seen but measured fewer than MIN_MEASUREMENTS times, so not ranked --
     a single row is too weak to anchor or place a selectivity claim. Counted, not hidden."""
+
+    # The A3 assay-kind split: every row is one of binding / cell-based / unassigned, so each
+    # number means what it says and a cell-line readout can never be read as a target potency.
+    n_cell_based_rows: int = 0
+    """Cell-line readouts (A549, HT-29, HUVEC): a CELL RESPONSE, not target binding. Never in the
+    selectivity profile above -- sectioned out so it cannot corrupt the on/off-target read."""
+    n_unassigned_rows: int = 0
+    """Rows that are neither single-protein binding nor a cell line: organism-/tissue-/complex-/
+    multi-protein or unspecified format. Shown honestly, never silently dropped."""
+    n_binding_nonexact_rows: int = 0
+    """Single-protein binding rows that could not rank: censored bound (>/<), non-nM unit, or no
+    target id. Binding in KIND, but not an exact measurement to place on the scale."""
 
     @property
     def reference(self) -> SelectivityTarget | None:
@@ -128,11 +163,10 @@ class SelectivityProfile:
             "n_protein_rows": self.n_protein_rows,
             "n_excluded_rows": self.n_excluded_rows,
             "n_uncorroborated_targets": self.n_uncorroborated_targets,
+            "n_cell_based_rows": self.n_cell_based_rows,
+            "n_unassigned_rows": self.n_unassigned_rows,
+            "n_binding_nonexact_rows": self.n_binding_nonexact_rows,
         }
-
-
-def _is_protein_binding(activity: dict[str, Any]) -> bool:
-    return (activity.get("bao_label") or "") in PROTEIN_FORMATS
 
 
 def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
@@ -140,30 +174,42 @@ def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
 
     No declared primary target: the reference is whichever single-protein target the drug binds
     most potently. Targets within `threshold_fold` of it are real targets; the rest are weaker or
-    incidental. Cell-based rows, censored bounds and non-nM rows do not rank (they are counted).
+    incidental. Every row is first split by assay kind (A3) -- only single-protein binding rows can
+    rank; cell-based and unassigned rows are counted by kind, never folded into an on/off read.
     """
     # target_chembl_id -> exact nM binding values against it
     by_target: dict[str, list[float]] = defaultdict(list)
     names: dict[str, str] = {}
-    excluded = 0
+    n_cell_based = 0
+    n_unassigned = 0
+    n_binding_nonexact = 0
 
     for a in activities:
+        kind = _assay_kind(a)
+        if kind == "cell_based":
+            n_cell_based += 1
+            continue
+        if kind == "unassigned":
+            n_unassigned += 1
+            continue
+        # Binding kind: rank it only if it is an exact nM measurement against a known target.
         tid = a.get("target_chembl_id")
         if (
             not tid
-            or not _is_protein_binding(a)
             or a.get("standard_units") != NANOMOLAR
             or (a.get("standard_relation") or "=") in CENSORED_RELATIONS
         ):
-            excluded += 1
+            n_binding_nonexact += 1
             continue
         value = _to_float(a.get("standard_value"))
         if value is None or value <= 0:
             # A non-positive potency is not a measurement; a fold-ratio would divide by it.
-            excluded += 1
+            n_binding_nonexact += 1
             continue
         by_target[tid].append(value)
         names.setdefault(tid, a.get("target_pref_name") or tid)
+
+    n_excluded = n_cell_based + n_unassigned + n_binding_nonexact
 
     # Corroboration gate: a target measured only once is too weak to place or anchor a
     # selectivity claim (imatinib's lone 0.06 nM ERBB2). Rank only corroborated targets; count
@@ -172,17 +218,25 @@ def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
     n_uncorroborated = len(by_target) - len(corroborated)
     n_protein_rows = sum(len(v) for v in corroborated.values())
 
+    def profile(targets: list[SelectivityTarget], n_ranked_rows: int) -> SelectivityProfile:
+        # One builder so the ranked and empty paths cannot drift on the kind counts.
+        return SelectivityProfile(
+            targets=targets,
+            n_protein_rows=n_ranked_rows,
+            n_uncorroborated_targets=n_uncorroborated,
+            n_excluded_rows=n_excluded,
+            n_cell_based_rows=n_cell_based,
+            n_unassigned_rows=n_unassigned,
+            n_binding_nonexact_rows=n_binding_nonexact,
+        )
+
     # One robust potency per target, then rank most-potent (lowest nM) first.
     ranked = sorted(
         ((tid, float(median(vals)), len(vals)) for tid, vals in corroborated.items()),
         key=lambda r: r[1],
     )
     if not ranked:
-        return SelectivityProfile(
-            n_protein_rows=0,
-            n_excluded_rows=excluded,
-            n_uncorroborated_targets=n_uncorroborated,
-        )
+        return profile([], 0)
 
     reference_nm = ranked[0][1]
     targets = [
@@ -196,9 +250,4 @@ def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
         )
         for tid, nm, n in ranked
     ]
-    return SelectivityProfile(
-        targets=targets,
-        n_protein_rows=n_protein_rows,
-        n_excluded_rows=excluded,
-        n_uncorroborated_targets=n_uncorroborated,
-    )
+    return profile(targets, n_protein_rows)

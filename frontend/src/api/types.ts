@@ -155,10 +155,21 @@ export interface SelectivityProfile {
   threshold_fold: number
   /** Exact single-protein nM measurements the ranking is built from. */
   n_protein_rows: number
-  /** Rows set aside: cell-based / organism / other format, censored, or non-nM. */
+  /** Rows set aside from the ranking, total (= the three kind counts below, when present). */
   n_excluded_rows: number
   /** Molecular targets seen but measured fewer than the minimum, so not ranked. */
   n_uncorroborated_targets: number
+  /**
+   * The A3 assay-kind split. Optional: facts stored before A3 lack them, and the card falls back
+   * to the single set-aside line then.
+   *   n_cell_based_rows      cell-line readouts (cell response, not target binding).
+   *   n_unassigned_rows      neither single-protein binding nor a cell line (organism/tissue/
+   *                          complex/multi-protein/unspecified format).
+   *   n_binding_nonexact_rows single-protein binding rows that could not rank (censored/non-nM).
+   */
+  n_cell_based_rows?: number
+  n_unassigned_rows?: number
+  n_binding_nonexact_rows?: number
 }
 
 /**

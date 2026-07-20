@@ -191,3 +191,50 @@ class TestHonestStates:
         assert p.reference is not None
         assert p.reference.median_nm == 20.0
         assert p.reference.n == 3
+
+
+class TestAssayKinds:
+    """A3: every row is one of binding / cell-based / unassigned. A cell-line IC50 measures a cell
+    response, not target affinity, so it must be counted apart and never enter the binding read."""
+
+    def test_the_three_kinds_are_counted_separately(self) -> None:
+        rows = [
+            # binding, exact nM, corroborated -> ranks
+            *_rows(EGFR, "Epidermal growth factor receptor", 10.0, 12.0, 14.0),
+            # binding, but censored / non-nM -> binding in kind, cannot rank
+            *_rows(EGFR, "Epidermal growth factor receptor", 9000.0, relation=">"),
+            *_rows(EGFR, "Epidermal growth factor receptor", 5.0, units="uM"),
+            # cell-line readouts -> a cell response, never the binding profile
+            *_rows("CELL_A549", "A549", 300.0, 320.0, bao_label="cell-based format"),
+            *_rows("CELL_HT29", "HT-29", 5.0, bao_label="cell-based format"),
+            # unassigned: organism-based and a multi-protein 'protein format'
+            *_rows("ORG", "Mus musculus", 40.0, bao_label="organism-based format"),
+            *_rows("CPLX", "A/B complex", 2.0, bao_label="protein format"),
+        ]
+        p = compute_selectivity(rows)
+        # The binding profile is EGFR alone; no cell line and no complex leaked in.
+        assert p.reference is not None and p.reference.target_chembl_id == EGFR
+        assert {t.target_chembl_id for t in p.targets} == {EGFR}
+        assert not any(t.target_pref_name in {"A549", "HT-29"} for t in p.targets)
+
+        # Each kind is counted apart, and the three sum to the total set-aside.
+        assert p.n_cell_based_rows == 3  # A549 x2 + HT-29 (HT-29 more potent than EGFR, still out)
+        assert p.n_unassigned_rows == 2  # organism-based + 'protein format' (multi-protein)
+        assert p.n_binding_nonexact_rows == 2  # the censored and the uM binding rows
+        assert (
+            p.n_excluded_rows
+            == p.n_cell_based_rows + p.n_unassigned_rows + p.n_binding_nonexact_rows
+        )
+        assert p.n_protein_rows == 3  # only the three exact nM EGFR rows
+
+    def test_a_more_potent_cell_line_never_enters_the_binding_profile(self) -> None:
+        # HT-29 at 5 nM is more potent than EGFR at 12 -- the exact trap that corrupts an
+        # on/off-target median. It is a cell response; it must be counted, never ranked.
+        rows = [
+            *_rows(EGFR, "Epidermal growth factor receptor", 10.0, 12.0, 14.0),
+            *_rows("CELL_HT29", "HT-29", 5.0, 6.0, bao_label="cell-based format"),
+        ]
+        p = compute_selectivity(rows)
+        assert p.reference is not None and p.reference.target_chembl_id == EGFR
+        assert p.n_cell_based_rows == 2
+        assert all(t.target_pref_name != "HT-29" for t in p.targets)
