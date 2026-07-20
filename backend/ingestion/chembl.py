@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from backend.domain.potency import summarize_ic50
+from backend.domain.selectivity import compute_selectivity
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 
 BASE = "https://www.ebi.ac.uk/chembl/api/data"
@@ -18,7 +19,7 @@ BASE = "https://www.ebi.ac.uk/chembl/api/data"
 # would leave a stale status=ok row in place while its siblings' retrieved_at moved
 # on, turning a missing fact into an actively wrong one.
 _MECHANISM_KEYS = ("moa", "all_moas", "action_type", "target_chembl_id", "target_chembl_ids")
-_ACTIVITY_KEYS = ("n_ic50", "n_ic50_scanned", "ic50_summary")
+_ACTIVITY_KEYS = ("n_ic50", "n_ic50_scanned", "ic50_summary", "selectivity_profile")
 
 
 def pick_molecule(molecules: list[dict[str, Any]], drug: str) -> dict[str, Any] | None:
@@ -180,17 +181,21 @@ class ChEMBLAdapter:
         try:
             act = await self.client.get(
                 f"{BASE}/activity.json",
-                params={"molecule_chembl_id": cid, "standard_type": "IC50", "limit": 100},
+                # 1000 (ChEMBL's page cap), not 100: a selectivity profile needs the drug's whole
+                # measured-target picture, and 100 truncated osimertinib's 701 to a sample. One
+                # page still covers the vast majority of oncology molecules; the true total below
+                # says when it did not.
+                params={"molecule_chembl_id": cid, "standard_type": "IC50", "limit": 1000},
             )
             act.raise_for_status()
             body = act.json()
             activities = body.get("activities", [])
-            # From page_meta, not len(): the page saturates at `limit` (osimertinib
-            # returns 100 of a true 701) and reads as a real measurement.
+            # From page_meta, not len(): the page saturates at `limit`, and len() would read that
+            # cap as a real measurement.
             #
             # And an absent total_count is not zero activities: ok(None) classifies as
             # EMPTY, so the brief would state "no IC50s" -- with a citation -- while
-            # n_ic50_scanned sat next to it saying 100. Never default a count.
+            # n_ic50_scanned sat next to it. Never default a count.
             page_meta = body.get("page_meta") or {}
             if "total_count" in page_meta:
                 facts["n_ic50"] = ok(page_meta["total_count"])
@@ -199,10 +204,13 @@ class ChEMBLAdapter:
                     self.name, "activity response carried no page_meta.total_count", source_url=url
                 )
             facts["n_ic50_scanned"] = ok(len(activities))
-            # The count is a row count, not a potency. Measured on adagrasib: 23 of
-            # its 30 IC50s are off-target (cell lines, a CDK7 assay, two SARS-CoV-2
-            # screens), so this is where the number becomes an answer.
+            # The count is a row count, not a potency. summarize_ic50 answers "how potent on the
+            # mechanism target(s)"; compute_selectivity ranks EVERY measured molecular target by
+            # potency (the reference is the most potent, not a declared primary), which is the
+            # only honest read for a multi-target drug -- vatalanib is a VEGFR inhibitor whose
+            # most potent target was being dumped as off-target.
             facts["ic50_summary"] = ok(summarize_ic50(activities, target_ids).as_dict())
+            facts["selectivity_profile"] = ok(compute_selectivity(activities).as_dict())
         except Exception as exc:
             for key in _ACTIVITY_KEYS:
                 facts[key] = failed(self.name, f"activity: {exc}", source_url=url)
