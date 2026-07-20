@@ -120,9 +120,24 @@ class TestGoldenSet:
         rows = [
             *_rows(EGFR, "Epidermal growth factor receptor", 10.0, 12.66, 15.0),
             *_rows(KIT, "Mast/stem cell growth factor receptor Kit", 3900.0, 4100.0),
+            # The third live failure mode: a VHL/EGFR protein-protein-interaction target (the
+            # ternary complex osimertinib's degrader analogues are measured against). More potent
+            # than EGFR itself (2 nM) and corroborated (n=2) -- but 'protein format' is a
+            # MULTI-protein assay, not a single molecular target, so it must be excluded and never
+            # become the reference. (On live ChEMBL it anchored the profile until this filter.)
+            *_rows(
+                "CHEMBL4523998",
+                "von Hippel-Lindau disease tumor suppressor/Epidermal growth factor receptor",
+                1.0,
+                3.0,
+                bao_label="protein format",
+            ),
         ]
         p = compute_selectivity(rows)
         assert p.reference is not None and p.reference.target_chembl_id == EGFR
+        # The PPI complex is set aside by format -- more potent, but not a single protein.
+        assert not any("Hippel" in t.target_pref_name for t in p.targets)
+        assert p.n_excluded_rows == 2  # the two 'protein format' PPI rows
         # KIT at ~316x is beyond 100x -> not a real target.
         assert p.n_targets == 1
         kit = next(t for t in p.targets if t.target_chembl_id == KIT)

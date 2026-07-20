@@ -37,12 +37,17 @@ from typing import Any
 
 from backend.domain.potency import CENSORED_RELATIONS, NANOMOLAR, _to_float
 
-# ChEMBL's BioAssay-Ontology assay format for a purified molecular target. A selectivity
-# ranking is about target affinity, so only these rows rank; "cell-based format",
-# "organism-based format" and the generic "assay format" measure something else and are set
-# aside (their fuller separation is A3). Matched on the ontology label, not the free-text
-# target name, because a cell line sits in target_pref_name just like a protein does.
-PROTEIN_FORMATS = frozenset({"single protein format", "protein format"})
+# ChEMBL's BioAssay-Ontology assay format for a purified SINGLE molecular target -- the only
+# rows a selectivity ranking is about, because selectivity is the drug's affinity for one
+# protein. Deliberately just "single protein format", NOT the broader "protein format": that
+# label covers multi-protein assays -- protein-protein-interaction and complex targets like the
+# VHL/EGFR ternary complex osimertinib's degrader analogues are measured against. That PPI carries
+# a 2 nM IC50 (`protein format`, n=2) which, admitted, outranks EGFR's own 8.8 nM (n=152) and
+# headlines the profile with a "target" that is not a single protein. "protein complex format",
+# "cell-based format", "organism-based format" and the generic "assay format" are set aside for
+# the same reason (their fuller separation is A3). Matched on the ontology label, not the
+# free-text target name, because a cell line sits in target_pref_name just like a protein does.
+PROTEIN_FORMATS = frozenset({"single protein format"})
 
 # How far below the reference a target may sit and still count as a real target. 100x is the
 # field's usual cut (the imatinib example). A judgement, disclosed -- not a measurement.
