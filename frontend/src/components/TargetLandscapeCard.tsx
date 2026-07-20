@@ -4,6 +4,7 @@ import type { DrugStatus, SourcedFact, TargetLandscape, TargetLandscapeEntry } f
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
+import { associationStrength, evidenceContributions } from '../association'
 
 /**
  * The cancer's target landscape: the top associated targets from Open Targets, each with
@@ -167,8 +168,13 @@ function TargetLandscapeBody({
                 <span className="text-ink">{t.symbol}</span>
               )}
             </span>
-            <span className="w-9 shrink-0 tabular-nums text-xs text-ink-muted">
-              {t.score.toFixed(2)}
+            {/* B5: lead with the qualitative strength (strong vs moderate, against the 0.5 cut);
+                the 0-1 score travels as faint detail, never a bare threshold to decode. */}
+            <span className="w-20 shrink-0 text-xs" title="Open Targets association strength">
+              <span className={associationStrength(t.score) === 'strong' ? 'text-ink' : 'text-ink-muted'}>
+                {associationStrength(t.score)}
+              </span>{' '}
+              <span className="text-[10px] tabular-nums text-ink-faint">{t.score.toFixed(2)}</span>
             </span>
             <span className="flex shrink-0 items-center gap-1">
               <Tractable on={t.sm_tractable} label="SM" title="Small-molecule tractable" />
@@ -178,9 +184,11 @@ function TargetLandscapeBody({
             <span className="ml-auto flex min-w-0 items-center gap-3">
               <span
                 className="min-w-0 truncate text-[11px] text-ink-faint"
-                title={t.evidence_types.join(', ')}
+                title={`contributing evidence: ${evidenceContributions(t.evidence_types).join(', ')}`}
               >
-                {t.evidence_types.slice(0, 2).join(' · ')}
+                {/* B5: the evidence TYPES that contributed to the score, in reader words -- what the
+                    score is built from (the interpretable thing), not the weighting formula. */}
+                {evidenceContributions(t.evidence_types).slice(0, 2).join(' · ')}
                 {/* mark the truncation, so two shown never read as all the evidence channels */}
                 {t.evidence_types.length > 2 && ` +${t.evidence_types.length - 2}`}
               </span>
