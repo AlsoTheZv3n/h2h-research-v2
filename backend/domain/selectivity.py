@@ -48,6 +48,15 @@ PROTEIN_FORMATS = frozenset({"single protein format", "protein format"})
 # field's usual cut (the imatinib example). A judgement, disclosed -- not a measurement.
 SELECTIVITY_THRESHOLD_FOLD = 100.0
 
+# A target must be measured at least this many times to be RANKED. ChEMBL aggregates
+# heterogeneous literature, and a single erroneous row can be wildly off: imatinib carries a
+# lone 0.06 nM ERBB2 IC50 and a lone 0.11 nM EGFR IC50 (both n=1) that would anchor the whole
+# profile and push its real targets -- ABL1 (n=24), KIT (n=12), PDGFRA (n=5) at 18-200 nM --
+# below the threshold. Selectivity is a claim about a drug's target profile; it must rest on
+# corroborated measurements, not one outlier. Uncorroborated targets are counted, not silently
+# dropped. A judgement, disclosed.
+MIN_MEASUREMENTS = 2
+
 
 @dataclass
 class SelectivityTarget:
@@ -84,10 +93,13 @@ class SelectivityProfile:
     threshold_fold: float = SELECTIVITY_THRESHOLD_FOLD
 
     n_protein_rows: int = 0
-    """Exact nM single-protein binding rows the ranking is built from."""
+    """Exact nM single-protein binding rows the ranking is built from (over ranked targets)."""
     n_excluded_rows: int = 0
     """Rows set aside: cell-based / organism / other format, censored, or non-nM. Reported so a
     profile built from a fraction of the rows says so (A4 warns when this dominates)."""
+    n_uncorroborated_targets: int = 0
+    """Molecular targets seen but measured fewer than MIN_MEASUREMENTS times, so not ranked --
+    a single row is too weak to anchor or place a selectivity claim. Counted, not hidden."""
 
     @property
     def reference(self) -> SelectivityTarget | None:
@@ -110,6 +122,7 @@ class SelectivityProfile:
             "threshold_fold": self.threshold_fold,
             "n_protein_rows": self.n_protein_rows,
             "n_excluded_rows": self.n_excluded_rows,
+            "n_uncorroborated_targets": self.n_uncorroborated_targets,
         }
 
 
@@ -147,15 +160,24 @@ def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
         by_target[tid].append(value)
         names.setdefault(tid, a.get("target_pref_name") or tid)
 
-    n_protein_rows = sum(len(v) for v in by_target.values())
+    # Corroboration gate: a target measured only once is too weak to place or anchor a
+    # selectivity claim (imatinib's lone 0.06 nM ERBB2). Rank only corroborated targets; count
+    # the rest.
+    corroborated = {tid: vals for tid, vals in by_target.items() if len(vals) >= MIN_MEASUREMENTS}
+    n_uncorroborated = len(by_target) - len(corroborated)
+    n_protein_rows = sum(len(v) for v in corroborated.values())
 
     # One robust potency per target, then rank most-potent (lowest nM) first.
     ranked = sorted(
-        ((tid, float(median(vals)), len(vals)) for tid, vals in by_target.items()),
+        ((tid, float(median(vals)), len(vals)) for tid, vals in corroborated.items()),
         key=lambda r: r[1],
     )
     if not ranked:
-        return SelectivityProfile(n_protein_rows=0, n_excluded_rows=excluded)
+        return SelectivityProfile(
+            n_protein_rows=0,
+            n_excluded_rows=excluded,
+            n_uncorroborated_targets=n_uncorroborated,
+        )
 
     reference_nm = ranked[0][1]
     targets = [
@@ -173,4 +195,5 @@ def compute_selectivity(activities: list[dict[str, Any]]) -> SelectivityProfile:
         targets=targets,
         n_protein_rows=n_protein_rows,
         n_excluded_rows=excluded,
+        n_uncorroborated_targets=n_uncorroborated,
     )
