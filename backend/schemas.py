@@ -173,6 +173,22 @@ class CancerList(BaseModel):
     offset: int
 
 
+class TdlCriterion(BaseModel):
+    """One pass/fail (or 'unknown') mark that explains a target's TDL verdict (C3)."""
+
+    label: str
+    state: str  # "pass" | "fail" | "unknown"
+
+
+class TdlVerdict(BaseModel):
+    """A Pharos-style Target Development Level (C3): the level, a short reading, and the criteria
+    that produced it. Surfaces the Tchem middle -- potent chemical matter with no approved drug."""
+
+    level: str  # "Tclin" | "Tchem" | "Tbio" | "Tdark"
+    label: str
+    criteria: list[TdlCriterion]
+
+
 class CancerDetail(BaseModel):
     """A cancer's evidence brief: the catalog row plus every fact we hold, with
     provenance. The disease-side twin of DrugDetail.
@@ -227,6 +243,13 @@ class CancerDetail(BaseModel):
         description="The page-level 'so what' (C1): derived threshold statements over the facts "
         "above, each linking to the block it came from. Empty when no rule's inputs are present -- "
         "computed here so the client renders, never invents, the reading.",
+    )
+
+    target_tdl: dict[str, TdlVerdict] = Field(
+        default_factory=dict,
+        description="For each landscape target's Ensembl id, its Pharos-style Target Development "
+        "Level (C3): the level plus the pass/fail criteria that produced it. Derived from drug "
+        "status and whether the catalog binds it potently; a parallel map, not on the fact.",
     )
 
 

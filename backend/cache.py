@@ -41,8 +41,9 @@ def detail_cache_key(chembl_id: str) -> str:
 # association count + threshold beside the displayed targets. v5: each displayed target
 # gained an Ensembl id + a drugged/in-development/unexploited status. v6: the trial-reality
 # block (ClinicalTrials.gov by condition) added a `trial_reality` fact to the brief. v7: the C1
-# page-level `synthesis` (derived server-side from the facts) joined the CancerDetail shape.
-_CANCER_DETAIL_SCHEMA_VERSION = "v7"
+# page-level `synthesis` (derived server-side from the facts) joined the CancerDetail shape. v8:
+# the C3 `target_tdl` map (per-target Pharos development level) joined it too.
+_CANCER_DETAIL_SCHEMA_VERSION = "v8"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:
