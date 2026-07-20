@@ -26,6 +26,10 @@ export interface Task {
 const OSIMERTINIB = 'CHEMBL3353410'
 const AFATINIB = 'CHEMBL1173655' // seeded with a ChEMBL outage -> the calm amber advisory
 const NSCLC = 'MONDO_0005233'
+const EGFR_TARGET = 'ENSG00000146648' // the target page (#37): EGFR, the cancers it drives
+// A high-volume drug for the observed-combinations card (#38): thousands of trials, so the
+// scan caps (scanned < total) and a few are dropped-ambiguous -- the full honest card.
+const PEMBROLIZUMAB = 'CHEMBL3137343'
 
 /** The header (h1 + the stat cards) plus one named section of a cancer page -- what a reader
  *  focusing on that block actually sees. */
@@ -59,6 +63,48 @@ async function drugPage(page: Page, base: string, id: string, waitText: RegExp):
     .innerText()
     .catch(() => '')
   return { url: `${base}/drugs/${id}`, text }
+}
+
+/** The header plus one named section of a DRUG page (e.g. the observed-combinations card),
+ *  scoped to that block so the reader is judged on that surface, not the whole brief. */
+async function drugSection(
+  page: Page,
+  base: string,
+  id: string,
+  section: string,
+): Promise<Capture> {
+  await page.goto(`${base}/drugs/${id}`, { waitUntil: 'networkidle' })
+  const sec = page.locator(`#${section}`)
+  await sec.waitFor({ timeout: 30_000 })
+  await sec.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(400)
+  const header = await page
+    .locator('article header, h1')
+    .first()
+    .innerText()
+    .catch(() => '')
+  const body = await sec.innerText().catch(() => '')
+  return { url: `${base}/drugs/${id}#${section}`, text: `${header}\n\n${body}` }
+}
+
+/** The target detail page (#37): the header plus the associated-cancers and catalog-drugs
+ *  sections -- what a reader focusing on "what does this gene do" actually sees. */
+async function targetPage(page: Page, base: string, id: string): Promise<Capture> {
+  await page.goto(`${base}/targets/${id}`, { waitUntil: 'networkidle' })
+  const ac = page.locator('#associated-cancers')
+  await ac.waitFor({ timeout: 30_000 })
+  await page.waitForTimeout(400)
+  const header = await page
+    .locator('article header, h1')
+    .first()
+    .innerText()
+    .catch(() => '')
+  const cancers = await ac.innerText().catch(() => '')
+  const drugs = await page
+    .locator('#catalog-drugs')
+    .innerText()
+    .catch(() => '')
+  return { url: `${base}/targets/${id}`, text: `${header}\n\n${cancers}\n\n${drugs}` }
 }
 
 export const TASKS: Task[] = [
@@ -185,5 +231,29 @@ export const TASKS: Task[] = [
         .catch(() => '')
       return { url: `${base}/drugs/${OSIMERTINIB} (ask box)`, text }
     },
+  },
+  {
+    id: 'target-associated-cancers',
+    question:
+      'You are on the page for a target (a gene, EGFR). Which cancers is this target associated with, and how do you know these are the relevant ones -- not, say, unrelated non-cancer conditions? And what does the drugs section tell you?',
+    expected:
+      "The associated cancers are the target's Open Targets associations FILTERED to the cancers this tool catalogs (each a live link, with a score, the top slice of a larger count). Non-cancers are excluded. The drugs section lists the catalog drugs that act on this target; an empty list is 'a gap in our catalog', NOT 'undruggable'.",
+    labels: [
+      'associated cancers = the OT reverse query filtered to the catalog (not raw top diseases)',
+      '"drugs in the catalog" = drugs WE hold against the target; empty is a gap, not "undruggable"',
+    ],
+    capture: (page, base) => targetPage(page, base, EGFR_TARGET),
+  },
+  {
+    id: 'observed-combinations',
+    question:
+      'Read the "observed combinations" card for this drug. In how many registered trials is it given IN COMBINATION with another drug, versus tested in a head-to-head COMPARISON against one? And is anything excluded?',
+    expected:
+      'Two DISTINCT counts from the trials\' arm structure: combination (drugs in one arm, given together) vs comparison (drugs in separate arms, tested against each other). The counts are over a scanned sample of the drug\'s trials, and the multi-drug trials whose arms carry no drug assignment are EXCLUDED (dropped, not guessed) -- a footnoted count, never folded into either bucket.',
+    labels: [
+      'combination (given together) vs comparison (tested against) -- opposite meanings, kept distinct',
+      'the dropped-ambiguous count = excluded, not guessed; counts are over a scanned sample',
+    ],
+    capture: (page, base) => drugSection(page, base, PEMBROLIZUMAB, 'combinations'),
   },
 ]
