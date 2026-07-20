@@ -55,6 +55,19 @@ describe('CombinationsCard', () => {
     )
   })
 
+  it('marks each example list as an excerpt of the total, so the sample is not read as the count', () => {
+    // The harness finding: a reader answered "5 combinations" (the example rows) instead of the
+    // summary total. Each list heading must state "N of TOTAL", tied to the summary count.
+    render(<CombinationsCard facts={[fact({ value: combinations })]} />)
+    // one example shown, 90 total combinations.
+    expect(screen.getByTestId('combination-examples-heading')).toHaveTextContent(
+      /Examples — 1 of 90 combinations/,
+    )
+    expect(screen.getByTestId('comparison-examples-heading')).toHaveTextContent(
+      /Examples — 1 of 22 comparisons/,
+    )
+  })
+
   it('is honest about the scanned sample and the dropped-ambiguous count', () => {
     render(<CombinationsCard facts={[fact({ value: combinations })]} />)
     expect(screen.getByTestId('combinations-summary')).toHaveTextContent(/300 trials scanned/)

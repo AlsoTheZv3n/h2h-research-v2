@@ -70,9 +70,13 @@ describe('TargetLandscapeCard', () => {
     expect(new Set(classes).size).toBe(4)
     const labels = states.map((s) => screen.getByTestId(`drug-status-${s}`).textContent)
     expect(new Set(labels).size).toBe(4)
-    // And the two whose confusion matters most read as different words.
-    expect(screen.getByTestId('drug-status-unexploited')).toHaveTextContent('unexploited')
-    expect(screen.getByTestId('drug-status-unknown')).toHaveTextContent('unknown')
+    // And the two whose confusion matters most read as different words -- and the finding's
+    // label WRITES OUT the claim ("no drug anywhere") rather than the term of art "unexploited",
+    // which the harness read as "not in this catalog" (the opposite). "not measured" is not "no
+    // drug". The scope word ("anywhere") is what stops catalog-absence being read as the finding.
+    expect(screen.getByTestId('drug-status-unexploited')).toHaveTextContent('no drug anywhere')
+    expect(screen.getByTestId('drug-status-unknown')).toHaveTextContent('not measured')
+    expect(screen.getByTestId('drug-status-unexploited')).not.toHaveTextContent('unexploited')
   })
 
   it('a target with no drug_status (pre-flag fact) reads unknown, never unexploited', () => {
@@ -106,12 +110,16 @@ describe('TargetLandscapeCard', () => {
     expect(egfr).toHaveAttribute('href', '/targets/ENSG_E') // joined on the stable Ensembl id
   })
 
-  it('links to a catalog drug (the weaker ℞ signal) when we hold one, by Ensembl id', () => {
+  it('links to a catalog drug with a WORDED action label, not a bare glyph', () => {
     renderCard({ facts: [fact({ value: landscape })], catalogDrugByTarget: { ENSG_E: 'CHEMBL_EGFR' } })
-    // EGFR (ENSG_E) is the only target we hold a drug for -> a single ℞ link into that brief.
+    // EGFR (ENSG_E) is the only target we hold a drug for -> one link into that brief.
     const link = screen.getByTestId('landscape-catalog-link')
     expect(link).toHaveAttribute('href', '/drugs/CHEMBL_EGFR')
     expect(screen.getAllByTestId('landscape-catalog-link')).toHaveLength(1)
+    // The harness read the old bare ℞ as a drugged-status marker. The link must carry a visible
+    // word so it reads as an action, not a status.
+    expect(link).toHaveTextContent(/in catalog/i)
+    expect(link).not.toHaveTextContent('℞')
   })
 
   it('a drugged target with no catalog drug shows its status but no ℞ link', () => {
