@@ -64,13 +64,17 @@ function CombinationsBody({ data, fact }: { data: Combinations; fact: SourcedFac
       </p>
 
       <ExampleList
-        title="Combinations (drugs given together)"
+        noun="combinations"
+        hint="drugs given together"
+        total={data.n_combination}
         testid="combination-examples"
         joiner=" + "
         examples={data.combination_examples}
       />
       <ExampleList
-        title="Comparisons (drugs tested against each other)"
+        noun="comparisons"
+        hint="drugs tested against each other"
+        total={data.n_comparison}
         testid="comparison-examples"
         joiner=" vs "
         examples={data.comparison_examples}
@@ -84,12 +88,16 @@ function CombinationsBody({ data, fact }: { data: Combinations; fact: SourcedFac
 }
 
 function ExampleList({
-  title,
+  noun,
+  hint,
+  total,
   testid,
   joiner,
   examples,
 }: {
-  title: string
+  noun: string
+  hint: string
+  total: number
   testid: string
   joiner: string
   examples: CombinationExample[]
@@ -97,7 +105,20 @@ function ExampleList({
   if (examples.length === 0) return null
   return (
     <div className="mt-3">
-      <p className="mb-1 text-[11px] font-medium text-ink-faint">{title}</p>
+      <p className="mb-1 text-[11px] font-medium text-ink-faint" data-testid={`${testid}-heading`}>
+        {examples.length < total ? (
+          // Truncated -> an EXCERPT: name the shown count AND the total, so the few example rows
+          // are never read as the whole (the summary's count is the population, this the sample).
+          <>
+            Examples — {formatCount(examples.length)} of {formatCount(total)} {noun}
+          </>
+        ) : (
+          // All are shown (total <= the example cap) -> the list IS the count; describe it, with
+          // no "of N", which would be the silly "N of N" truncation marker when nothing was cut.
+          <>{noun[0].toUpperCase() + noun.slice(1)}</>
+        )}{' '}
+        <span className="font-normal">({hint})</span>
+      </p>
       <ul className="space-y-0.5" data-testid={testid}>
         {examples.map((e) => (
           <li key={e.nct_id} className="flex items-center gap-2 text-xs">

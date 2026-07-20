@@ -249,7 +249,12 @@ export function DetailPage() {
               <Fact
                 label="Indications"
                 facts={pick(detail, 'indications')}
-                render={(v) => (Array.isArray(v) ? v.slice(0, 4).join(', ') : String(v))}
+                // A truncated list must say how many of how many, or the four shown read as all.
+                render={(v) => {
+                  if (!Array.isArray(v)) return String(v)
+                  const shown = v.slice(0, 4).join(', ')
+                  return v.length > 4 ? `${shown} — 4 of ${v.length}` : shown
+                }}
                 emptyLabel="None annotated"
               />
               <Fact
@@ -267,17 +272,27 @@ export function DetailPage() {
                 label="Recent titles"
                 facts={pick(detail, 'sample_titles')}
                 emptyLabel="None"
-                render={(v) => (
-                  <ul className="mt-0.5 space-y-0.5">
-                    {/* keyed by index+title: two records can share a title (errata, duplicate
-                        deposits) and a title-only key would drop one row. */}
-                    {(v as string[]).map((t, i) => (
-                      <li key={`${i}-${t}`} className="text-xs text-ink-muted">
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                render={(v) => {
+                  const titles = v as string[]
+                  return (
+                    <>
+                      {/* Explicitly a sample: the N most recent, not the whole literature (the
+                          count of which is the PubMed hits above). */}
+                      <span className="text-[11px] text-ink-faint">
+                        the {titles.length} most recent
+                      </span>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {/* keyed by index+title: two records can share a title (errata, duplicate
+                            deposits) and a title-only key would drop one row. */}
+                        {titles.map((t, i) => (
+                          <li key={`${i}-${t}`} className="text-xs text-ink-muted">
+                            {t}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )
+                }}
               />
             </dl>
           </Card>

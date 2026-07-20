@@ -59,30 +59,37 @@ export function TargetLandscapeCard({
   )
 }
 
-// The four drugged states, each with a distinct look (fill vs contrast vs faint) AND a
-// distinct label, so no two ever read alike. Only accent (blue) and partial (amber) exist
-// in the theme, so "unexploited" -- the finding -- takes the high-contrast inverted chip to
-// pull the eye, and "unknown" stays faint because a gap in our data is not a finding.
+// The four drugged states, each with a distinct look (fill vs contrast vs faint) AND a label
+// that WRITES OUT the claim, so no term of art (the harness read "unexploited" as "not in this
+// catalog" -- the opposite of what it means). The label says WHAT (a drug / no drug) and, for
+// the finding, its SCOPE (anywhere = the world, not our catalog). "no drug anywhere" takes the
+// high-contrast inverted chip to pull the eye; "not measured" stays faint (a gap is not a
+// finding). The data states (approved/clinical/unexploited/unknown) are unchanged -- only the
+// wording. Catalog availability is a SEPARATE, weaker signal (the "in catalog" link), never
+// this badge, so catalog absence can never read as "no drug anywhere".
 const STATUS_STYLE: Record<DrugStatus, { label: string; className: string; title: string }> = {
   approved: {
-    label: 'approved',
+    label: 'approved drug',
     className: 'bg-accent-bg text-accent',
     title:
-      'An approved drug exists against this target. Indication-agnostic — it may be ' +
-      'approved for a different cancer, not necessarily this one.',
+      'An approved drug exists against this target, somewhere in the world (Open Targets). ' +
+      'Indication-agnostic — it may be approved for a different cancer, not necessarily this one.',
   },
   clinical: {
-    label: 'in dev',
+    label: 'in trials',
     className: 'bg-partial-bg text-partial',
-    title: 'In clinical development against this target — candidates exist, none approved yet.',
+    title:
+      'In clinical trials against this target somewhere — candidates exist, none approved yet.',
   },
   unexploited: {
-    label: 'unexploited',
+    label: 'no drug anywhere',
     className: 'bg-ink text-card',
-    title: 'No drugs against this target anywhere — a strong association with no therapeutic.',
+    title:
+      'No drug exists against this target anywhere in the world (Open Targets) — a strong ' +
+      'association with no therapeutic. NOT the same as "we do not hold one in this catalog".',
   },
   unknown: {
-    label: 'unknown',
+    label: 'not measured',
     className: 'text-ink-faint ring-1 ring-line',
     title: 'Drug status unavailable from Open Targets — not measured, which is not "no drug".',
   },
@@ -90,10 +97,10 @@ const STATUS_STYLE: Record<DrugStatus, { label: string; className: string; title
 
 const FILTERS: { value: string; label: string }[] = [
   { value: '', label: 'All statuses' },
-  { value: 'unexploited', label: 'Unexploited only' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'clinical', label: 'In development' },
-  { value: 'unknown', label: 'Unknown' },
+  { value: 'unexploited', label: 'No drug anywhere' },
+  { value: 'approved', label: 'Approved drug' },
+  { value: 'clinical', label: 'In trials' },
+  { value: 'unknown', label: 'Not measured' },
 ]
 
 // Pre-flag facts (before drug_status shipped) have no status -> "unknown", never a guess.
@@ -130,7 +137,9 @@ function TargetLandscapeBody({
             </option>
           ))}
         </select>
-        <span className="text-[11px] text-ink-faint">status is against the target, any indication</span>
+        <span className="text-[11px] text-ink-faint">
+          Drug status: is there a drug against this target anywhere? (Open Targets, any indication)
+        </span>
       </div>
 
       <ul className="divide-y divide-line" data-testid="target-landscape">
@@ -165,25 +174,30 @@ function TargetLandscapeBody({
               <Tractable on={t.sm_tractable} label="SM" title="Small-molecule tractable" />
               <Tractable on={t.ab_tractable} label="AB" title="Antibody tractable" />
               <DrugStatusBadge status={statusOf(t)} />
-              {/* A weaker, separate signal: a drug WE hold against this target (keyed by Ensembl
-                  id). Absent -> nothing, never a claim about the target's world drugged status,
-                  which is the badge's job. */}
+            </span>
+            <span className="ml-auto flex min-w-0 items-center gap-3">
+              <span
+                className="min-w-0 truncate text-[11px] text-ink-faint"
+                title={t.evidence_types.join(', ')}
+              >
+                {t.evidence_types.slice(0, 2).join(' · ')}
+                {/* mark the truncation, so two shown never read as all the evidence channels */}
+                {t.evidence_types.length > 2 && ` +${t.evidence_types.length - 2}`}
+              </span>
+              {/* A weaker, separate signal from the badge: we hold a drug in our catalog against
+                  this target. A WORDED link, set apart from the status badge, so it reads as an
+                  action (open a brief), not a status -- the harness read the old bare ℞ glyph, sat
+                  beside the badges, as a drugged-status marker. Absent -> nothing. */}
               {catalogDrug && (
                 <Link
                   to={`/drugs/${catalogDrug}`}
                   data-testid="landscape-catalog-link"
-                  title="Open a drug in our catalog that acts on this target"
-                  className="text-[11px] text-accent hover:underline"
+                  title="A drug in our catalog acts on this target — open its brief"
+                  className="shrink-0 whitespace-nowrap text-[11px] text-accent hover:underline"
                 >
-                  ℞
+                  in catalog ↗
                 </Link>
               )}
-            </span>
-            <span
-              className="ml-auto truncate text-[11px] text-ink-faint"
-              title={t.evidence_types.join(', ')}
-            >
-              {t.evidence_types.slice(0, 2).join(' · ')}
             </span>
           </li>
           )
