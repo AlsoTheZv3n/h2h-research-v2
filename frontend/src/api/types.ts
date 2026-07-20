@@ -312,6 +312,20 @@ export interface SynthesisStatement {
   block: string
 }
 
+/** One pass/fail (or 'unknown') criterion behind a target's TDL verdict (C3). */
+export interface TdlCriterion {
+  label: string
+  state: 'pass' | 'fail' | 'unknown'
+}
+
+/** A target's Pharos-style Target Development Level (C3): the level, a short reading, and the
+ *  criteria that produced it. Surfaces the Tchem middle -- potent chemical matter, none approved. */
+export interface TdlVerdict {
+  level: 'Tclin' | 'Tchem' | 'Tbio' | 'Tdark'
+  label: string
+  criteria: TdlCriterion[]
+}
+
 /**
  * A cancer's evidence brief: the catalog facts plus every fact we hold, with
  * provenance. `state` is enriching while the brief is built, ready once stored --
@@ -342,6 +356,9 @@ export interface CancerDetail {
   /** The page-level "so what" (C1): derived threshold statements over the facts, each linking to
    *  its block. Empty when no rule's inputs are present. Optional: absent on pre-C1 payloads. */
   synthesis?: SynthesisStatement[]
+  /** For each landscape target's Ensembl id, its Pharos-style Target Development Level (C3).
+   *  Optional: absent on pre-C3 payloads (the card falls back to the drug-status badge). */
+  target_tdl?: Record<string, TdlVerdict>
 }
 
 /** One cancer a target is associated with, in the target brief's associated_cancers fact.

@@ -45,6 +45,7 @@ export const CANCER_SECTIONS: CancerSection[] = [
         id="target-landscape"
         facts={d.facts['target_landscape']}
         catalogDrugByTarget={d.target_catalog_drug}
+        targetTdl={d.target_tdl}
       />
     ),
   },

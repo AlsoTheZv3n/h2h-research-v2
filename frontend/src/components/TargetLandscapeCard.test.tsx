@@ -71,6 +71,25 @@ describe('TargetLandscapeCard', () => {
     expect(stk11).not.toHaveTextContent(/somatic_mutation/)
   })
 
+  it('renders the TDL verdict (C3) when given, surfacing the Tchem middle over the drug-status badge', () => {
+    // STK11 is "unexploited" per Open Targets, but has a potent catalog ligand -> Tchem, the
+    // missing middle. With a TDL map the row shows the level badge, not the plain drug-status one.
+    const targetTdl = {
+      ENSG_E: { level: 'Tclin' as const, label: 'approved drug', criteria: [] },
+      ENSG_S: {
+        level: 'Tchem' as const,
+        label: 'chemical matter, none approved',
+        criteria: [{ label: 'Potent ligand in catalog', state: 'pass' as const }],
+      },
+    }
+    renderCard({ facts: [fact({ value: landscape })], targetTdl })
+    expect(screen.getByTestId('tdl-Tclin')).toBeInTheDocument()
+    // STK11 was "no drug anywhere" (unexploited); the TDL reveals it is actually Tchem.
+    expect(screen.getByTestId('tdl-Tchem')).toHaveTextContent('chemical matter, none approved')
+    // The plain drug-status badge is superseded where a TDL verdict exists.
+    expect(screen.queryByTestId('drug-status-approved')).not.toBeInTheDocument()
+  })
+
   it('renders each drugged state with its own distinct marker', () => {
     renderCard({ facts: [fact({ value: landscape })] })
     const states = ['approved', 'clinical', 'unexploited', 'unknown']
