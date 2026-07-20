@@ -162,6 +162,30 @@ test.describe('detail brief', () => {
     expect(await failed.first().textContent()).not.toEqual(await empty.first().textContent())
   })
 
+  test('the observed-combinations card renders combinations vs comparisons from a seeded fact', async ({
+    page,
+  }) => {
+    // The S3 fact flows DB -> API -> UI on the synthetic fixture. Combination (drugs given
+    // together) and comparison (drugs tested against each other) must render distinctly, and the
+    // dropped-ambiguous count is footnoted, not folded into either bucket.
+    await page.goto(`/drugs/${E2E_FIXTURE}`)
+    await expect(page.getByText('Observed combinations')).toBeVisible()
+
+    const summary = page.getByTestId('combinations-summary')
+    await expect(summary).toContainText('80 combinations')
+    await expect(summary).toContainText('15 comparisons')
+    await expect(summary).toContainText(/300 trials scanned/)
+
+    await expect(page.getByTestId('combination-examples')).toContainText('pembrolizumab')
+    await expect(page.getByTestId('comparison-examples')).toContainText('docetaxel')
+    await expect(page.getByTestId('combinations-ambiguous')).toContainText(/7 further multi-drug/)
+    // The trial links out to its ClinicalTrials.gov record.
+    await expect(page.getByText('NCT_E2E_COMBO')).toHaveAttribute(
+      'href',
+      'https://clinicaltrials.gov/study/NCT_E2E_COMBO',
+    )
+  })
+
   test('a complete drug shows a real on-target potency, not a row count', async ({ page }) => {
     // Unconditional. This sat behind `if ((await median.count()) > 0)`, which made
     // both assertions optional -- so the project's marquee claim had no enforced
