@@ -94,14 +94,17 @@ test.describe('cancer catalog', () => {
     page,
   }) => {
     // Fixture: EGFR is `approved` and we hold a drug against it (drug_target, by Ensembl id)
-    // -> a badge AND an "in catalog" link to that drug; KRAS has no drug anywhere -> a badge, no
-    // link. Every target's symbol also drills into its own page. This checks the R4 flag and both
-    // catalog links (target page + drug) end to end.
+    // -> a badge AND an "in catalog" link to that drug. C3's TDL verdict extends the drugged flag
+    // and supersedes the plain status badge, so each row shows its level: EGFR (approved) reads
+    // Tclin, and KRAS -- `unexploited` per Open Targets (no drug anywhere) yet with a potent ligand
+    // in the demo catalog -- reads Tchem, the missing middle (chemical matter, none approved). Every
+    // target's symbol also drills into its own page. This checks the verdict and both catalog links.
     await page.goto('/cancers/MONDO_E2E_NSCLC')
-    await expect(page.getByTestId('drug-status-approved')).toBeVisible()
-    await expect(page.getByTestId('drug-status-unexploited')).toBeVisible()
-    // The finding's badge writes out the claim ("no drug anywhere"), not the term of art.
-    await expect(page.getByTestId('drug-status-unexploited')).toContainText(/no drug anywhere/i)
+    await expect(page.getByTestId('tdl-Tclin')).toBeVisible()
+    await expect(page.getByTestId('tdl-Tchem')).toBeVisible()
+    // The Tchem badge writes out the claim: potent chemical matter exists in our catalog though no
+    // approved drug does (Open Targets) -- the decision-relevant cell, not the bare term of art.
+    await expect(page.getByTestId('tdl-Tchem')).toContainText(/chemical matter, none approved/i)
     // EGFR's symbol drills into its own target page, matched by Ensembl id.
     const targetLink = page.getByTestId('landscape-target-link').filter({ hasText: 'EGFR' })
     await expect(targetLink).toHaveAttribute('href', '/targets/ENSG_E2E_EGFR')
