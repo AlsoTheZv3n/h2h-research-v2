@@ -186,20 +186,23 @@ test.describe('detail brief', () => {
     )
   })
 
-  test('a complete drug shows a real on-target potency, not a row count', async ({ page }) => {
-    // Unconditional. This sat behind `if ((await median.count()) > 0)`, which made
-    // both assertions optional -- so the project's marquee claim had no enforced
-    // coverage anywhere, ninety lines below two guards written to kill exactly that.
-    // The fixture pins osimertinib at 12.66 nM over 62 exact rows, so there is
-    // nothing to be defensive about.
+  test('a complete drug shows a selectivity profile, not a row count', async ({ page }) => {
+    // Epic A: the potency card is a selectivity profile now, not a single median. The fixture
+    // pins osimertinib, whose profile is led by its most potent target EGFR and is selective
+    // (one target within 100x), so these assertions are exact, not defensive.
     await page.goto(`/drugs/${OSIMERTINIB}`)
-    await expect(page.getByText('Binding & potency')).toBeVisible()
+    await expect(page.getByText('Selectivity & potency')).toBeVisible()
 
-    await expect(page.getByTestId('median-ic50')).toBeVisible()
-    await expect(page.getByText(/nM median/)).toBeVisible()
-    // The count is demoted to a footnote on purpose: 701 activities exist, and the
-    // median over 62 exact on-target rows is the only one of the two that is an answer.
-    await expect(page.getByText(/exact on-target measurements/)).toBeVisible()
+    // A derived verdict leads, naming what the drug mainly targets and how selectively.
+    await expect(page.getByTestId('selectivity-verdict')).toHaveText(/Selective/)
+    // The ranked profile leads with the most potent target, EGFR (the name appears in both the
+    // verdict and the row, so scope the assertion to the ranked list to stay unambiguous).
+    await expect(page.getByTestId('selectivity-profile')).toContainText(
+      'Epidermal growth factor receptor',
+    )
+    // The assay kinds are sectioned: cell-line readouts are never folded into the binding read.
+    await expect(page.getByTestId('assay-kind-binding')).toBeVisible()
+    await expect(page.getByTestId('assay-kind-cell')).toBeVisible()
   })
 })
 
@@ -227,7 +230,7 @@ test.describe('detail redesign', () => {
     // The signature interaction, in its redesigned form: the source is a quiet "i", not
     // its name spelled out on every value, and the provenance is one hover away.
     await page.goto(`/drugs/${OSIMERTINIB}`)
-    await expect(page.getByText('Binding & potency')).toBeVisible()
+    await expect(page.getByText('Selectivity & potency')).toBeVisible()
 
     const info = page.getByTestId('source-info').first()
     await expect(info).toBeVisible()

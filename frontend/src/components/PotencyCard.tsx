@@ -66,7 +66,10 @@ function highExclusionCaveat(
   if (total === 0) return null
   const rate = unusable / total
   if (rate < HIGH_BINDING_EXCLUSION) return null
-  return { shown: p.n_protein_rows, total, pct: Math.round(rate * 100) }
+  // A reference exists here, so shown >= 1 and the true unrankable share is strictly < 100%.
+  // Cap the rounded percentage at 99 so it can never read "100% could not be ranked" beside a
+  // "rests on N of M" that shows some rows WERE ranked (Math.round(99.5) would say 100).
+  return { shown: p.n_protein_rows, total, pct: Math.min(99, Math.round(rate * 100)) }
 }
 
 /** The decades 1, 10, 100 … up to the axis max -- the log ticks. */

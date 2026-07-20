@@ -147,6 +147,22 @@ describe('PotencyCard', () => {
     expect(warn).toHaveTextContent('95%')
   })
 
+  it('never reads "100% could not be ranked" while stating rows were ranked (rounding cap)', () => {
+    // 2 ranked of 400 binding rows = 99.5% unusable. Un-capped, Math.round(99.5) = 100, which
+    // would contradict "rests on 2 of 400" in the same sentence. Capped at 99.
+    const extreme: SelectivityProfile = {
+      ...selective,
+      n_protein_rows: 2,
+      n_uncorroborated_targets: 200,
+      n_binding_nonexact_rows: 198,
+    }
+    render(<PotencyCard facts={[fact({ value: extreme })]} isBiologic={false} />)
+    const warn = screen.getByTestId('exclusion-warning')
+    expect(warn).toHaveTextContent('2 of 400 target-binding measurements')
+    expect(warn).toHaveTextContent('99%')
+    expect(warn).not.toHaveTextContent('100%')
+  })
+
   it('does NOT warn when the binding evidence is solid, however many cell-line rows exist', () => {
     // The prove-fail other direction: osimertinib is 154 ranked of 171 binding (10% unusable) with
     // 450 cell-line rows. A total-based rate would scream "78% excluded"; the binding-only rate

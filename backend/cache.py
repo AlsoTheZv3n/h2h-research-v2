@@ -12,13 +12,14 @@ logger = logging.getLogger(__name__)
 
 _client: redis.Redis | None = None
 
-# Bumped whenever the cached DrugDetail shape changes. Without it, a brief serialized
-# by the previous schema outlives the deploy and deserializes with the new fields at
-# their defaults -- e.g. a pre-`smiles` brief comes back with smiles=None, and the
-# structure card, which now reads only that field, declares a structure missing that is
-# actually there. The version is part of the key, so old-shape entries are simply never
-# read again and expire on their own.
-_DETAIL_SCHEMA_VERSION = "v2"
+# Bumped whenever the cached DrugDetail shape changes OR a new fact joins the brief. Without it, a
+# brief serialized before the change outlives the deploy and is served stale -- e.g. a pre-`smiles`
+# brief comes back with smiles=None and the structure card declares a structure missing that is
+# actually there. The version is part of the key, so old entries are simply never read again and
+# expire on their own. v3: Epic A added the `selectivity_profile` fact to the drug brief (the
+# potency card reads it); paired with the a1b3c5d7e9f0 migration that back-dates last_enriched_at
+# so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
+_DETAIL_SCHEMA_VERSION = "v3"
 
 
 def get_redis() -> redis.Redis:
