@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,11 +13,19 @@ from backend.cache import detail_cache_key, get_redis, invalidate_detail
 from backend.config import get_settings
 from backend.db import get_session
 from backend.domain.structure import render_svg
+from backend.domain.synthesis import drug_synthesis
 from backend.ingestion.base import FactStatus
 from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
-from backend.schemas import DrugDetail, DrugList, DrugSummary, FacetCount, SourcedFact
+from backend.schemas import (
+    DrugDetail,
+    DrugList,
+    DrugSummary,
+    FacetCount,
+    SourcedFact,
+    SynthesisStatement,
+)
 from backend.services.briefs import BriefState, get_or_start_brief, is_enriching, retry_brief
 
 logger = logging.getLogger(__name__)
@@ -237,6 +245,23 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         if entries and all(f.status is FactStatus.SOURCE_FAILED for f in entries)
     )
 
+    # The page-level "so what" (C2): derived threshold statements over the facts, each linking to
+    # its block. Computed server-side from a fact's value only when that source answered OK, so an
+    # absent/failed/empty fact yields no statement (never a defaulted one).
+    def ok_fact(key: str) -> Any:
+        entries = facts.get(key)
+        return entries[0].value if entries and entries[0].status is FactStatus.OK else None
+
+    synthesis = [
+        SynthesisStatement(**s)
+        for s in drug_synthesis(
+            max_phase=ok_fact("max_phase"),
+            selectivity=ok_fact("selectivity_profile"),
+            n_trials=ok_fact("n_trials"),
+            has_terminated=ok_fact("has_terminated"),
+        )
+    ]
+
     detail = DrugDetail(
         chembl_id=drug.chembl_id,
         pref_name=drug.pref_name,
@@ -257,6 +282,7 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         last_enriched_at=drug.last_enriched_at,
         facts=dict(facts),
         unavailable=unavailable,
+        synthesis=synthesis,
     )
 
     # Only cache a finished brief, and not one whose sources are being re-fetched right

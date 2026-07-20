@@ -215,6 +215,9 @@ export interface DrugDetail {
   facts: Record<string, SourcedFact[]>
   /** Keys where *every* source failed. Hoisted so a client cannot miss an outage. */
   unavailable: string[]
+  /** The page-level "so what" (C2): derived threshold statements over the facts, each linking to
+   *  its block. Empty when no rule's inputs are present. Optional: absent on pre-C2 payloads. */
+  synthesis?: SynthesisStatement[]
 }
 
 /** Columns the overview can sort by; must match the API's accepted `sort` values. */

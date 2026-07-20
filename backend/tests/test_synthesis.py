@@ -7,8 +7,10 @@ from __future__ import annotations
 from backend.domain.synthesis import (
     CROWDED_PIPELINE,
     HIGH_ATTRITION,
+    WELL_STUDIED_TRIALS,
     WIDE_STAGE_GAP,
     cancer_synthesis,
+    drug_synthesis,
 )
 
 LANDSCAPE = {
@@ -102,3 +104,51 @@ class TestCancerSynthesis:
         out = cancer_synthesis(drugged, None, None, None)
         assert not any("unexploited" in s["text"] for s in out)
         assert any("5 strongly-associated" in s["text"] for s in out)
+
+
+SELECTIVE = {"reference": {"gene_symbol": "EGFR", "target_pref_name": "EGFR"}, "n_targets": 1}
+MULTI = {"reference": {"gene_symbol": "PDGFRA"}, "n_targets": 6}
+
+
+def _text_for_block(statements: list[dict[str, str]], block: str) -> list[str]:
+    return [s["text"] for s in statements if s["block"] == block]
+
+
+class TestDrugSynthesis:
+    def test_an_approved_selective_well_studied_drug_reads_as_such(self) -> None:
+        # Osimertinib-shaped: approved, selective for EGFR, past the trials cut, with attrition.
+        out = drug_synthesis(max_phase=4, selectivity=SELECTIVE, n_trials=384, has_terminated=True)
+        clinical = _text_for_block(out, "clinical")
+        assert "Approved — reached phase 4" in clinical
+        assert any("Well-studied: 384" in t for t in clinical)
+        assert "Terminated or withdrawn trials on record" in clinical
+        assert "Selective for EGFR" in _text_for_block(out, "potency")
+
+    def test_phase_below_4_reads_in_development(self) -> None:
+        out = drug_synthesis(max_phase=2, selectivity=None, n_trials=None, has_terminated=None)
+        assert "In development — reached phase 2" in _text_for_block(out, "clinical")
+
+    def test_multi_target_drug_says_so(self) -> None:
+        out = drug_synthesis(max_phase=None, selectivity=MULTI, n_trials=None, has_terminated=None)
+        assert "Multi-target: 6 within 100x" in _text_for_block(out, "potency")
+
+    def test_well_studied_is_silent_below_the_cut(self) -> None:
+        below = drug_synthesis(
+            max_phase=None, selectivity=None, n_trials=WELL_STUDIED_TRIALS - 1, has_terminated=None
+        )
+        assert below == []
+        at = drug_synthesis(
+            max_phase=None, selectivity=None, n_trials=WELL_STUDIED_TRIALS, has_terminated=None
+        )
+        assert any("Well-studied" in s["text"] for s in at)
+
+    def test_no_attrition_statement_when_not_terminated(self) -> None:
+        # has_terminated False is a measured "no", not a red flag -- no statement.
+        out = drug_synthesis(max_phase=4, selectivity=None, n_trials=None, has_terminated=False)
+        assert not any("Terminated" in s["text"] for s in out)
+
+    def test_missing_inputs_yield_no_statements(self) -> None:
+        assert (
+            drug_synthesis(max_phase=None, selectivity=None, n_trials=None, has_terminated=None)
+            == []
+        )

@@ -72,6 +72,14 @@ class FacetCount(BaseModel):
     count: int
 
 
+class SynthesisStatement(BaseModel):
+    """One page-level synthesis line (Epic C): a derived reading and the anchor id of the block it
+    was derived from, so the reader can jump to and check the evidence behind it."""
+
+    text: str
+    block: str
+
+
 class DrugDetail(BaseModel):
     """The evidence brief: the catalog row plus every fact we hold, with provenance."""
 
@@ -134,6 +142,13 @@ class DrugDetail(BaseModel):
         ),
     )
 
+    synthesis: list[SynthesisStatement] = Field(
+        default_factory=list,
+        description="The page-level 'so what' (C2): derived threshold statements over the facts, "
+        "each linking to its block. Empty when no rule's inputs are present -- computed "
+        "server-side so the client renders, never invents, the reading.",
+    )
+
 
 class CancerSummary(BaseModel):
     """A cancer overview row. Index columns only, mirroring DrugSummary.
@@ -156,14 +171,6 @@ class CancerList(BaseModel):
     total: int
     limit: int
     offset: int
-
-
-class SynthesisStatement(BaseModel):
-    """One page-level synthesis line (Epic C): a derived reading and the anchor id of the block it
-    was derived from, so the reader can jump to and check the evidence behind it."""
-
-    text: str
-    block: str
 
 
 class CancerDetail(BaseModel):

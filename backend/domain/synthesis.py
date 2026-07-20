@@ -23,6 +23,8 @@ HIGH_ATTRITION = 0.15
 WIDE_STAGE_GAP = 30.0
 """A localized-vs-distant 5-year-survival gap at least this wide (percentage points) means the
 outcome hinges on stage at diagnosis -- the 'catch it early' story."""
+WELL_STUDIED_TRIALS = 20
+""">= this many registered trials marks a drug as well-studied rather than early or sparse."""
 
 
 @dataclass
@@ -109,5 +111,48 @@ def cancer_synthesis(
                     "survival",
                 )
             )
+
+    return [s.as_dict() for s in out]
+
+
+def drug_synthesis(
+    max_phase: Any,
+    selectivity: dict[str, Any] | None,
+    n_trials: Any,
+    has_terminated: Any,
+) -> list[dict[str, str]]:
+    """The drug page's "so what" (C2). Same discipline as cancer_synthesis: each statement is a
+    disclosed threshold rule over a fact, computed only when its input is present (an absent fact
+    yields no statement, never a defaulted one), and links to the block it came from."""
+    out: list[Statement] = []
+
+    # Maturity: the single most orienting fact -- has it reached patients, and how far.
+    if isinstance(max_phase, int) and not isinstance(max_phase, bool):
+        if max_phase >= 4:
+            out.append(Statement("Approved — reached phase 4", "clinical"))
+        else:
+            out.append(Statement(f"In development — reached phase {max_phase}", "clinical"))
+
+    # Selectivity: the potency card's own verdict, hoisted -- what it mainly targets, how tightly.
+    reference = (selectivity or {}).get("reference")
+    n_targets = (selectivity or {}).get("n_targets")
+    if reference and isinstance(n_targets, int):
+        name = reference.get("gene_symbol") or reference.get("target_pref_name")
+        if name:
+            if n_targets <= 1:
+                out.append(Statement(f"Selective for {name}", "potency"))
+            else:
+                out.append(Statement(f"Multi-target: {n_targets} within 100x", "potency"))
+
+    if (
+        isinstance(n_trials, int)
+        and not isinstance(n_trials, bool)
+        and n_trials >= WELL_STUDIED_TRIALS
+    ):
+        out.append(Statement(f"Well-studied: {n_trials:,} registered trials", "clinical"))
+
+    # A red flag worth surfacing up top, not buried in the clinical block.
+    if has_terminated is True:
+        out.append(Statement("Terminated or withdrawn trials on record", "clinical"))
 
     return [s.as_dict() for s in out]

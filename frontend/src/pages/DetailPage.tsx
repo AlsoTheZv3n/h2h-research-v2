@@ -10,6 +10,7 @@ import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { MechanismsFact } from '../components/MechanismsFact'
 import { PotencyCard } from '../components/PotencyCard'
+import { SynthesisPanel } from '../components/SynthesisPanel'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
 import { orderTargetsByPotency } from '../targets'
@@ -152,10 +153,14 @@ export function DetailPage() {
           />
         </div>
 
+        {/* C2: the page-level "so what" leads the evidence cards -- derived statements, each
+            linking to the block it came from. Renders nothing when no rule's inputs are present. */}
+        <SynthesisPanel synthesis={detail.synthesis} />
+
         <div className="grid gap-4 md:grid-cols-2">
           {/* Hero, first row: the molecule beside the distilled potency. Four cards, not
               eight -- physchem folded in under the structure it describes. */}
-          <Card title="Structure & chemistry">
+          <Card id="structure" title="Structure & chemistry">
             {isBiologic ? (
               <NotApplicable
                 reason={`Not applicable — ${detail.drug_type ?? 'This drug'} is not a small molecule, so it has no structure or physicochemical profile; that data model is v2.`}
@@ -237,9 +242,9 @@ export function DetailPage() {
             )}
           </Card>
 
-          <PotencyCard facts={pick(detail, 'selectivity_profile')} isBiologic={isBiologic} />
+          <PotencyCard id="potency" facts={pick(detail, 'selectivity_profile')} isBiologic={isBiologic} />
 
-          <Card title="Mechanism & target">
+          <Card id="mechanism" title="Mechanism & target">
             <dl>
               <Fact
                 label="Mechanism of action"
@@ -270,7 +275,7 @@ export function DetailPage() {
             </dl>
           </Card>
 
-          <Card title="Clinical & literature">
+          <Card id="clinical" title="Clinical & literature">
             <dl>
               <Fact label="Trials" facts={pick(detail, 'n_trials')} emptyLabel="None registered" />
               {/* showZero: ct_max_phase is an ordinal (0 = early phase 1), a real stage, not the

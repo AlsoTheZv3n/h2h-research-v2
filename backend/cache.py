@@ -19,7 +19,8 @@ _client: redis.Redis | None = None
 # expire on their own. v3: Epic A added the `selectivity_profile` fact to the drug brief (the
 # potency card reads it); paired with the a1b3c5d7e9f0 migration that back-dates last_enriched_at
 # so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
-_DETAIL_SCHEMA_VERSION = "v3"
+# v4: the C2 page-level `synthesis` (derived server-side from the facts) joined DrugDetail.
+_DETAIL_SCHEMA_VERSION = "v4"
 
 
 def get_redis() -> redis.Redis:
