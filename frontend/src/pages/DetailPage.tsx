@@ -10,10 +10,20 @@ import { BriefStateProvider, Fact } from '../components/Fact'
 import { MaturityPill } from '../components/MaturityPill'
 import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
+import { lipinskiReading } from '../physchem'
 
 /** Facts for a key, from whichever source(s) asserted it. */
 function pick(detail: DrugDetail, key: string): SourcedFact[] | undefined {
   return detail.facts[key]
+}
+
+/** The numeric value of a fact, or null when it was not measured. A source_failed fact is null
+ *  (an outage, not a value); a measured 0 (status empty under this codebase's fact() classifier)
+ *  is kept as 0 -- the showZero discipline -- so a real 0 violations reads as a 0, not as missing. */
+function num(detail: DrugDetail, key: string): number | null {
+  const f = pick(detail, key)?.[0]
+  if (!f || f.status === 'source_failed') return null
+  return typeof f.value === 'number' ? f.value : null
 }
 
 const list = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v))
@@ -176,8 +186,30 @@ export function DetailPage() {
                   </>
                 ) : null}
 
-                <dl className="mt-3 border-t border-line pt-2">
-                  <Fact label="Molecular weight" facts={pick(detail, 'mw')} render={(v) => `${v} Da`} />
+                <div className="mt-3 border-t border-line pt-2">
+                  {/* B1: the block leads with a one-line reading of what the numbers imply (which
+                      property drives the Lipinski violation), Open Targets' summary→detail shape.
+                      Withheld when the count is missing; a caution reading is muted amber, never a
+                      red/green verdict -- Ro5 is a rough heuristic, not a pass/fail on the drug. */}
+                  {(() => {
+                    const reading = lipinskiReading({
+                      mw: num(detail, 'mw'),
+                      alogp: num(detail, 'alogp'),
+                      hbd: num(detail, 'hbd'),
+                      hba: num(detail, 'hba'),
+                      ro5_violations: num(detail, 'ro5_violations'),
+                    })
+                    return reading ? (
+                      <p
+                        data-testid="lipinski-reading"
+                        className={`mb-2 text-xs ${reading.tone === 'caution' ? 'text-partial' : 'text-ink-muted'}`}
+                      >
+                        {reading.text}
+                      </p>
+                    ) : null
+                  })()}
+                  <dl>
+                    <Fact label="Molecular weight" facts={pick(detail, 'mw')} render={(v) => `${v} Da`} />
                   {/* showZero: a measured 0 is the value for these properties (0 H-bond donors,
                       LogP 0, 0 Lipinski violations), never the "None found" that reads as no data. */}
                   <Fact label="LogP" facts={pick(detail, 'alogp')} showZero />
@@ -189,13 +221,14 @@ export function DetailPage() {
                     render={(v) => `${v} Å²`}
                     showZero
                   />
-                  <Fact
-                    label="Lipinski violations"
-                    facts={pick(detail, 'ro5_violations')}
-                    render={(v) => (Number(v) === 0 ? '0 — passes all four' : String(v))}
-                    showZero
-                  />
-                </dl>
+                    <Fact
+                      label="Lipinski violations"
+                      facts={pick(detail, 'ro5_violations')}
+                      render={(v) => (Number(v) === 0 ? '0 — passes all four' : String(v))}
+                      showZero
+                    />
+                  </dl>
+                </div>
               </>
             )}
           </Card>
