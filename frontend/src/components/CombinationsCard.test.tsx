@@ -68,6 +68,24 @@ describe('CombinationsCard', () => {
     )
   })
 
+  it('does not show an "of N" excerpt marker when all examples are shown (no "N of N")', () => {
+    // The backend caps examples at 5; when the total is <= that, the list IS the count. The
+    // heading must not read the silly "2 of 2 combinations" (a truncation marker with nothing
+    // truncated), only when there are genuinely more than shown.
+    const value = {
+      ...combinations,
+      n_combination: 2,
+      combination_examples: [
+        { nct_id: 'NCT_A', drugs: ['x', 'y'] },
+        { nct_id: 'NCT_B', drugs: ['x', 'z'] },
+      ],
+    }
+    render(<CombinationsCard facts={[fact({ value })]} />)
+    const heading = screen.getByTestId('combination-examples-heading')
+    expect(heading).not.toHaveTextContent(/of 2/)
+    expect(heading).not.toHaveTextContent(/Examples/)
+  })
+
   it('is honest about the scanned sample and the dropped-ambiguous count', () => {
     render(<CombinationsCard facts={[fact({ value: combinations })]} />)
     expect(screen.getByTestId('combinations-summary')).toHaveTextContent(/300 trials scanned/)
