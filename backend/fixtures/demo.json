@@ -240,6 +240,7 @@
             "n": 151,
             "is_target": true,
             "median_nm": 8.807,
+            "gene_symbol": "EGFR",
             "target_chembl_id": "CHEMBL203",
             "target_pref_name": "Epidermal growth factor receptor",
             "fold_vs_reference": 1.0
@@ -248,6 +249,7 @@
             "n": 3,
             "is_target": false,
             "median_nm": 3980.0,
+            "gene_symbol": "KDM1A",
             "target_chembl_id": "CHEMBL6136",
             "target_pref_name": "Lysine-specific histone demethylase 1A",
             "fold_vs_reference": 451.91
@@ -258,6 +260,7 @@
           "n": 151,
           "is_target": true,
           "median_nm": 8.807,
+          "gene_symbol": "EGFR",
           "target_chembl_id": "CHEMBL203",
           "target_pref_name": "Epidermal growth factor receptor",
           "fold_vs_reference": 1.0
@@ -1139,6 +1142,7 @@
             "n": 2,
             "is_target": true,
             "median_nm": 3754.83,
+            "gene_symbol": "KRAS",
             "target_chembl_id": "CHEMBL2189121",
             "target_pref_name": "GTPase KRas",
             "fold_vs_reference": 1.0
@@ -1149,6 +1153,7 @@
           "n": 2,
           "is_target": true,
           "median_nm": 3754.83,
+          "gene_symbol": "KRAS",
           "target_chembl_id": "CHEMBL2189121",
           "target_pref_name": "GTPase KRas",
           "fold_vs_reference": 1.0
@@ -2386,6 +2391,7 @@
             "n": 2,
             "is_target": true,
             "median_nm": 2.0,
+            "gene_symbol": "KRAS",
             "target_chembl_id": "CHEMBL2189121",
             "target_pref_name": "GTPase KRas",
             "fold_vs_reference": 1.0
@@ -2396,6 +2402,7 @@
           "n": 2,
           "is_target": true,
           "median_nm": 2.0,
+          "gene_symbol": "KRAS",
           "target_chembl_id": "CHEMBL2189121",
           "target_pref_name": "GTPase KRas",
           "fold_vs_reference": 1.0

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getDrug, retryDrug, structureUrl } from '../api/client'
-import type { DrugDetail, SourcedFact } from '../api/types'
+import type { DrugDetail, SelectivityProfile, SourcedFact } from '../api/types'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { Ask } from '../components/Ask'
@@ -12,6 +12,7 @@ import { MechanismsFact } from '../components/MechanismsFact'
 import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
+import { orderTargetsByPotency } from '../targets'
 
 /** Facts for a key, from whichever source(s) asserted it. */
 function pick(detail: DrugDetail, key: string): SourcedFact[] | undefined {
@@ -247,10 +248,19 @@ export function DetailPage() {
               {/* Deduped across ChEMBL + Open Targets (B2): one set, each mechanism with its
                   source chips, instead of the same list repeated once per source. */}
               <MechanismsFact facts={pick(detail, 'all_moas')} />
+              {/* Ordered by the selectivity profile's potency ranking (B3), so the target list
+                  and the potency card tell the same story -- no target is "primary" here and
+                  "off-target" there. Falls back to source order when the ranking is unavailable. */}
               <Fact
                 label="Targets"
                 facts={pick(detail, 'targets')}
-                render={list}
+                render={(v) => {
+                  if (!Array.isArray(v)) return String(v)
+                  const profile = pick(detail, 'selectivity_profile')?.[0]?.value as
+                    | SelectivityProfile
+                    | null
+                  return orderTargetsByPotency(v as string[], profile?.targets ?? []).join(', ')
+                }}
                 emptyLabel="None annotated"
               />
               <Fact label="Target (ChEMBL)" facts={pick(detail, 'target_chembl_id')} />

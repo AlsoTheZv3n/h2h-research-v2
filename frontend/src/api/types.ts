@@ -134,6 +134,9 @@ export interface SelectivityTarget {
   fold_vs_reference: number
   /** Within threshold_fold of the reference -- a real target, not incidental. */
   is_target: boolean
+  /** The target's HGNC gene symbol (KDR for VEGFR2), for ordering the mechanism card's symbol
+   *  list by this same potency ranking (B3). Optional: absent on pre-B3 facts / a failed lookup. */
+  gene_symbol?: string | null
 }
 
 /**
