@@ -292,10 +292,12 @@ class TestRelevanceRerank:
         rel = facts["relevant_titles"]
         assert rel.status.value == "ok"
         assert rel.source == "pubmed"
+        titles = rel.value
+        assert isinstance(titles, list)
         # The oncology paper leads; recency (rank order) would have led with the Alzheimer's one.
-        assert rel.value[0] == "Antitumour efficacy in the clinic"
+        assert titles[0] == "Antitumour efficacy in the clinic"
         # And the off-topic papers rank below it, not above.
-        assert rel.value.index("Antitumour efficacy in the clinic") < rel.value.index(
+        assert titles.index("Antitumour efficacy in the clinic") < titles.index(
             "Alzheimer mouse model"
         )
 
