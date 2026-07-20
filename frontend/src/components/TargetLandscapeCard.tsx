@@ -4,7 +4,7 @@ import type { DrugStatus, SourcedFact, TargetLandscape, TargetLandscapeEntry } f
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
-import { associationStrength, evidenceContributions } from '../association'
+import { associationStrength, evidenceContributions, STRONG_ASSOCIATION } from '../association'
 
 /**
  * The cancer's target landscape: the top associated targets from Open Targets, each with
@@ -30,7 +30,11 @@ export function TargetLandscapeCard({
   catalogDrugByTarget?: Record<string, string>
 }) {
   return (
-    <Card id={id} title="Target landscape" note="Top associated targets · Open Targets association score">
+    <Card
+      id={id}
+      title="Target landscape"
+      note={`Top associated targets · Open Targets association strength (strong = score ≥ ${STRONG_ASSOCIATION})`}
+    >
       <FactGate facts={facts}>
         {(fact) => {
           // Tolerate both fact shapes. The current value is {threshold, n_strong, targets}; a

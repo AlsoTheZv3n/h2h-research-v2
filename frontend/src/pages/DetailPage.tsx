@@ -13,6 +13,7 @@ import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
 import { orderTargetsByPotency } from '../targets'
+import { chooseTitleFacts } from '../titles'
 import { formatCount } from '../format'
 
 /** Facts for a key, from whichever source(s) asserted it. */
@@ -312,18 +313,25 @@ export function DetailPage() {
               />
               {/* B4: the shown titles are ranked by relevance to oncology (relevant_titles),
                   falling back to PubMed's recency order (sample_titles) if the rerank was
-                  unavailable -- so the sample is worth reading, not led by an off-topic paper. */}
-              <Fact
-                label="Key papers"
-                facts={pick(detail, 'relevant_titles') ?? pick(detail, 'sample_titles')}
-                emptyLabel="None"
-                render={(v) => {
-                  const titles = v as string[]
-                  const ranked = pick(detail, 'relevant_titles') !== undefined
-                  const total = num(detail, 'n_pubmed')
-                  // A sample, labelled as such: the N most relevant OF the M PubMed hits above.
-                  const ofTotal = total !== null && total > titles.length ? ` of ${formatCount(total)}` : ''
-                  return (
+                  unavailable or stale -- so the sample is worth reading, not led by an off-topic
+                  paper, and a source_failed outage is never masked by a leftover ranked list. */}
+              {(() => {
+                const { facts: titleFacts, ranked } = chooseTitleFacts(
+                  pick(detail, 'sample_titles'),
+                  pick(detail, 'relevant_titles'),
+                )
+                return (
+                  <Fact
+                    label="Key papers"
+                    facts={titleFacts}
+                    emptyLabel="None"
+                    render={(v) => {
+                      const titles = v as string[]
+                      const total = num(detail, 'n_pubmed')
+                      // A sample, labelled: the N most relevant OF the M PubMed hits above.
+                      const ofTotal =
+                        total !== null && total > titles.length ? ` of ${formatCount(total)}` : ''
+                      return (
                     <>
                       <span className="text-[11px] text-ink-faint">
                         the {titles.length} {ranked ? 'most relevant' : 'most recent'}
@@ -339,9 +347,11 @@ export function DetailPage() {
                         ))}
                       </ul>
                     </>
-                  )
-                }}
-              />
+                      )
+                    }}
+                  />
+                )
+              })()}
             </dl>
           </Card>
         </div>

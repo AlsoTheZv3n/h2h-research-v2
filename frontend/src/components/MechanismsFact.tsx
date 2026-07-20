@@ -40,35 +40,53 @@ function MechanismsValue({ facts }: { facts?: SourcedFact[] }) {
     )
   }
 
-  // Every source failed -> an outage, never "no mechanisms". A single ok source still yields a set.
-  if (facts.every((f) => f.status === 'source_failed')) {
-    return <SourceFailedChip fact={facts[0]} />
-  }
-
+  // A source that was DOWN is surfaced regardless of what the others said. Testing only
+  // facts.every(source_failed) would let an outage vanish the moment ANY other source answered --
+  // including a source that answered EMPTY, collapsing "ChEMBL was down" into a definitive "none
+  // annotated". That is this codebase's founding bug, so every failed source gets its amber chip.
+  const failed = facts.filter((f) => f.status === 'source_failed')
   const mechanisms = dedupeMechanisms(facts)
+
   if (mechanisms.length === 0) {
-    // Measured, none: a real empty. Cite a source that answered (not the failed one).
-    const cite = facts.find((f) => f.status !== 'source_failed') ?? facts[0]
+    // No source that answered named a mechanism. If a source was down, that outage -- not a
+    // definitive empty -- is (at least partly) why: show it, never render it as "none".
+    if (failed.length > 0) {
+      return (
+        <>
+          {failed.map((f) => (
+            <SourceFailedChip key={f.source} fact={f} />
+          ))}
+        </>
+      )
+    }
+    // Measured, none: a real empty.
     return (
       <span data-testid="fact-empty" className="text-ink-faint">
         None annotated
-        <CitationChip fact={cite} />
+        <CitationChip fact={facts[0]} />
       </span>
     )
   }
 
   return (
-    <ul data-testid="mechanisms" className="space-y-0.5">
-      {mechanisms.map((m) => (
-        <li key={m.text} className="flex flex-wrap items-baseline gap-x-1">
-          <span>{m.text}</span>
-          {/* One chip per source that named it -- the provenance stays on the fact, and two chips
-              is the visible sign the sources agree. */}
-          {m.facts.map((f) => (
-            <CitationChip key={f.source} fact={f} />
-          ))}
-        </li>
+    <>
+      <ul data-testid="mechanisms" className="space-y-0.5">
+        {mechanisms.map((m) => (
+          <li key={m.text} className="flex flex-wrap items-baseline gap-x-1">
+            <span>{m.text}</span>
+            {/* One chip per source that named it -- the provenance stays on the fact, and two chips
+                is the visible sign the sources agree. */}
+            {m.facts.map((f) => (
+              <CitationChip key={f.source} fact={f} />
+            ))}
+          </li>
+        ))}
+      </ul>
+      {/* A partial outage: mechanisms from the source(s) that answered, but another was down -- so
+          the set never reads as complete when a source could not be asked. */}
+      {failed.map((f) => (
+        <SourceFailedChip key={f.source} fact={f} />
       ))}
-    </ul>
+    </>
   )
 }

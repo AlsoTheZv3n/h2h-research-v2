@@ -49,6 +49,31 @@ describe('MechanismsFact', () => {
     expect(screen.queryByTestId('mechanisms')).not.toBeInTheDocument()
   })
 
+  it('shows the outage, not "None annotated", when one source FAILED and another was empty', () => {
+    // The founding-bug trap: ChEMBL (the primary MoA source) is down, Open Targets measured empty.
+    // Rendering "None annotated" would tell the reader mechanisms are definitively absent when the
+    // main source was never asked. The failed source must still surface its amber chip.
+    render(
+      <MechanismsFact
+        facts={[fact('chembl', null, 'source_failed'), fact('opentargets', [], 'empty')]}
+      />,
+    )
+    expect(screen.getByTestId('fact-source-failed')).toBeInTheDocument()
+    expect(screen.queryByText(/none annotated/i)).not.toBeInTheDocument()
+  })
+
+  it('surfaces a partial outage: mechanisms from the source that answered PLUS the failed chip', () => {
+    render(
+      <MechanismsFact
+        facts={[fact('chembl', null, 'source_failed'), fact('opentargets', ['EGFR inhibitor'])]}
+      />,
+    )
+    // The mechanism the answering source gave is shown...
+    expect(screen.getByTestId('mechanisms')).toHaveTextContent('EGFR inhibitor')
+    // ...and the outage is not hidden by it.
+    expect(screen.getByTestId('fact-source-failed')).toBeInTheDocument()
+  })
+
   it('says "waiting for sources" while the brief is still enriching', () => {
     render(
       <BriefStateProvider value="enriching">

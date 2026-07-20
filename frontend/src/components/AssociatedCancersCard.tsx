@@ -3,7 +3,7 @@ import type { AssociatedCancers, SourcedFact } from '../api/types'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
-import { associationStrength } from '../association'
+import { associationStrength, STRONG_ASSOCIATION } from '../association'
 
 /**
  * The cancers a target is associated with -- the cancer target-landscape run backwards. Open
@@ -20,7 +20,7 @@ export function AssociatedCancersCard({ id, facts }: { id?: string; facts?: Sour
     <Card
       id={id}
       title="Associated cancers"
-      note="Cancers this target is associated with · Open Targets association score, filtered to the catalog"
+      note={`Cancers this target is associated with · Open Targets association strength, filtered to the catalog (strong = score ≥ ${STRONG_ASSOCIATION})`}
     >
       <FactGate facts={facts}>
         {(fact) => {
