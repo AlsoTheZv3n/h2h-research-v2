@@ -42,8 +42,11 @@ def detail_cache_key(chembl_id: str) -> str:
 # gained an Ensembl id + a drugged/in-development/unexploited status. v6: the trial-reality
 # block (ClinicalTrials.gov by condition) added a `trial_reality` fact to the brief. v7: the C1
 # page-level `synthesis` (derived server-side from the facts) joined the CancerDetail shape. v8:
-# the C3 `target_tdl` map (per-target Pharos development level) joined it too.
-_CANCER_DETAIL_SCHEMA_VERSION = "v8"
+# the C3 `target_tdl` map (per-target Pharos development level) joined it too. v9: the TDL verdict
+# for an unresolved-status target with a potent ligand now reads "approval not measured" instead of
+# a false "none approved" -- an honest-state fix to target_tdl's label, so stale v8 briefs must
+# recompute rather than keep serving the old wording.
+_CANCER_DETAIL_SCHEMA_VERSION = "v9"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

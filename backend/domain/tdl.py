@@ -34,12 +34,19 @@ def tdl_verdict(drug_status: str, has_potent_ligand: bool) -> dict[str, Any]:
     if approved:
         level, label = "Tclin", "approved drug"
     elif clinical or has_potent_ligand:
-        # Chemical matter exists (a clinical candidate, or a potent catalog ligand), none approved.
-        level, label = "Tchem", "chemical matter, none approved"
+        # Chemical matter exists (a clinical candidate, or a potent catalog ligand). We may only
+        # say "none approved" when OT actually resolved the drug status; when it did not, a potent
+        # ligand still lifts the target to Tchem (real chemical matter), but the verdict must NOT
+        # assert approval either way -- the ligand itself might be an approved drug, and claiming
+        # "none approved" from an unmeasured input is the exact honest-state collapse this refuses.
+        if resolved:
+            level, label = "Tchem", "chemical matter, none approved"
+        else:
+            level, label = "Tchem", "chemical matter, approval not measured"
     elif drug_status == "unexploited":
-        level, label = "Tbio", "no drug, no potent ligand"
+        level, label = "Tbio", "no drug anywhere"
     else:
-        level, label = "Tdark", "drug status not measured"
+        level, label = "Tdark", "not measured"
 
     def drug_state(passed: bool) -> str:
         # A drug criterion is pass/fail only when OT resolved the status; else it is unknown, never
