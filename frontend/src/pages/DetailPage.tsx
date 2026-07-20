@@ -13,6 +13,7 @@ import { PotencyCard } from '../components/PotencyCard'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
 import { orderTargetsByPotency } from '../targets'
+import { formatCount } from '../format'
 
 /** Facts for a key, from whichever source(s) asserted it. */
 function pick(detail: DrugDetail, key: string): SourcedFact[] | undefined {
@@ -309,18 +310,24 @@ export function DetailPage() {
                 facts={pick(detail, 'n_pubmed')}
                 emptyLabel="No publications found"
               />
+              {/* B4: the shown titles are ranked by relevance to oncology (relevant_titles),
+                  falling back to PubMed's recency order (sample_titles) if the rerank was
+                  unavailable -- so the sample is worth reading, not led by an off-topic paper. */}
               <Fact
-                label="Recent titles"
-                facts={pick(detail, 'sample_titles')}
+                label="Key papers"
+                facts={pick(detail, 'relevant_titles') ?? pick(detail, 'sample_titles')}
                 emptyLabel="None"
                 render={(v) => {
                   const titles = v as string[]
+                  const ranked = pick(detail, 'relevant_titles') !== undefined
+                  const total = num(detail, 'n_pubmed')
+                  // A sample, labelled as such: the N most relevant OF the M PubMed hits above.
+                  const ofTotal = total !== null && total > titles.length ? ` of ${formatCount(total)}` : ''
                   return (
                     <>
-                      {/* Explicitly a sample: the N most recent, not the whole literature (the
-                          count of which is the PubMed hits above). */}
                       <span className="text-[11px] text-ink-faint">
-                        the {titles.length} most recent
+                        the {titles.length} {ranked ? 'most relevant' : 'most recent'}
+                        {ofTotal}
                       </span>
                       <ul className="mt-0.5 space-y-0.5">
                         {/* keyed by index+title: two records can share a title (errata, duplicate

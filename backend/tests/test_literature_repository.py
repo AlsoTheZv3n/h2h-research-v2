@@ -242,3 +242,75 @@ class TestSearch:
         assert hit.year == 2024
         assert hit.url == "https://pubmed.ncbi.nlm.nih.gov/42/"
         assert 0.0 <= hit.distance <= 2.0
+
+
+class TestRelevanceRerank:
+    """B4: the shown titles are ranked by oncology relevance, not recency, using the abstracts
+    already fetched. Real embeddings, because the whole claim is that this ranks on MEANING."""
+
+    async def test_the_oncology_paper_leads_the_off_topic_ones(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        from backend.ingestion.enrich import _rank_titles_by_relevance
+        from backend.models import Drug
+        from backend.repositories.drugs import DrugRepository
+
+        repo = LiteratureRepository(session)
+        # A drug's PubMed hits by name include off-topic papers; only one is about its cancer use.
+        await repo.save(
+            OSI,
+            _record(
+                _article(
+                    "1",
+                    "A transgenic mouse model of Alzheimer's disease with amyloid-beta plaques and "
+                    "cognitive decline; no relation to cancer.",
+                    rank=0,
+                    title="Alzheimer mouse model",
+                ),
+                _article(
+                    "2",
+                    "The drug inhibits its kinase target and induces regression of the tumour in "
+                    "patients with this malignancy; an antitumour, oncology result.",
+                    rank=1,
+                    title="Antitumour efficacy in the clinic",
+                ),
+                _article(
+                    "3",
+                    "Hepatic stellate cell activation and the progression of liver fibrosis in a "
+                    "non-oncological model.",
+                    rank=2,
+                    title="Liver fibrosis pathway",
+                ),
+            ),
+        )
+
+        drug = await session.get(Drug, OSI)
+        assert drug is not None
+        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow())
+
+        facts = {f.key: f for f in await DrugRepository(session).facts_for(OSI)}
+        rel = facts["relevant_titles"]
+        assert rel.status.value == "ok"
+        assert rel.source == "pubmed"
+        # The oncology paper leads; recency (rank order) would have led with the Alzheimer's one.
+        assert rel.value[0] == "Antitumour efficacy in the clinic"
+        # And the off-topic papers rank below it, not above.
+        assert rel.value.index("Antitumour efficacy in the clinic") < rel.value.index(
+            "Alzheimer mouse model"
+        )
+
+    async def test_skips_when_no_abstract_has_text(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        # Nothing embedded -> no relevant_titles fact, and the block falls back to sample_titles.
+        from backend.ingestion.enrich import _rank_titles_by_relevance
+        from backend.models import Drug
+        from backend.repositories.drugs import DrugRepository
+
+        await LiteratureRepository(session).save(OSI, _record(_article("9", None, title="No body")))
+        drug = await session.get(Drug, OSI)
+        assert drug is not None
+        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow())
+
+        facts = {f.key for f in await DrugRepository(session).facts_for(OSI)}
+        assert "relevant_titles" not in facts

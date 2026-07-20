@@ -28,7 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.db import get_sessionmaker
-from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, failed, utcnow
+from backend.embeddings import embed_query
+from backend.ingestion.base import FactStatus, SourceAdapter, SourceRecord, fact, failed, utcnow
 from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
 from backend.ingestion.clinicaltrials_combinations import ClinicalTrialsCombinationsAdapter
@@ -121,6 +122,27 @@ def _query_for(drug: Drug) -> str:
     return drug.pref_name or drug.chembl_id
 
 
+# B4: the shown titles should be ranked by relevance to oncology, not by recency -- a drug's
+# PubMed hits by name include off-topic papers (an Alzheimer's-mouse study that merely mentions the
+# compound) that erode trust in the whole block. A fixed oncology anchor, embedded once, ranks the
+# drug's ALREADY-FETCHED abstracts by cosine similarity; the most on-topic titles lead. No new
+# source, no new query -- it reuses the same abstracts and embedding model the RAG chat does.
+_ONCOLOGY_ANCHOR = (
+    "cancer oncology tumour: the antitumour mechanism, target inhibition and clinical activity "
+    "of this drug against malignancy"
+)
+_oncology_vector: list[float] | None = None
+
+
+async def _oncology_query_vector() -> list[float]:
+    """The oncology anchor's embedding, computed once and reused. A concurrent double-compute is
+    harmless (the value is identical), so no lock is needed."""
+    global _oncology_vector
+    if _oncology_vector is None:
+        _oncology_vector = await embed_query(_ONCOLOGY_ANCHOR)
+    return _oncology_vector
+
+
 async def _enrich_literature(
     session: AsyncSession, drug: Drug, query: str, fetcher: LiteratureFetcher, stats: EnrichStats
 ) -> None:
@@ -140,6 +162,41 @@ async def _enrich_literature(
     stats.abstracts_embedded += embedded
     if not record.ok:
         logger.info("%s: literature fetch failed: %s", drug.chembl_id, record.error)
+        return
+    if embedded:
+        await _rank_titles_by_relevance(session, drug, query, record.retrieved_at)
+
+
+async def _rank_titles_by_relevance(
+    session: AsyncSession, drug: Drug, query: str, retrieved_at: datetime
+) -> None:
+    """Write `relevant_titles` (B4): the drug's just-embedded abstracts, ranked by oncology
+    relevance rather than recency. A separate fact from pubmed's `sample_titles`, so the block
+    falls back to the recency order if this step is unavailable and pubmed's honest states stay
+    intact. Best-effort: any failure leaves only sample_titles, never a broken brief.
+    """
+    try:
+        vector = await _oncology_query_vector()
+        ranked = await LiteratureRepository(session).search(drug.chembl_id, vector, limit=5)
+        titles = [a.title for a in ranked if a.title]
+    except Exception as exc:
+        logger.info("%s: title relevance rerank skipped: %s", drug.chembl_id, exc)
+        return
+    if not titles:
+        return
+    url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query}"
+    await DrugRepository(session).save_record(
+        drug.chembl_id,
+        SourceRecord(
+            "pubmed",
+            query,
+            ok=True,
+            facts={
+                "relevant_titles": fact(titles, "pubmed", source_url=url, retrieved_at=retrieved_at)
+            },
+            provenance={"source_url": url, "retrieved_at": retrieved_at},
+        ),
+    )
 
 
 async def _save_source_record(
