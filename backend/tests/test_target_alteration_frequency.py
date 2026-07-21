@@ -64,9 +64,11 @@ def _mock_study(study_id: str, *, sequenced: int, entrez: int, altered: int) -> 
 
 
 class TestTargetAlterationFrequency:
+    @respx.mock
     async def test_no_cohort_short_circuits_before_any_network_call(self) -> None:
-        # Cancers present, but NONE mapped to a cohort -> no_cohort, and NO HTTP (respx would flag a
-        # stray call). No mock registered, so a mygene/cbioportal call would raise.
+        # Cancers present, but NONE mapped to a cohort -> no_cohort, and NO HTTP call. @respx.mock
+        # with an empty route table enforces it: a stray call raises (assert-all-mocked), catching a
+        # regression that hits the network before the short-circuit.
         async with httpx.AsyncClient() as client:
             record = await target_alteration_frequency(client, _target(), CANCERS, {})
         fact = record.facts["target_alteration_frequency"]

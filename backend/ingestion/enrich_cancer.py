@@ -900,6 +900,27 @@ def make_alteration_frequency_source(study_map: StudyMap) -> CancerSource:
             client, [g["ensembl_id"] for g in genes if g.get("ensembl_id")]
         )
         want = sorted({e for e in entrez_by_ensembl.values()})
+        if not want:
+            # No landscape gene resolved to an Entrez id. resolve_entrez returns {} both on a
+            # mygene OUTAGE and (unreachably, for real driver symbols) on a genuine no-match, so
+            # the safe honest reading is source_failed with the accurate cause -- NOT a cBioPortal
+            # outage (which fetch_mutation_frequencies would raise on an empty gene list), and never
+            # a measured "0% everywhere".
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={
+                    key: failed(
+                        source,
+                        "gene-id lookup resolved no Entrez ids (mygene unavailable)",
+                        source_url=url,
+                    )
+                },
+                error="no landscape gene resolved to an Entrez id",
+                outage=True,
+            )
         try:
             freqs = await cbioportal.fetch_mutation_frequencies(client, study_id, want)
         except cbioportal.CBioPortalError as exc:

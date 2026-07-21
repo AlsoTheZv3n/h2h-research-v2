@@ -72,9 +72,11 @@ def _mock_cbioportal(
 
 
 class TestAlterationFrequencySource:
+    @respx.mock
     async def test_a_cancer_with_no_mapped_cohort_is_unmapped_and_makes_no_call(self) -> None:
         # The dominant case (~98% of the catalog). An OK fact whose value says "unmapped", and --
-        # crucially -- NOT a network call, so respx would flag a stray request. No mock registered.
+        # crucially -- NOT a network call. @respx.mock with no registered route enforces it: a stray
+        # request raises (assert-all-mocked), catching a regression that calls out before the check.
         source = make_alteration_frequency_source({})  # empty map -> nothing resolves
         async with httpx.AsyncClient() as client:
             record = await source(client, _cancer())
@@ -172,6 +174,25 @@ class TestAlterationFrequencySource:
         assert fact.status is FactStatus.SOURCE_FAILED
         assert fact.value is None
         assert record.outage is True
+
+    @respx.mock
+    async def test_total_gene_resolution_failure_is_source_failed_not_a_cbioportal_outage(
+        self,
+    ) -> None:
+        # mygene is down -> resolve_entrez returns {} -> no Entrez ids. This must be a source_failed
+        # naming the GENE-ID lookup, NOT a cBioPortal outage (cBioPortal is never even called -- no
+        # study route is registered, so @respx.mock would flag a stray call to it).
+        respx.post(OT).mock(return_value=_landscape_genes(("ENSG00000157764", "BRAF")))
+        respx.post(MYGENE).mock(return_value=httpx.Response(500))
+
+        source = make_alteration_frequency_source(STUDY_MAP)
+        async with httpx.AsyncClient() as client:
+            record = await source(client, _cancer())
+
+        fact = record.facts["alteration_frequency"]
+        assert fact.status is FactStatus.SOURCE_FAILED
+        assert record.outage is True
+        assert "mygene" in (fact.error or "").lower()
 
     @respx.mock
     async def test_a_disease_ot_cannot_resolve_writes_no_fact(self) -> None:

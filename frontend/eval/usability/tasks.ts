@@ -118,7 +118,15 @@ async function targetPage(page: Page, base: string, id: string): Promise<Capture
     .locator('#catalog-drugs')
     .innerText()
     .catch(() => '')
-  return { url: `${base}/targets/${id}`, text: `${header}\n\n${cancers}\n\n${drugs}` }
+  // #43: the mutation-frequency reflection (this gene across the cancers it drives).
+  const mutation = await page
+    .locator('#mutation-frequency')
+    .innerText()
+    .catch(() => '')
+  return {
+    url: `${base}/targets/${id}`,
+    text: `${header}\n\n${cancers}\n\n${drugs}\n\n${mutation}`,
+  }
 }
 
 /** The orientation surface (D2): what a first-time visitor sees in three minutes -- the
@@ -199,6 +207,30 @@ export const TASKS: Task[] = [
       '"drugged, no link" (a drug exists but not in this catalog) vs "unexploited"',
     ],
     capture: (page, base) => cancerSection(page, base, 'target-landscape'),
+  },
+  {
+    id: 'mutation-frequency-coverage',
+    question:
+      'Read the "Mutation frequency" block on this cancer page. Does it tell you these genes are RARELY mutated in this cancer, or is it saying something else? What is the honest reading?',
+    expected:
+      'Something else: this cancer (broad NSCLC) has NO matched cBioPortal cohort, so mutation frequency is NOT MEASURED here -- explicitly "not measured, which is not zero". It is a coverage gap (only ~two dozen tumour types have a curated cohort), NOT a finding that the genes are rarely mutated. Reading "no cohort" as "low/zero mutation" is the exact None-vs-0 error the block is worded to prevent.',
+    labels: [
+      '"No matched cBioPortal cohort" = a coverage gap, NOT a low frequency',
+      '"not measured — which is not zero" (the None-vs-0 distinction)',
+    ],
+    capture: (page, base) => cancerSection(page, base, 'mutation-frequency'),
+  },
+  {
+    id: 'mutation-frequency-target',
+    question:
+      'On this target (EGFR) page, read the "Mutation frequency by cancer" block. In which cancer is this gene most mutated, and what does the percentage COUNT (and not count)?',
+    expected:
+      'EGFR is most mutated in lung adenocarcinoma (~12%), lower in the others shown. The percentage counts SOMATIC MUTATIONS ONLY (SNV/indel) in a matched cohort -- it excludes copy-number and fusions, so it is a floor on the true alteration frequency, and the block says so. A measured 0% (profiled, never mutated) is distinct from "not measured".',
+    labels: [
+      'the per-cancer frequency, ranked (lung adenocarcinoma highest)',
+      'scope: "somatic mutation (SNV/indel)" — a floor, excludes copy-number & fusions',
+    ],
+    capture: (page, base) => targetPage(page, base, EGFR_TARGET),
   },
   {
     id: 'epidemiology-most-common',
