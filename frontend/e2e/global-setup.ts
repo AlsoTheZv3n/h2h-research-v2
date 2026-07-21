@@ -117,7 +117,20 @@ VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
           "by_status":[{"status":"RECRUITING","count":153},{"status":"COMPLETED","count":362},{"status":"TERMINATED","count":143}],
           "stopped":{"count":172,"reasons":[{"reason":"Slow accrual","count":12},{"reason":"Sponsor business decision","count":8}]},
           "dach_recruiting":122}'::jsonb,
-        'ok', 'https://clinicaltrials.gov/search?cond=E2E+lung+carcinoma', now())
+        'ok', 'https://clinicaltrials.gov/search?cond=E2E+lung+carcinoma', now()),
+       -- The cBioPortal mutation-frequency block (#43): the landscape's EGFR measured, KRAS a
+       -- MEASURED ZERO (profiled, never mutated -- distinct from "not measured"), so the card's
+       -- honest-state distinction is checked DB -> API -> UI. Scope (mutation-only) + attribution
+       -- travel in the value. Same Ensembl ids as the landscape fact so the rows line up.
+       ('MONDO_E2E_NSCLC', 'alteration_frequency', 'cbioportal',
+        '{"state":"measured","study_id":"e2e_lung_tcga","study_label":"E2E Lung — TCGA PanCancer Atlas",
+          "study_name":"E2E Lung (TCGA)","alteration_scope":"somatic mutation (SNV/indel); excludes copy-number & fusions",
+          "denominator_type":"samples with mutation data (sequenced)","denominator_n":500,
+          "genes":[
+            {"symbol":"EGFR","ensembl_id":"ENSG_E2E_EGFR","entrez_id":1956,"state":"measured","altered_n":62,"pct":12.4},
+            {"symbol":"KRAS","ensembl_id":"ENSG_E2E_KRAS","entrez_id":3845,"state":"measured_zero","altered_n":0,"pct":0.0}],
+          "attribution":{"portal":["Cerami E, et al. Cancer Discov. 2012;2(5):401-404.","Gao J, et al. Sci Signal. 2013;6(269):pl1.","de Bruijn I, et al. Cancer Res. 2023;83(23):3861-3867."],"study_citation":"E2E TCGA, Cell 2018","study_pmid":"29625048"}}'::jsonb,
+        'ok', 'https://www.cbioportal.org/study/summary?id=e2e_lung_tcga', now())
 ON CONFLICT (disease_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 
@@ -152,7 +165,14 @@ ON CONFLICT (ensembl_id) DO UPDATE
 INSERT INTO target_fact (ensembl_id, key, source, value, status, source_url, retrieved_at)
 VALUES ('ENSG_E2E_EGFR', 'associated_cancers', 'opentargets',
         '{"n_cancers":1,"cancers":[{"disease_id":"MONDO_E2E_NSCLC","name":"E2E lung carcinoma","score":0.89}]}'::jsonb,
-        'ok', 'https://platform.opentargets.org/target/ENSG_E2E_EGFR', now())
+        'ok', 'https://platform.opentargets.org/target/ENSG_E2E_EGFR', now()),
+       -- The target-side cBioPortal reflection (#43): this gene's mutation frequency across the
+       -- cancers it drives, so the target page's mutation-frequency card renders DB -> API -> UI.
+       ('ENSG_E2E_EGFR', 'target_alteration_frequency', 'cbioportal',
+        '{"state":"measured","entrez_id":1956,"alteration_scope":"somatic mutation (SNV/indel); excludes copy-number & fusions",
+          "cancers":[{"disease_id":"MONDO_E2E_NSCLC","name":"E2E lung carcinoma","study_label":"E2E Lung — TCGA PanCancer Atlas","state":"measured","pct":12.4,"altered_n":62,"denominator_n":500}],
+          "n_more":0,"attribution":{"portal":["Cerami E, et al. Cancer Discov. 2012;2(5):401-404.","Gao J, et al. Sci Signal. 2013;6(269):pl1.","de Bruijn I, et al. Cancer Res. 2023;83(23):3861-3867."]}}'::jsonb,
+        'ok', 'https://www.cbioportal.org/', now())
 ON CONFLICT (ensembl_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 `

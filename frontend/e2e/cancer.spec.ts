@@ -90,6 +90,24 @@ test.describe('cancer catalog', () => {
     await expect(stat).toContainText('8,000 with any evidence')
   })
 
+  test('the mutation-frequency block reads a measured % and a measured-zero distinctly', async ({
+    page,
+  }) => {
+    // #43: cBioPortal mutation frequency, seeded for MONDO_E2E_NSCLC. EGFR is a real 12.4%; KRAS is
+    // a MEASURED ZERO (profiled, never mutated) -- the card must keep the 0% distinct from a
+    // "not measured", DB -> API -> UI, and must state the mutation-only scope. This is the whole
+    // None-vs-0 discipline for the new source, checked end to end.
+    await page.goto('/cancers/MONDO_E2E_NSCLC')
+    const card = page.getByTestId('alteration-genes')
+    await expect(card).toBeVisible()
+    await expect(card).toContainText('EGFR')
+    await expect(page.getByTestId('alteration-measured').first()).toContainText('12.4%')
+    // The measured zero renders as a 0% (with a "none" marker), NOT as "not measured".
+    await expect(page.getByTestId('alteration-measured-zero')).toContainText('0.0%')
+    // The scope is stated so the number is never read as the full alteration frequency.
+    await expect(page.getByTestId('alteration-scope')).toContainText(/somatic mutation/i)
+  })
+
   test('the target landscape shows the drugged flag, the target link and the in-catalog drug link', async ({
     page,
   }) => {
