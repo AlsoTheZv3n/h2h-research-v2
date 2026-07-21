@@ -73,7 +73,7 @@ def cancer_synthesis(
 ) -> list[dict[str, str]]:
     """The cancer page's "so what", as derived statements. Each arg is a fact's value, or None when
     that fact is missing/failed/empty -- in which case its statements are simply absent. `now_year`
-    is the serve-time year, needed only by the silent-stalling rule; omitted (None) it is skipped."""
+    is the serve-time year, only for the silent-stalling rule; omitted (None) it is skipped."""
     out: list[Statement] = []
 
     if landscape:

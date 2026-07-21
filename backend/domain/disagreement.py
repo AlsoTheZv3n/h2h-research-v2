@@ -36,7 +36,7 @@ _PHASE_KEYS = ("max_phase", "ct_max_phase", "max_stage")
 
 # Open Targets reports the stage as an enum string. Map each to the shared 0-4 ordinal; fractional
 # and boundary stages get a half-step so the tolerance above absorbs near-agreement rather than a
-# naive round producing a false conflict. UNKNOWN / anything unmapped -> None (does not participate).
+# naive round producing a false conflict. UNKNOWN / unmapped -> None (does not participate).
 _OT_STAGE_ORDINAL: dict[str, float] = {
     "APPROVAL": 4.0,
     "PHASE_4": 4.0,
