@@ -64,6 +64,14 @@ describe('PipelineCard', () => {
     expect(screen.getByText(/roll-up/i)).toBeInTheDocument()
   })
 
+  it('carries the modality census caveat, so a modality filter is not read as complete (#40)', () => {
+    renderCard([fact({ value: pipeline })], ['CHEMBL_IN'])
+    const note = screen.getByTestId('pipeline-modality-note')
+    // The load-bearing honesty: the filter reflects the catalog, and mRNA vaccines are absent/mistyped.
+    expect(note.textContent).toMatch(/not a complete census/i)
+    expect(note.textContent).toMatch(/mRNA/i)
+  })
+
   it('the modality filter narrows the table', async () => {
     const user = userEvent.setup()
     renderCard([fact({ value: pipeline })], ['CHEMBL_IN'])
