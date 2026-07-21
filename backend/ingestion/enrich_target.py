@@ -28,7 +28,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
-from backend.ingestion import cbioportal
+from backend.ingestion import cbioportal, pubtator
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
 from backend.ingestion.gene_ids import resolve_entrez
 from backend.ingestion.http import build_client
@@ -36,6 +36,7 @@ from backend.models import Target
 from backend.repositories.cancers import CancerRepository
 from backend.repositories.targets import TargetRepository
 from backend.services.cbioportal_map import StudyMap, load_study_map
+from backend.services.mesh_map import MeshMap, load_mesh_map
 
 logger = logging.getLogger(__name__)
 
@@ -314,6 +315,87 @@ async def target_alteration_frequency(
     return _ok(value)
 
 
+_PUBTATOR_HOME = "https://www.ncbi.nlm.nih.gov/research/pubtator3/"
+
+
+async def target_extracted_relations(
+    client: httpx.AsyncClient, target: Target, mesh_map: MeshMap
+) -> SourceRecord:
+    """This gene's machine-EXTRACTED literature relations (PubTator3, #44): the top diseases and
+    chemicals it co-occurs with, each with its relation type + co-mention volume.
+
+    These are NLP-extracted, NOT curated -- so the fact is stamped a distinct `extracted` state and
+    carries the provenance note, never blended with the curated facts. Honest states: gene_unmapped
+    (no Entrez join), the not-found skip (PubTator does not resolve the gene -> no fact), and an
+    outage (source_failed). Diseases link to our catalog only where the MeSH id bridges to MONDO.
+    """
+    source, key = "pubtator", "extracted_relations"
+    retrieved_at = utcnow()
+    prov: dict[str, Any] = {"source_url": _PUBTATOR_HOME, "retrieved_at": retrieved_at}
+
+    entrez_by_ensembl = await resolve_entrez(client, [target.ensembl_id])
+    entrez = entrez_by_ensembl.get(target.ensembl_id)
+    if entrez is None:
+        # Could not join this gene to an Entrez id -> cannot confirm the PubTator gene entity. An
+        # honest state, distinct from "no relations" and from an outage.
+        return SourceRecord(
+            source,
+            target.ensembl_id,
+            ok=True,
+            provenance=prov,
+            facts={
+                key: fact(
+                    {"state": "gene_unmapped"},
+                    source,
+                    source_url=_PUBTATOR_HOME,
+                    retrieved_at=retrieved_at,
+                )
+            },
+        )
+
+    try:
+        data = await pubtator.fetch_gene_relations(client, target.symbol or "", entrez, mesh_map)
+    except pubtator.PubtatorError as exc:
+        return SourceRecord(
+            source,
+            target.ensembl_id,
+            ok=False,
+            provenance=prov,
+            facts={key: failed(source, str(exc), source_url=_PUBTATOR_HOME)},
+            error=str(exc),
+            outage=True,
+        )
+    if data is None:
+        # PubTator (Entrez-confirmed) did not resolve this gene: a lookup miss -> write no fact, the
+        # same skip the OT-not-resolved branch makes, never a measured "no relations".
+        return SourceRecord(
+            source,
+            target.ensembl_id,
+            ok=False,
+            provenance=prov,
+            error="PubTator did not resolve this gene (Entrez-confirmed)",
+        )
+
+    value = {
+        "state": "extracted",
+        # The load-bearing stamp: these are NLP-extracted, not curated. Carried in the data so the
+        # UI cannot render them as settled facts.
+        "provenance": pubtator.EXTRACTED_PROVENANCE,
+        "diseases": data["diseases"],
+        "chemicals": data["chemicals"],
+        "n_disease_relations": data["n_disease_relations"],
+        "n_chemical_relations": data["n_chemical_relations"],
+        "attribution": pubtator.PUBTATOR_CITATION,
+    }
+    return SourceRecord(
+        source,
+        target.ensembl_id,
+        ok=True,
+        provenance=prov,
+        facts={key: fact(value, source, source_url=_PUBTATOR_HOME, retrieved_at=retrieved_at)},
+    )
+
+
 async def _save_source_record(
     repo: TargetRepository, ensembl_id: str, record: SourceRecord, stats: TargetEnrichStats
 ) -> None:
@@ -339,13 +421,14 @@ async def enrich_target(
     client: httpx.AsyncClient,
     catalog_ids: set[str],
     study_map: StudyMap,
+    mesh_map: MeshMap,
     stats: TargetEnrichStats,
     *,
     commit_each: bool = False,
 ) -> None:
-    """Fetch a target's sources and persist them: the associated cancers (Open Targets), then its
-    mutation frequency across those cancers (cBioPortal, #43), reusing the cancers already found so
-    the reverse query runs once.
+    """Fetch and persist a target's sources: the associated cancers (Open Targets), the mutation
+    frequency across those cancers (cBioPortal, #43), and its machine-extracted literature relations
+    (PubTator, #44).
 
     last_enriched_at is stamped even when a source failed -- it records that we *looked*, distinct
     from a never-analyzed target. name and n_cancers are updated only when actually measured."""
@@ -359,9 +442,17 @@ async def enrich_target(
     # the associated-cancers source actually resolved the target (record.ok): an outage or an
     # unresolved id leaves the cancers unknown, so we must not assert a "no cohort" state for a
     # target we could not look up (the same skip the associated-cancers source itself makes).
+    # Both downstream sources run only when the target actually resolved (record.ok): an OT outage
+    # or an unresolved id means we could not look the target up at all, so we write no downstream
+    # facts for it -- the same skip the associated-cancers source itself makes.
     if result.record.ok:
         alt = await target_alteration_frequency(client, target, result.cancers, study_map)
         await _save_source_record(repo, target.ensembl_id, alt, stats)
+        if commit_each:
+            await session.commit()
+
+        extracted = await target_extracted_relations(client, target, mesh_map)
+        await _save_source_record(repo, target.ensembl_id, extracted, stats)
         if commit_each:
             await session.commit()
 
@@ -396,9 +487,11 @@ async def enrich_target_catalog(
 
     stats = TargetEnrichStats()
     repo = TargetRepository(session)
-    # The catalog id set + the cBioPortal study crosswalk, loaded once and reused across the batch.
+    # The catalog id set + the two crosswalks (cBioPortal studies, MeSH->MONDO), loaded once and
+    # reused across the batch.
     catalog_ids = await CancerRepository(session).all_cancer_ids()
     study_map = await load_study_map(session)
+    mesh_map = await load_mesh_map(session)
 
     targets = await repo.enrichment_targets(
         limit=limit,
@@ -410,7 +503,7 @@ async def enrich_target_catalog(
     logger.info("enriching %d targets", len(targets))
 
     for target in targets:
-        await enrich_target(session, target, client, catalog_ids, study_map, stats)
+        await enrich_target(session, target, client, catalog_ids, study_map, mesh_map, stats)
         await session.commit()
 
     return stats

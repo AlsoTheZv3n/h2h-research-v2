@@ -123,9 +123,14 @@ async function targetPage(page: Page, base: string, id: string): Promise<Capture
     .locator('#mutation-frequency')
     .innerText()
     .catch(() => '')
+  // #44: the machine-extracted literature relations (PubTator).
+  const extracted = await page
+    .locator('#extracted-relations')
+    .innerText()
+    .catch(() => '')
   return {
     url: `${base}/targets/${id}`,
-    text: `${header}\n\n${cancers}\n\n${drugs}\n\n${mutation}`,
+    text: `${header}\n\n${cancers}\n\n${drugs}\n\n${mutation}\n\n${extracted}`,
   }
 }
 
@@ -243,6 +248,18 @@ export const TASKS: Task[] = [
       'a canonical company name stands for several raw strings -> its count is larger than any one',
     ],
     capture: (page, base) => cancerSection(page, base, 'trial-reality'),
+  },
+  {
+    id: 'extracted-not-curated',
+    question:
+      'On this target (EGFR) page, read the "Extracted literature relations" block. Should you trust these relations the same way as the rest of the page (the associated cancers, the mutation frequency), or are they a different kind of thing? What does the count mean?',
+    expected:
+      'A DIFFERENT kind: these are machine-EXTRACTED (NLP) co-occurrences from the literature, NOT curated/verified facts like the rest of the page — the block says so, in a set-apart frame. So they should be trusted LESS / treated as leads, not settled facts. The count is CO-MENTIONS (how many papers mention both), a measure of attention/volume, NOT of evidence strength.',
+    labels: [
+      '"Extracted, not curated" = a different, lower-confidence kind of evidence than the curated cards',
+      'the count is co-mentions (attention/volume), NOT curated evidence weight',
+    ],
+    capture: (page, base) => targetPage(page, base, EGFR_TARGET),
   },
   {
     id: 'epidemiology-most-common',

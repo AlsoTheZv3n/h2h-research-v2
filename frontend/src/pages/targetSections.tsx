@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { TargetDetail } from '../api/types'
 import { AssociatedCancersCard } from '../components/AssociatedCancersCard'
 import { CatalogDrugsCard } from '../components/CatalogDrugsCard'
+import { ExtractedRelationsCard } from '../components/ExtractedRelationsCard'
 import { TargetAlterationCard } from '../components/TargetAlterationCard'
 
 /**
@@ -42,5 +43,15 @@ export const TARGET_SECTIONS: TargetSection[] = [
     id: 'catalog-drugs',
     label: 'Drugs in the catalog',
     render: (d) => <CatalogDrugsCard id="catalog-drugs" drugs={d.catalog_drugs} />,
+  },
+  // #44: machine-EXTRACTED relations from the literature (PubTator). LAST on purpose -- it is a
+  // different, lower-confidence KIND of evidence (extracted, not curated), so it sits below the
+  // curated cards and wears a distinct frame, never blended with them.
+  {
+    id: 'extracted-relations',
+    label: 'Extracted relations',
+    render: (d) => (
+      <ExtractedRelationsCard id="extracted-relations" facts={d.facts['extracted_relations']} />
+    ),
   },
 ]

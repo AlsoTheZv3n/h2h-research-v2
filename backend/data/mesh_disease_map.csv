@@ -1,0 +1,212 @@
+mesh_id,mondo_id,mondo_label
+D018288,MONDO_0000402,small cell carcinoma
+D016410,MONDO_0000607,primary cutaneous T-cell non-Hodgkin lymphoma
+D004379,MONDO_0000920,duodenum cancer
+D006338,MONDO_0001340,heart cancer
+D014625,MONDO_0001402,vaginal cancer
+D014846,MONDO_0001528,vulva cancer
+D001932,MONDO_0001657,brain cancer
+D015173,MONDO_0002071,supratentorial cancer
+D009383,MONDO_0002095,vascular cancer
+D018278,MONDO_0002120,neuroendocrine carcinoma
+D001859,MONDO_0002129,bone cancer
+D007573,MONDO_0002131,jaw cancer
+D051677,MONDO_0002142,undifferentiated pleomorphic sarcoma
+D005134,MONDO_0002236,ocular cancer
+D007680,MONDO_0002367,kidney cancer
+C562741,MONDO_0002422,adamantinoma
+D000231,MONDO_0002512,papillary adenocarcinoma
+C537605,MONDO_0002580,orbit rhabdomyosarcoma
+D018237,MONDO_0002598,germinoma
+D018243,MONDO_0002599,teratocarcinoma
+D010144,MONDO_0002648,mammary Paget disease
+D002551,MONDO_0002682,cerebral ventricle cancer
+D016543,MONDO_0002714,central nervous system cancer
+D014594,MONDO_0002715,uterine cancer
+D018335,MONDO_0002728,rhabdoid tumor
+D002283,MONDO_0002806,bronchogenic carcinoma
+D018268,MONDO_0002814,adrenal carcinoma
+D000310,MONDO_0002817,adrenal gland cancer
+C538232,MONDO_0002878,uterine corpus adenosarcoma
+D020295,MONDO_0002912,brainstem cancer
+D018227,MONDO_0002926,clear cell sarcoma
+D002296,MONDO_0002928,carcinosarcoma
+D018239,MONDO_0003001,seminoma
+D004407,MONDO_0003002,dysgerminoma
+C536851,MONDO_0003008,hereditary renal cell carcinoma
+C536368,MONDO_0003024,breast angiosarcoma
+D018277,MONDO_0003036,mucoepidermoid carcinoma
+D019572,MONDO_0003072,retinal cancer
+D015192,MONDO_0003107,infratentorial cancer
+D018201,MONDO_0003130,mesoblastic nephroma
+D065311,MONDO_0003218,adenocarcinoma in situ
+D002281,MONDO_0003264,basosquamous carcinoma
+D004428,MONDO_0003277,malignant ear neoplasm
+D018285,MONDO_0003345,hilar cholangiocarcinoma
+C536475,MONDO_0003715,bladder urachal carcinoma
+C536474,MONDO_0004331,bladder urachal adenocarcinoma
+D009959,MONDO_0004608,oropharynx cancer
+D014062,MONDO_0004631,tongue cancer
+D007951,MONDO_0004643,myeloid leukemia
+D002278,MONDO_0004647,in situ carcinoma
+D000071960,MONDO_0004658,breast carcinoma in situ
+D012468,MONDO_0004669,salivary gland cancer
+D010307,MONDO_0004700,parotid gland cancer
+D007725,MONDO_0004829,Krukenberg carcinoma
+D002288,MONDO_0004957,mucinous adenocarcinoma
+D018267,MONDO_0004965,acinar cell carcinoma
+D000230,MONDO_0004970,adenocarcinoma
+D003528,MONDO_0004971,adenoid cystic carcinoma
+D002282,MONDO_0004991,minimally invasive lung adenocarcinoma
+D002277,MONDO_0004993,carcinoma
+D018262,MONDO_0005004,clear cell adenocarcinoma
+D002285,MONDO_0005023,ductal breast carcinoma in situ
+D013920,MONDO_0005029,essential thrombocythemia
+D018263,MONDO_0005034,thyroid gland follicular carcinoma
+D012514,MONDO_0005055,Kaposi's sarcoma
+D007890,MONDO_0005058,leiomyosarcoma
+D008080,MONDO_0005060,liposarcoma
+C538231,MONDO_0005061,lung adenocarcinoma
+D018283,MONDO_0005074,papillary cystadenocarcinoma
+D002292,MONDO_0005086,renal cell carcinoma
+D012509,MONDO_0005089,sarcoma
+D018279,MONDO_0005092,signet ring cell carcinoma
+D002294,MONDO_0005096,squamous cell carcinoma
+D005354,MONDO_0005164,fibrosarcoma
+D021441,MONDO_0005184,pancreatic ductal adenocarcinoma
+D012208,MONDO_0005212,rhabdomyosarcoma
+D018287,MONDO_0005232,large cell carcinoma
+D002289,MONDO_0005233,non-small cell lung carcinoma
+D018236,MONDO_0005440,embryonal carcinoma
+D013736,MONDO_0005447,testicular cancer
+D064726,MONDO_0005494,triple-negative breast carcinoma
+D010610,MONDO_0005517,pharynx cancer
+C562729,MONDO_0005580,esophageal squamous cell carcinoma
+D018270,MONDO_0005590,breast ductal adenocarcinoma
+D003536,MONDO_0005596,cystadenocarcinoma
+D018567,MONDO_0005628,male breast carcinoma
+D018195,MONDO_0005636,adenosarcoma
+D018212,MONDO_0005674,bone giant cell tumor
+D054740,MONDO_0005764,follicular dendritic cell sarcoma
+D007012,MONDO_0005806,hypopharynx cancer
+D054739,MONDO_0005813,interdigitating dendritic cell sarcoma
+D007414,MONDO_0005814,intestinal cancer
+D005834,MONDO_0005836,male reproductive organ cancer
+D008339,MONDO_0005837,mandibular cancer
+D008479,MONDO_0005843,mediastinal cancer
+D018198,MONDO_0005853,malignant mixed neoplasm
+D018282,MONDO_0005858,mucinous cystadenocarcinoma
+D009423,MONDO_0005872,nervous system cancer
+D018273,MONDO_0005893,pancreatic endocrine carcinoma
+D018202,MONDO_0005933,pulmonary blastoma
+D012186,MONDO_0005941,retroperitoneal cancer
+D002293,MONDO_0005953,scirrhous adenocarcinoma
+D013160,MONDO_0005966,spleen cancer
+D018289,MONDO_0006006,verrucous carcinoma
+D000080443,MONDO_0006033,diffuse intrinsic pontine glioma
+D009396,MONDO_0006058,Wilms tumor
+D018196,MONDO_0006074,adenosquamous carcinoma
+C563168,MONDO_0006094,Askin tumor
+D001752,MONDO_0006115,"blast phase chronic myelogenous leukemia, BCR-ABL1 positive"
+D057090,MONDO_0006189,eccrine porocarcinoma
+C537258,MONDO_0006210,fibrolamellar hepatocellular carcinoma
+D018286,MONDO_0006275,lung giant cell carcinoma
+D008204,MONDO_0006282,lymphangiosarcoma
+C562839,MONDO_0006292,malignant mesothelioma
+C537344,MONDO_0006411,sinonasal undifferentiated carcinoma
+D065646,MONDO_0006468,thyroid gland undifferentiated (anaplastic) carcinoma
+D002295,MONDO_0006474,transitional cell carcinoma
+D012192,MONDO_0006485,uterine carcinosarcoma
+C536494,MONDO_0006486,uveal melanoma
+D002291,MONDO_0006509,papillary carcinoma
+D002830,MONDO_0006700,choroid cancer
+D002286,MONDO_0006739,Ehrlich tumor carcinoma
+D018203,MONDO_0006745,endometrioid stromal sarcoma
+D006101,MONDO_0006770,giant cell reparative granuloma
+D058922,MONDO_0006804,inflammatory breast carcinoma
+D018217,MONDO_0006817,juxtacortical osteosarcoma
+D002287,MONDO_0006824,Krebs 2 carcinoma
+D008048,MONDO_0006834,lip cancer
+D018211,MONDO_0006853,mesenchymal chondrosarcoma
+D023981,MONDO_0006861,myeloid sarcoma
+D009236,MONDO_0006863,myxosarcoma
+D018265,MONDO_0006886,thyroid gland papillary and follicular carcinoma
+D018266,MONDO_0006962,sebaceous adenocarcinoma
+D018280,MONDO_0006973,skin appendage carcinoma
+D018228,MONDO_0006974,small cell sarcoma
+D014067,MONDO_0006998,tonsil cancer
+D006528,MONDO_0007256,hepatocellular carcinoma
+C537946,MONDO_0007300,cerebral sarcoma
+D007948,MONDO_0007896,acute monocytic leukemia
+C536911,MONDO_0007958,familial medullary thyroid carcinoma
+D055653,MONDO_0008018,Muir-Torre syndrome
+C563551,MONDO_0008040,transient myeloproliferative syndrome
+D018814,MONDO_0008082,multiple endocrine neoplasia type 2B
+D010051,MONDO_0008170,ovarian cancer
+D010145,MONDO_0008177,extramammary Paget disease
+D018813,MONDO_0008234,multiple endocrine neoplasia type 2A
+D011471,MONDO_0008315,prostate cancer
+D012175,MONDO_0008380,retinoblastoma
+D055752,MONDO_0008433,small cell lung carcinoma
+C572845,MONDO_0008566,"thyroid cancer, nonmedullary, 2"
+D014516,MONDO_0008627,ureter cancer
+C565972,MONDO_0008734,"adrenocortical carcinoma, hereditary"
+D002813,MONDO_0008977,chondrosarcoma
+D009182,MONDO_0009691,mycosis fungoides
+D055728,MONDO_0009692,primary myelofibrosis
+D009101,MONDO_0009693,plasma cell myeloma
+D012516,MONDO_0009807,osteosarcoma
+D011087,MONDO_0009891,acquired polycythemia vera
+D018232,MONDO_0009994,alveolar rhabdomyosarcoma
+C535575,MONDO_0010150,head and neck squamous cell carcinoma
+D013584,MONDO_0010434,synovial sarcoma
+D018238,MONDO_0010768,gonadoblastoma
+C537516,MONDO_0011014,pleuropulmonary blastoma
+C566646,MONDO_0011121,pheochromocytoma/paraganglioma syndrome 2
+C565310,MONDO_0011578,familial papillary thyroid carcinoma with renal papillary neoplasia
+D018234,MONDO_0011655,alveolar soft part sarcoma
+D054429,MONDO_0011908,juvenile myelomonocytic leukemia
+D018223,MONDO_0011934,dermatofibrosarcoma protuberans
+D055847,MONDO_0012249,Lynch syndrome 2
+C563738,MONDO_0012252,rhabdoid tumor predisposition syndrome 1
+D012512,MONDO_0012817,Ewing sarcoma
+C563195,MONDO_0012825,extraskeletal myxoid chondrosarcoma
+D015473,MONDO_0012883,acute promyelocytic leukemia
+C567685,MONDO_0013196,Lynch syndrome 8
+C567643,MONDO_0013224,rhabdoid tumor predisposition syndrome 2
+D018208,MONDO_0013280,myxoid liposarcoma
+C566039,MONDO_0013695,"colorectal cancer, hereditary nonpolyposis, type 6"
+C535837,MONDO_0015278,familial pancreatic carcinoma
+C538339,MONDO_0015459,nasopharyngeal carcinoma
+D018323,MONDO_0015523,epithelioid hemangioendothelioma
+C562840,MONDO_0016419,hereditary breast carcinoma
+D018316,MONDO_0016681,gliosarcoma
+D009837,MONDO_0016695,oligodendroglioma
+C562943,MONDO_0016718,choroid plexus carcinoma
+D006394,MONDO_0016982,angiosarcoma
+C566775,MONDO_0017790,gastric adenocarcinoma and proximal polyposis of the stomach
+D012751,MONDO_0017844,Sezary syndrome
+D004915,MONDO_0017858,acute erythroid leukemia
+D005909,MONDO_0018177,glioblastoma
+D008039,MONDO_0018184,gastric linitis plastica
+C538090,MONDO_0018364,malignant epithelial tumor of ovary
+D018197,MONDO_0018666,hepatoblastoma
+D007947,MONDO_0018872,acute megakaryoblastic leukemia
+D015470,MONDO_0018874,acute myeloid leukemia
+D012515,MONDO_0019024,mast cell sarcoma
+D018281,MONDO_0019087,cholangiocarcinoma
+D058405,MONDO_0019373,desmoplastic small round cell tumor
+D015467,MONDO_0019451,chronic neutrophilic leukemia
+D015471,MONDO_0019458,acute basophilic leukemia
+C537503,MONDO_0019475,subcutaneous panniculitis-like T-cell lymphoma
+D054752,MONDO_0019480,Langerhans cell sarcoma
+D015477,MONDO_0020311,chronic myelomonocytic leukemia
+D015456,MONDO_0020322,acute biphenotypic leukemia
+D001913,MONDO_0020761,Bowen disease of the skin
+D002280,MONDO_0020804,basal cell carcinoma
+D004701,MONDO_0021069,malignant endocrine neoplasm
+C538230,MONDO_0021659,combined carcinoid and adenocarcinoma
+C536848,MONDO_0023119,familial myelofibrosis
+D062688,MONDO_0027026,Buschke Lowenstein tumor
+D018290,MONDO_0042487,uterine cervix carcinoma in situ
+C537243,MONDO_0700275,"prostate cancer, hereditary"

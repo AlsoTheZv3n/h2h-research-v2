@@ -37,6 +37,14 @@ test.describe('target detail', () => {
     await expect(altCard).toContainText('E2E lung carcinoma')
     await expect(page.getByTestId('target-alt-measured').first()).toContainText('12.4%')
 
+    // #44: the PubTator extracted-relations block. The load-bearing thing: the "extracted, not
+    // curated" banner reads at a glance, and a bridged disease links into the catalog, DB -> API -> UI.
+    await expect(page.getByTestId('extracted-banner')).toContainText(/extracted, not curated/i)
+    await expect(
+      page.getByTestId('extracted-diseases').getByRole('link', { name: /E2E lung carcinoma/i }),
+    ).toBeVisible()
+    await expect(page.getByTestId('extracted-chemicals')).toContainText('E2E Gefitinib')
+
     // A target page belongs to neither catalog: no primary tab is lit.
     await expect(page.getByTestId('nav-drugs')).not.toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('nav-cancers')).not.toHaveAttribute('aria-current', 'page')
