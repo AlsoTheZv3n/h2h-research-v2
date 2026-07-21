@@ -53,14 +53,21 @@ Work the task using ONLY the page text above -- you cannot see the code, the REA
 
 async function main(): Promise<void> {
   const evaluator = await resolveEvaluator() // throws (and exits) if no model -- never a stub
-  console.log(`Evaluator: ${evaluator.name}\nBase: ${BASE}\nTasks: ${TASKS.length}\n`)
+  // HARNESS_ONLY=id1,id2 runs just those tasks (a fast re-check of one changed surface); unset
+  // runs the whole suite (the default, and what a full snapshot report needs).
+  const only = (process.env.HARNESS_ONLY ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const selected = only.length ? TASKS.filter((t) => only.includes(t.id)) : TASKS
+  console.log(`Evaluator: ${evaluator.name}\nBase: ${BASE}\nTasks: ${selected.length}\n`)
   mkdirSync(CAP_DIR, { recursive: true })
 
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } })
   const results: Result[] = []
 
-  for (const task of TASKS) {
+  for (const task of selected) {
     console.log(`[${task.id}] ${task.question.slice(0, 68)}...`)
     try {
       const { url, text } = await task.capture(page, BASE)

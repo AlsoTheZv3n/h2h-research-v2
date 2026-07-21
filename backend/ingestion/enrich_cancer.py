@@ -44,6 +44,7 @@ from backend.services.disease_map import (
     load_source_maps,
     resolve,
 )
+from backend.services.sponsor_map import load_sponsor_map
 
 logger = logging.getLogger(__name__)
 
@@ -731,61 +732,67 @@ def make_survival_source(
     return cancer_survival
 
 
-async def cancer_trial_reality(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
-    """Block D: the real registered-trial landscape from ClinicalTrials.gov v2, by condition.
+def make_trial_reality_source(sponsor_map: dict[str, str]) -> CancerSource:
+    """Block D factory: captures the curated sponsor-normalisation map (#39) so the trial-reality
+    source can merge a company's subsidiaries when counting sponsors."""
 
-    Distinct from the pipeline block (an Open Targets drug roll-up): pipeline says which drugs are
-    in development for this cancer; trial reality says what trials actually exist and their state.
-    Queried by the cancer's NAME as condition text -- CT.gov keys diseases by condition string, not
-    MONDO -- so the match is soft, which the value owns via its `condition` field. Field paths and
-    the count/DACH design were verified live in the P1-T4.0 gate (issue #20); see ctgov_cancer.
-    """
-    source, key = "clinicaltrials", "trial_reality"
-    retrieved_at = utcnow()
-    condition = (cancer.name or "").strip()
-    url = f"https://clinicaltrials.gov/search?cond={quote(condition)}"
-    prov: dict[str, Any] = {"source_url": url, "retrieved_at": retrieved_at}
-    if not condition:
-        # A catalog row with no name -- nothing to query by. Skip (write no fact), the same
-        # lookup-miss branch the OT sources take: never a measured EMPTY ("no trials") for a
-        # cancer we could not even query.
-        return SourceRecord(
-            source,
-            cancer.disease_id,
-            ok=False,
-            provenance=prov,
-            error="cancer has no name to query ClinicalTrials.gov by",
-        )
-    try:
-        data = await ctgov_cancer.fetch_trial_reality(client, condition)
-    except Exception as exc:
-        # Outage (network, 5xx, absent-count handled inside): the source failed, so its answer is
-        # unknown -- an amber source_failed fact, never "no trials".
-        return SourceRecord(
-            source,
-            cancer.disease_id,
-            ok=False,
-            provenance=prov,
-            facts={key: failed(source, str(exc), source_url=url)},
-            error=str(exc),
-            outage=True,
-        )
-    if data is None:
-        # Resolved, zero registered trials -- a measured EMPTY, distinct from an outage.
+    async def cancer_trial_reality(client: httpx.AsyncClient, cancer: Cancer) -> SourceRecord:
+        """Block D: the real registered-trial landscape from ClinicalTrials.gov v2, by condition.
+
+        Distinct from the pipeline block (an Open Targets drug roll-up): pipeline says which drugs
+        are in development for this cancer; trial reality says what trials actually exist and their
+        state. Queried by the cancer's NAME as condition text -- CT.gov keys diseases by condition
+        string, not MONDO -- so the match is soft, which the value owns via its `condition` field.
+        Field paths and the count/DACH design were verified live in the P1-T4.0 gate (issue #20).
+        """
+        source, key = "clinicaltrials", "trial_reality"
+        retrieved_at = utcnow()
+        condition = (cancer.name or "").strip()
+        url = f"https://clinicaltrials.gov/search?cond={quote(condition)}"
+        prov: dict[str, Any] = {"source_url": url, "retrieved_at": retrieved_at}
+        if not condition:
+            # A catalog row with no name -- nothing to query by. Skip (write no fact), the same
+            # lookup-miss branch the OT sources take: never a measured EMPTY ("no trials") for a
+            # cancer we could not even query.
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                error="cancer has no name to query ClinicalTrials.gov by",
+            )
+        try:
+            data = await ctgov_cancer.fetch_trial_reality(client, condition, sponsor_map)
+        except Exception as exc:
+            # Outage (network, 5xx, absent-count handled inside): the source failed, so its answer
+            # is unknown -- an amber source_failed fact, never "no trials".
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, str(exc), source_url=url)},
+                error=str(exc),
+                outage=True,
+            )
+        if data is None:
+            # Resolved, zero registered trials -- a measured EMPTY, distinct from an outage.
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={key: fact(None, source, source_url=url, retrieved_at=retrieved_at)},
+            )
         return SourceRecord(
             source,
             cancer.disease_id,
             ok=True,
             provenance=prov,
-            facts={key: fact(None, source, source_url=url, retrieved_at=retrieved_at)},
+            facts={key: fact(data, source, source_url=url, retrieved_at=retrieved_at)},
         )
-    return SourceRecord(
-        source,
-        cancer.disease_id,
-        ok=True,
-        provenance=prov,
-        facts={key: fact(data, source, source_url=url, retrieved_at=retrieved_at)},
-    )
+
+    return cancer_trial_reality
 
 
 # -- Block E: cBioPortal somatic-mutation frequency (issue #43) -----------------------------------
@@ -998,6 +1005,7 @@ async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
     alteration-frequency source captures its own MONDO->study crosswalk the same way."""
     source_maps = await load_source_maps(session)
     study_map = await load_study_map(session)
+    sponsor_map = await load_sponsor_map(session)
     # One ancestor cache shared by the two disease-map sources, so a cancer's Open Targets
     # ancestors are fetched once even though epidemiology and survival both resolve it.
     ancestors_cache: dict[str, list[str]] = {}
@@ -1007,7 +1015,7 @@ async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
         make_alteration_frequency_source(study_map),
         make_epidemiology_source(source_maps.get("eurostat", {}), ancestors_cache),
         make_survival_source(source_maps.get("seer", {}), ancestors_cache),
-        cancer_trial_reality,
+        make_trial_reality_source(sponsor_map),
     ]
 
 

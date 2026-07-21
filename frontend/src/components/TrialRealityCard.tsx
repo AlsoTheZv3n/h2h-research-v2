@@ -151,6 +151,24 @@ function TrialRealityBody({ data, fact }: { data: TrialReality; fact: SourcedFac
         )}
       </div>
 
+      {/* #39: top sponsors, NORMALISED. Absent on a pre-#39 fact -> the block just doesn't render.
+          The "normalised" note is load-bearing: the counts merge a company's subsidiaries, so they
+          deliberately differ from the raw leadSponsor names -- a reader must know that, or a merged
+          count looks wrong. */}
+      {data.by_sponsor && data.by_sponsor.length > 0 && (
+        <div className="mt-3" data-testid="trial-sponsors">
+          <Distribution
+            title={`Top sponsors${data.n_sponsors ? ` (of ${formatCount(data.n_sponsors)})` : ''}`}
+            testid="trial-sponsor-distribution"
+            items={data.by_sponsor.map((s) => ({ key: s.sponsor, label: s.sponsor, count: s.count }))}
+          />
+          <p className="mt-1 text-[11px] text-ink-faint">
+            Counts are <span className="italic">normalised</span> — a company's subsidiaries are
+            merged onto one name (raw sponsor strings fragment big pharma), over the scanned sample.
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 text-right">
         <CitationChip fact={fact} />
       </div>

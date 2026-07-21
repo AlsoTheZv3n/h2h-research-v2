@@ -1,0 +1,53 @@
+raw_name,canonical_name,note
+Seagen Inc.,Pfizer,acquired by Pfizer 2023
+"Seagen, a wholly owned subsidiary of Pfizer",Pfizer,
+Wyeth is now a wholly owned subsidiary of Pfizer,Pfizer,
+"Array Biopharma, now a wholly owned subsidiary of Pfizer",Pfizer,
+Array BioPharma,Pfizer,acquired by Pfizer 2019
+"Hospira, now a wholly owned subsidiary of Pfizer",Pfizer,
+Hoffmann-La Roche,Roche,
+"Genentech, Inc.",Roche,Roche subsidiary
+Merck Sharp & Dohme LLC,"Merck & Co. (MSD, US)","US Merck (Merck & Co / MSD). MUST NOT merge with Merck KGaA (Darmstadt, DE) -- different company."
+"ArQule, Inc., a subsidiary of Merck Sharp & Dohme LLC, a subsidiary of Merck & Co., Inc. (Rahway, NJ USA)","Merck & Co. (MSD, US)",
+"Peloton Therapeutics, Inc., a subsidiary of Merck & Co., Inc. (Rahway, New Jersey USA)","Merck & Co. (MSD, US)",
+"Oncoimmune, Inc., a subsidiary of Merck & Co., Inc. (Rahway, New Jersey USA)","Merck & Co. (MSD, US)",
+"Oncoethix GmbH, a subsidiary of Merck & Co., Inc. (Rahway, New Jersey USA)","Merck & Co. (MSD, US)",
+MSD Italia S.r.l.,"Merck & Co. (MSD, US)",
+"Immune Design, a subsidiary of Merck & Co., Inc. (Rahway, New Jersey USA)","Merck & Co. (MSD, US)",
+"Acceleron Pharma, Inc., a wholly-owned subsidiary of Merck & Co., Inc., Rahway, NJ USA","Merck & Co. (MSD, US)",
+"Merck KGaA, Darmstadt, Germany","Merck KGaA (Darmstadt, DE)",German Merck (Merck KGaA / EMD Serono). MUST NOT merge with Merck & Co / MSD (US) -- different company.
+"Merck Healthcare KGaA, Darmstadt, Germany, an affiliate of Merck KGaA, Darmstadt, Germany","Merck KGaA (Darmstadt, DE)",
+"EMD Serono Research & Development Institute, Inc.","Merck KGaA (Darmstadt, DE)","EMD Serono is the US arm of Merck KGaA, NOT Merck & Co"
+EMD Serono,"Merck KGaA (Darmstadt, DE)",
+"Janssen Research & Development, LLC",Johnson & Johnson (Janssen),
+Janssen Pharmaceutical K.K.,Johnson & Johnson (Janssen),
+"Johnson & Johnson Pharmaceutical Research & Development, L.L.C.",Johnson & Johnson (Janssen),
+Johnson & Johnson Enterprise Innovation Inc.,Johnson & Johnson (Janssen),
+"Janssen Scientific Affairs, LLC",Johnson & Johnson (Janssen),
+Janssen Cilag S.A.S.,Johnson & Johnson (Janssen),
+Xian-Janssen Pharmaceutical Ltd.,Johnson & Johnson (Janssen),
+Johnson & Johnson Taiwan Ltd,Johnson & Johnson (Janssen),
+Johnson & Johnson Medical (Suzhou) Ltd.,Johnson & Johnson (Janssen),
+Johnson & Johnson International (Singapore) Pte. Ltd.,Johnson & Johnson (Janssen),
+"Janssen-Cilag Ltd.,Thailand",Johnson & Johnson (Janssen),
+Janssen-Cilag B.V.,Johnson & Johnson (Janssen),
+Janssen Pharmaceutica,Johnson & Johnson (Janssen),
+"Janssen Korea, Ltd., Korea",Johnson & Johnson (Janssen),
+Janssen Inc.,Johnson & Johnson (Janssen),
+Novartis Pharmaceuticals,Novartis,
+Celgene,Bristol-Myers Squibb,acquired by BMS 2019
+Celgene Corporation,Bristol-Myers Squibb,
+"Juno Therapeutics, a Subsidiary of Celgene",Bristol-Myers Squibb,
+"Juno Therapeutics, Inc., a Bristol-Myers Squibb Company",Bristol-Myers Squibb,
+"Adnexus, A Bristol-Myers Squibb R&D Company",Bristol-Myers Squibb,
+"Alexion Pharmaceuticals, Inc.",AstraZeneca,acquired by AstraZeneca 2021
+MedImmune LLC,AstraZeneca,AstraZeneca biologics arm
+GlaxoSmithKline,GSK,
+"Tesaro, Inc.",GSK,acquired by GSK 2019
+Sierra Oncology LLC - a GSK company,GSK,
+"Genzyme, a Sanofi Company",Sanofi,
+"Synthorx, Inc, a Sanofi company",Sanofi,
+Eli Lilly and Company,Eli Lilly,
+"Millennium Pharmaceuticals, Inc.",Takeda,Takeda Oncology
+Pharmacyclics LLC.,AbbVie,
+"AbbVie (prior sponsor, Abbott)",AbbVie,

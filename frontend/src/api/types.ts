@@ -629,6 +629,13 @@ export interface TrialStopReason {
  *                         A true zero is an EMPTY fact, never a value, so null is unambiguous.
  *   dach_recruiting null — the DACH sub-query failed (unknown), distinct from a real 0.
  */
+/** One sponsor bucket in the trial-reality fact (#39). `sponsor` is the CANONICAL company name
+ *  (subsidiaries merged); `count` is over the scanned page. */
+export interface TrialSponsor {
+  sponsor: string
+  count: number
+}
+
 export interface TrialReality {
   condition: string
   n_trials: number | null
@@ -641,6 +648,12 @@ export interface TrialReality {
    *  unknown. Drives the "last new trial" line and the derived silent-stalling signal. Optional:
    *  absent on pre-E3 facts. */
   latest_registration?: string | null
+  /** #39: the top lead sponsors over the scanned page, NORMALISED — a company's subsidiaries are
+   *  merged onto its canonical name (raw display would fragment big pharma ~4:1). All optional:
+   *  absent on a pre-#39 fact. `sponsors_normalised` says the counts merged subsidiaries. */
+  by_sponsor?: TrialSponsor[]
+  n_sponsors?: number
+  sponsors_normalised?: boolean
 }
 
 /** One example trial in a drug's observed-combinations fact. `drugs` are the drugs the arm

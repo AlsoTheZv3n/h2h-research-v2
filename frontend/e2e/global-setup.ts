@@ -116,7 +116,9 @@ VALUES ('MONDO_E2E_NSCLC', 'target_landscape', 'opentargets',
           "by_phase":[{"phase":"PHASE1","count":283},{"phase":"PHASE2","count":440},{"phase":"PHASE3","count":120}],
           "by_status":[{"status":"RECRUITING","count":153},{"status":"COMPLETED","count":362},{"status":"TERMINATED","count":143}],
           "stopped":{"count":172,"reasons":[{"reason":"Slow accrual","count":12},{"reason":"Sponsor business decision","count":8}]},
-          "dach_recruiting":122}'::jsonb,
+          "dach_recruiting":122,
+          "by_sponsor":[{"sponsor":"Pfizer","count":19},{"sponsor":"Merck & Co. (MSD, US)","count":8}],
+          "n_sponsors":532,"sponsors_normalised":true}'::jsonb,
         'ok', 'https://clinicaltrials.gov/search?cond=E2E+lung+carcinoma', now()),
        -- The cBioPortal mutation-frequency block (#43): the landscape's EGFR measured, KRAS a
        -- MEASURED ZERO (profiled, never mutated -- distinct from "not measured"), so the card's
