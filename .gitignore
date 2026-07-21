@@ -21,3 +21,6 @@ htmlcov/
 node_modules/
 dist/
 scratchpad/
+
+# Throwaway spike probes (Gate-0 investigations); findings live in the PR/issue, not the repo.
+experiment/

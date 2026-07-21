@@ -9,6 +9,7 @@ const SOURCE_LABELS: Record<string, string> = {
   pubmed: 'PubMed',
   eurostat: 'Eurostat',
   seer: 'SEER',
+  cbioportal: 'cBioPortal',
 }
 
 function confidenceTone(confidence: number | null): string {

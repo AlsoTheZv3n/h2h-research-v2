@@ -30,11 +30,13 @@ from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
-from backend.ingestion import ctgov_cancer, eurostat, seer
+from backend.ingestion import cbioportal, ctgov_cancer, eurostat, seer
 from backend.ingestion.base import Fact, SourceRecord, fact, failed, utcnow
+from backend.ingestion.gene_ids import resolve_entrez
 from backend.ingestion.http import build_client
 from backend.models import Cancer
 from backend.repositories.cancers import CancerRepository
+from backend.services.cbioportal_map import StudyMap, load_study_map
 from backend.services.disease_map import (
     MatchType,
     Resolution,
@@ -786,16 +788,202 @@ async def cancer_trial_reality(client: httpx.AsyncClient, cancer: Cancer) -> Sou
     )
 
 
+# -- Block E: cBioPortal somatic-mutation frequency (issue #43) -----------------------------------
+#
+# For each of the cancer's top landscape genes, how often it is mutated in a matched tumour cohort
+# -- an orthogonal, quantitative signal beside the Open Targets association score. A curated,
+# licence-whitelisted MONDO -> cBioPortal-study crosswalk (exact match, never rollup: a molecular
+# profile is subtype-specific) picks the cohort; mygene maps our Ensembl ids to cBioPortal's Entrez
+# keys (ID -> ID). SCOPE is mutation-only (SNV/indel), stated on the fact so it is never read as the
+# full alteration frequency. Honest states, distinct: no cohort mapped (unmapped) / a gene we could
+# not join (gene_unmapped) / profiled-never-mutated (measured_zero) / an outage (source_failed).
+
+_CBIOPORTAL_HOME = "https://www.cbioportal.org/"
+
+# Lean twin of _TARGET_LANDSCAPE_QUERY: just the top genes' Ensembl id + symbol, in score order.
+# Same size + score-desc + require-approvedSymbol selection as the landscape card's displayed set,
+# so the two cards name the SAME genes -- frequency reads beside the target being looked at.
+_LANDSCAPE_GENES_QUERY = """
+query LandscapeGenes($id: String!, $n: Int!) {
+  disease(efoId: $id) {
+    id
+    associatedTargets(page: {index: 0, size: $n}) {
+      rows { score target { id approvedSymbol } }
+    }
+  }
+}
+"""
+
+
+async def _fetch_landscape_genes(client: httpx.AsyncClient, cancer: Cancer) -> list[dict[str, str]]:
+    """The cancer's top landscape genes (Ensembl id + symbol), matching the displayed set. Returns
+    [] when Open Targets does not resolve the disease -- a lookup miss the caller skips, never a
+    measured "no genes". Raises on an OT outage, which the caller records as source_failed."""
+    data = await _gql(client, _LANDSCAPE_GENES_QUERY, {"id": cancer.disease_id, "n": _TOP_TARGETS})
+    disease = data.get("disease")
+    if disease is None:
+        return []
+    rows = (disease.get("associatedTargets") or {}).get("rows") or []
+    rows.sort(key=lambda r: r.get("score") or 0.0, reverse=True)
+    out: list[dict[str, str]] = []
+    for r in rows[:_TOP_TARGETS]:
+        target = r.get("target") or {}
+        if target.get("approvedSymbol") and target.get("id"):
+            out.append({"ensembl_id": target["id"], "symbol": target["approvedSymbol"]})
+    return out
+
+
+def _study_url(study_id: str) -> str:
+    return f"https://www.cbioportal.org/study/summary?id={study_id}"
+
+
+def make_alteration_frequency_source(study_map: StudyMap) -> CancerSource:
+    """Block E: cBioPortal mutation frequency, attached via the curated MONDO->study crosswalk."""
+
+    async def cancer_alteration_frequency(
+        client: httpx.AsyncClient, cancer: Cancer
+    ) -> SourceRecord:
+        source, key = "cbioportal", "alteration_frequency"
+        retrieved_at = utcnow()
+        mapped = study_map.get(cancer.disease_id)  # EXACT MONDO match only -- no rollup
+        if mapped is None:
+            # NOT_MEASURED: no cBioPortal cohort is mapped to this cancer. An honest, measured
+            # answer about coverage (most of the 1324-entity catalog), kept distinct from empty
+            # and source_failed -- the UI says "no matched cohort", never "0% altered".
+            prov: dict[str, Any] = {"source_url": _CBIOPORTAL_HOME, "retrieved_at": retrieved_at}
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=True,
+                provenance=prov,
+                facts={
+                    key: fact(
+                        {"state": "unmapped"},
+                        source,
+                        source_url=_CBIOPORTAL_HOME,
+                        retrieved_at=retrieved_at,
+                    )
+                },
+            )
+        study_id, study_label = mapped
+        url = _study_url(study_id)
+        prov = {"source_url": url, "retrieved_at": retrieved_at}
+
+        try:
+            genes = await _fetch_landscape_genes(client, cancer)
+        except Exception as exc:
+            # OT outage while getting the gene set -> unknown, an amber source_failed fact.
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, f"landscape gene fetch failed: {exc}", source_url=url)},
+                error=str(exc),
+                outage=True,
+            )
+        if not genes:
+            # A cohort is mapped but OT resolves no landscape genes (deprecated disease id, or an
+            # empty landscape): nothing to measure frequency FOR. A lookup miss -> write no fact,
+            # like the not-resolved branches above, never a measured "no genes altered".
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                error="no landscape genes to measure alteration frequency for",
+            )
+
+        # Ensembl -> Entrez (ID -> ID). A gene mygene cannot resolve is omitted here and marked
+        # gene_unmapped below -- never joined by symbol, never dropped silently.
+        entrez_by_ensembl = await resolve_entrez(
+            client, [g["ensembl_id"] for g in genes if g.get("ensembl_id")]
+        )
+        want = sorted({e for e in entrez_by_ensembl.values()})
+        try:
+            freqs = await cbioportal.fetch_mutation_frequencies(client, study_id, want)
+        except cbioportal.CBioPortalError as exc:
+            return SourceRecord(
+                source,
+                cancer.disease_id,
+                ok=False,
+                provenance=prov,
+                facts={key: failed(source, str(exc), source_url=url)},
+                error=str(exc),
+                outage=True,
+            )
+
+        gene_rows: list[dict[str, Any]] = []
+        for g in genes:
+            ensembl_id, symbol = g.get("ensembl_id"), g.get("symbol")
+            entrez = entrez_by_ensembl.get(ensembl_id) if ensembl_id else None
+            altered = freqs.altered_by_entrez.get(entrez) if entrez is not None else None
+            if entrez is None or altered is None:
+                # Could not join this gene to an Entrez id (or, defensively, it was not in the
+                # fetched set): NOT measured for this gene -- distinct from a 0% frequency.
+                gene_rows.append(
+                    {
+                        "symbol": symbol,
+                        "ensembl_id": ensembl_id,
+                        "entrez_id": entrez,
+                        "state": "gene_unmapped",
+                    }
+                )
+                continue
+            pct = round(100.0 * altered / freqs.denominator, 1)
+            gene_rows.append(
+                {
+                    "symbol": symbol,
+                    "ensembl_id": ensembl_id,
+                    "entrez_id": entrez,
+                    # A whole-exome cohort profiles every gene, so altered == 0 is a MEASURED zero
+                    # (profiled, never mutated) -- not "not measured". The two states never merge.
+                    "state": "measured_zero" if altered == 0 else "measured",
+                    "altered_n": altered,
+                    "pct": pct,
+                }
+            )
+
+        value = {
+            "state": "measured",
+            "study_id": study_id,
+            "study_label": study_label,
+            "study_name": freqs.study_name,
+            "alteration_scope": cbioportal.ALTERATION_SCOPE,
+            "denominator_type": cbioportal.DENOMINATOR_TYPE,
+            "denominator_n": freqs.denominator,
+            "genes": gene_rows,
+            # The ODbL grant condition: the portal citations PLUS the specific source study.
+            "attribution": {
+                "portal": list(cbioportal.CBIOPORTAL_CITATIONS),
+                "study_citation": freqs.study_citation,
+                "study_pmid": freqs.study_pmid,
+            },
+        }
+        return SourceRecord(
+            source,
+            cancer.disease_id,
+            ok=True,
+            provenance=prov,
+            facts={key: fact(value, source, source_url=url, retrieved_at=retrieved_at)},
+        )
+
+    return cancer_alteration_frequency
+
+
 async def build_cancer_sources(session: AsyncSession) -> list[CancerSource]:
     """The cancer evidence sources, assembled. The disease-map-resolved sources (epidemiology,
-    survival) capture their source's crosswalk, loaded once from the DB here."""
+    survival) capture their source's crosswalk, loaded once from the DB here; the cBioPortal
+    alteration-frequency source captures its own MONDO->study crosswalk the same way."""
     source_maps = await load_source_maps(session)
+    study_map = await load_study_map(session)
     # One ancestor cache shared by the two disease-map sources, so a cancer's Open Targets
     # ancestors are fetched once even though epidemiology and survival both resolve it.
     ancestors_cache: dict[str, list[str]] = {}
     return [
         opentargets_target_landscape,
         opentargets_pipeline,
+        make_alteration_frequency_source(study_map),
         make_epidemiology_source(source_maps.get("eurostat", {}), ancestors_cache),
         make_survival_source(source_maps.get("seer", {}), ancestors_cache),
         cancer_trial_reality,

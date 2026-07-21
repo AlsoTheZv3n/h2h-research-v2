@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CancerDetail } from '../api/types'
+import { AlterationFrequencyCard } from '../components/AlterationFrequencyCard'
 import { EpidemiologyCard } from '../components/EpidemiologyCard'
 import { PipelineCard } from '../components/PipelineCard'
 import { SurvivalCard } from '../components/SurvivalCard'
@@ -47,6 +48,19 @@ export const CANCER_SECTIONS: CancerSection[] = [
         facts={d.facts['target_landscape']}
         catalogDrugByTarget={d.target_catalog_drug}
         targetTdl={d.target_tdl}
+      />
+    ),
+  },
+  // #43: mutation frequency sits directly under the landscape it augments -- the reader sees, for
+  // each associated target, how often it is actually mutated in a matched cohort (the orthogonal
+  // signal beside the association score). cBioPortal, EXACT-match cohorts only; honest states.
+  {
+    id: 'mutation-frequency',
+    label: 'Mutation frequency',
+    render: (d) => (
+      <AlterationFrequencyCard
+        id="mutation-frequency"
+        facts={d.facts['alteration_frequency']}
       />
     ),
   },

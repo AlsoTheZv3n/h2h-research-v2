@@ -357,6 +357,43 @@ export interface TdlVerdict {
   criteria: TdlCriterion[]
 }
 
+/** One gene's mutation-frequency reading in a cancer's alteration_frequency fact (#43, cBioPortal).
+ *  `state` keeps the honest cases apart: `measured` (a real %), `measured_zero` (profiled, never
+ *  mutated — a real 0%, NOT missing), `gene_unmapped` (could not join this gene to an Entrez id —
+ *  not measured, distinct from 0%). `pct`/`altered_n` are absent for gene_unmapped. */
+export interface AlterationGene {
+  symbol: string
+  ensembl_id: string | null
+  entrez_id: number | null
+  state: 'measured' | 'measured_zero' | 'gene_unmapped'
+  altered_n?: number
+  pct?: number
+}
+
+/** The attribution the surface must carry (ODbL grant condition): the cBioPortal portal citations
+ *  plus the specific source study cited by the cohort. */
+export interface AlterationAttribution {
+  portal: string[]
+  study_citation: string | null
+  study_pmid: string | null
+}
+
+/** A cancer's cBioPortal somatic-mutation frequency fact (#43). `state: 'unmapped'` is the honest
+ *  "no matched cohort for this cancer" (most of the catalog) — distinct from source_failed and from
+ *  a real 0%. `state: 'measured'` carries the cohort, the SCOPE (mutation-only) + denominator so the
+ *  number is never bare, the per-gene readings, and the attribution. */
+export interface AlterationFrequency {
+  state: 'unmapped' | 'measured'
+  study_id?: string
+  study_label?: string
+  study_name?: string | null
+  alteration_scope?: string
+  denominator_type?: string
+  denominator_n?: number
+  genes?: AlterationGene[]
+  attribution?: AlterationAttribution
+}
+
 /**
  * A cancer's evidence brief: the catalog facts plus every fact we hold, with
  * provenance. `state` is enriching while the brief is built, ready once stored --
