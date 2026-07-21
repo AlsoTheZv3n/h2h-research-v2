@@ -51,15 +51,27 @@ date**, and gaps are shown honestly instead of papered over.
   whether it is **drugged (approved), in development, or unexploited** in the world — sourced from Open
   Targets (not our catalog), joined on stable Ensembl ids, with a separate link to a catalog drug
   against it where we hold one. A high-association target with no drug anywhere is the finding; one
-  merely absent from *our* catalog is not. Two more blocks ship beside these — **epidemiology**
-  (European age-standardised cancer mortality, from Eurostat) and **survival** (SEER 5-year relative
-  survival by stage) — each attached through a MONDO disease crosswalk and each loading and failing on
-  its own, with the same honest states: a cancer with no mapped category reads *not available for this
-  cancer*, never a false zero.
+  merely absent from *our* catalog is not. Three more blocks ship beside these — **trial reality** (the
+  registered-trial landscape from ClinicalTrials.gov: phase and status distributions, stopped-with-reasons,
+  and a derived *no new trial since YYYY* stalled-programme signal), **epidemiology** (European
+  age-standardised cancer mortality, from Eurostat) and **survival** (SEER 5-year relative survival by
+  stage) — each attached through a MONDO disease crosswalk and each loading and failing on its own, with
+  the same honest states: a cancer with no mapped category reads *not available for this cancer*, never a
+  false zero.
+- **Read the page, not eight blocks.** Every drug and cancer page opens with a **page-level synthesis** —
+  *what the evidence adds up to* — a few derived threshold statements (crowded vs sparse pipeline, notable
+  attrition, selective vs multi-target, the unexploited-opportunity gap) that each link back to the block
+  they came from, so a reader reaches a conclusion instead of assembling one. Each landscape target also
+  carries a **Pharos-style development-level verdict** (Tclin / Tchem / Tbio / Tdark) that surfaces the
+  *missing middle* — potent chemical matter with no approved drug. When two sources give a comparable fact
+  different values (the clinical phase, from ChEMBL, ClinicalTrials.gov and Open Targets), the
+  **disagreement is named** as its own honest state rather than left for the reader to notice. And every
+  fact shows **how fresh it is** — *checked yesterday* vs *three months ago* — from the retrieval date it
+  always carried.
 
 The cancer view is deliberately partial, and says which parts exist. **Known gaps, named not shipped:**
-trial reality (which trials, where, recruiting), the molecular profile, cost-of-care and unmet-need
-blocks are not built yet. What is shown is sourced; what is missing is stated rather than faked — the
+the molecular profile (alteration frequency per entity), cost-of-care and unmet-need blocks are not built
+yet. What is shown is sourced; what is missing is stated rather than faked — the
 same discipline as the honest states below. It is a research and drug-intelligence view of the
 evidence, not clinical decision support and not medical advice.
 
