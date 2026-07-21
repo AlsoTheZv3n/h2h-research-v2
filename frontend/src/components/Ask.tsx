@@ -81,8 +81,11 @@ export function Ask({ chemblId, drugName }: { chemblId: string; drugName: string
       </form>
 
       {asking && (
+        // Sets the expectation that a grounded answer is not instant. The harness read a still-
+        // pending box as "the tool does not answer, it just shows a progress message" -- i.e.
+        // broken. Naming the wait as normal keeps a slow answer reading as working, not stuck.
         <p data-testid="ask-pending" className="text-sm text-ink-faint italic">
-          Reading this drug's facts and literature…
+          Reading this drug's facts and literature… a grounded answer can take a moment.
         </p>
       )}
 
