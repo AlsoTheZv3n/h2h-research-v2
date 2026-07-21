@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,9 +18,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.cache import cancer_detail_cache_key, get_redis, invalidate_cancer_detail
 from backend.config import get_settings
 from backend.db import get_session
+from backend.domain.synthesis import cancer_synthesis
+from backend.domain.tdl import tdl_verdict
 from backend.ingestion.base import FactStatus
 from backend.repositories.cancers import CancerRepository
-from backend.schemas import CancerDetail, CancerList, CancerSummary, FacetCount, SourcedFact
+from backend.schemas import (
+    CancerDetail,
+    CancerList,
+    CancerSummary,
+    FacetCount,
+    SourcedFact,
+    SynthesisStatement,
+    TdlVerdict,
+)
 from backend.services.briefs import BriefState
 from backend.services.cancer_briefs import (
     get_or_start_cancer_brief,
@@ -174,12 +184,42 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
     # the symbol). A target missing from the result simply gets no link; it is NOT rendered
     # "unexploited", which is the world's answer and comes from the fact itself.
     target_catalog_drug: dict[str, str] = {}
+    # C3: a Pharos-style Target Development Level per landscape target, keyed by Ensembl id. Derived
+    # from the target's drug status (OT) plus whether our catalog binds it potently -- surfacing the
+    # Tchem middle (potent chemical matter, no approval). A parallel map, never mutating the fact.
+    target_tdl: dict[str, TdlVerdict] = {}
     landscape = facts.get("target_landscape")
     if landscape and landscape[0].status is FactStatus.OK and isinstance(landscape[0].value, dict):
-        ensembl_ids = [
-            t["ensembl_id"] for t in landscape[0].value.get("targets", []) if t.get("ensembl_id")
-        ]
+        targets = landscape[0].value.get("targets", [])
+        ensembl_ids = [t["ensembl_id"] for t in targets if t.get("ensembl_id")]
         target_catalog_drug = await repo.catalog_drug_for_targets(ensembl_ids)
+        potent = await repo.potent_ligand_symbols()
+        for t in targets:
+            eid = t.get("ensembl_id")
+            if eid:
+                has_ligand = (t.get("symbol") or "").upper() in potent
+                target_tdl[eid] = TdlVerdict(
+                    **tdl_verdict(t.get("drug_status") or "unknown", has_ligand)
+                )
+
+    # The page-level "so what" (C1): derived threshold statements over the facts above, computed
+    # server-side so the client renders (never invents) the reading. Each rule sees a fact's value
+    # only when that source answered OK -- an absent/failed/empty fact yields no statement.
+    def ok_value(key: str) -> dict[str, Any] | None:
+        entries = facts.get(key)
+        if entries and entries[0].status is FactStatus.OK and isinstance(entries[0].value, dict):
+            return entries[0].value
+        return None
+
+    synthesis = [
+        SynthesisStatement(**s)
+        for s in cancer_synthesis(
+            landscape=ok_value("target_landscape"),
+            pipeline=ok_value("pipeline"),
+            trial_reality=ok_value("trial_reality"),
+            survival=ok_value("survival"),
+        )
+    ]
 
     detail = CancerDetail(
         disease_id=cancer.disease_id,
@@ -194,6 +234,8 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
         unavailable=unavailable,
         catalog_drug_ids=catalog_drug_ids,
         target_catalog_drug=target_catalog_drug,
+        target_tdl=target_tdl,
+        synthesis=synthesis,
     )
 
     # Cache only a finished brief, and not one being re-fetched right now (the retry-race

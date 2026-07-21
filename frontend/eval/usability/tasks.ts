@@ -65,6 +65,20 @@ async function drugPage(page: Page, base: string, id: string, waitText: RegExp):
   return { url: `${base}/drugs/${id}`, text }
 }
 
+/** The WHOLE cancer page (every block), for a conclusion task (D1): the reader must reach a "so
+ *  what" across the page, so it needs all of it, not one section. */
+async function cancerPage(page: Page, base: string, id: string): Promise<Capture> {
+  await page.goto(`${base}/cancers/${id}`, { waitUntil: 'networkidle' })
+  await page.locator('#target-landscape').waitFor({ timeout: 30_000 })
+  await page.waitForTimeout(400)
+  const text = await page
+    .locator('article')
+    .first()
+    .innerText()
+    .catch(() => '')
+  return { url: `${base}/cancers/${id}`, text }
+}
+
 /** The header plus one named section of a DRUG page (e.g. the observed-combinations card),
  *  scoped to that block so the reader is judged on that surface, not the whole brief. */
 async function drugSection(
@@ -255,5 +269,34 @@ export const TASKS: Task[] = [
       'the dropped-ambiguous count = excluded, not guessed; counts are over a scanned sample',
     ],
     capture: (page, base) => drugSection(page, base, PEMBROLIZUMAB, 'combinations'),
+  },
+  // D1 (#74): CONCLUSION tasks -- "what would you conclude, and would you act on it?" -- built
+  // BEFORE Epic C so its page-level synthesis is measurable. Usefulness is reaching a correct
+  // conclusion, not parsing a label. Each expected answer is derivable from the real page's data;
+  // a page that only lists blocks (no synthesis) should leave the reader assembling it themselves,
+  // which is the prove-fail the synthesis (C1/C2) is meant to remove.
+  {
+    id: 'drug-conclusion',
+    question:
+      "After reading this whole drug page, what would you CONCLUDE about the drug overall -- what is it, how strong is the evidence, and would you act on it (e.g. prioritise it for an EGFR-driven cancer)? Answer as a one-paragraph conclusion, not a list of fields.",
+    expected:
+      'Osimertinib is an APPROVED (phase 4), SELECTIVE EGFR inhibitor (most potent on EGFR, ~8.8 nM, no other target within 100x) with a large trial and literature base -- a well-evidenced, actionable EGFR-targeted therapy; act: yes, for an EGFR-driven cancer. A reader should reach this WITHOUT assembling it from scattered blocks.',
+    labels: [
+      'a page-level synthesis the reader can conclude from, not eight separate blocks',
+      'the conclusion is supported by the data: approved + selective for EGFR + deep evidence',
+    ],
+    capture: (page, base) => drugPage(page, base, OSIMERTINIB, /Selectivity & potency/),
+  },
+  {
+    id: 'cancer-conclusion',
+    question:
+      "After reading this whole cancer page, what would you CONCLUDE -- what is the therapeutic landscape, and where is the opportunity or the risk? Answer as a one-paragraph conclusion, not a list of blocks.",
+    expected:
+      'NSCLC has strongly-associated, druggable targets with approved drugs (EGFR, KRAS) and a large development pipeline, but ALSO high-association targets with no drug anywhere -- the unexploited opportunity; survival is strongly stage-dependent. A reader should reach a "so what" (the druggable landscape plus the unexploited gap) without assembling it from separate blocks.',
+    labels: [
+      'a page-level "so what": the druggable landscape plus the unexploited gap, not separate blocks',
+      'the conclusion is supported: approved targets, pipeline size, unexploited high-association targets',
+    ],
+    capture: (page, base) => cancerPage(page, base, NSCLC),
   },
 ]

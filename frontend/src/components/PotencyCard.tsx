@@ -21,10 +21,18 @@ import { formatNm } from '../format'
  *   - the single-measurement targets and the cell-based/censored/non-nM rows are set aside but
  *     COUNTED, shown as a disclosed footnote (A4 turns a dominant exclusion into a warning).
  */
-export function PotencyCard({ facts, isBiologic }: { facts?: SourcedFact[]; isBiologic: boolean }) {
+export function PotencyCard({
+  facts,
+  isBiologic,
+  id,
+}: {
+  facts?: SourcedFact[]
+  isBiologic: boolean
+  id?: string
+}) {
   if (isBiologic) {
     return (
-      <Card title="Selectivity & potency">
+      <Card id={id} title="Selectivity & potency">
         <NotApplicable reason="Not applicable — this drug is not a small molecule, so it has no small-molecule binding curve; that data model is out of scope for v1." />
       </Card>
     )
@@ -32,6 +40,7 @@ export function PotencyCard({ facts, isBiologic }: { facts?: SourcedFact[]; isBi
 
   return (
     <Card
+      id={id}
       title="Selectivity & potency"
       note="Targets ranked by potency · fold vs the most potent (log scale)"
     >

@@ -19,7 +19,8 @@ _client: redis.Redis | None = None
 # expire on their own. v3: Epic A added the `selectivity_profile` fact to the drug brief (the
 # potency card reads it); paired with the a1b3c5d7e9f0 migration that back-dates last_enriched_at
 # so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
-_DETAIL_SCHEMA_VERSION = "v3"
+# v4: the C2 page-level `synthesis` (derived server-side from the facts) joined DrugDetail.
+_DETAIL_SCHEMA_VERSION = "v4"
 
 
 def get_redis() -> redis.Redis:
@@ -39,8 +40,13 @@ def detail_cache_key(chembl_id: str) -> str:
 # strand entries of the other. v4: target_landscape fact reshaped to carry the strong-
 # association count + threshold beside the displayed targets. v5: each displayed target
 # gained an Ensembl id + a drugged/in-development/unexploited status. v6: the trial-reality
-# block (ClinicalTrials.gov by condition) added a `trial_reality` fact to the brief.
-_CANCER_DETAIL_SCHEMA_VERSION = "v6"
+# block (ClinicalTrials.gov by condition) added a `trial_reality` fact to the brief. v7: the C1
+# page-level `synthesis` (derived server-side from the facts) joined the CancerDetail shape. v8:
+# the C3 `target_tdl` map (per-target Pharos development level) joined it too. v9: the TDL verdict
+# for an unresolved-status target with a potent ligand now reads "approval not measured" instead of
+# a false "none approved" -- an honest-state fix to target_tdl's label, so stale v8 briefs must
+# recompute rather than keep serving the old wording.
+_CANCER_DETAIL_SCHEMA_VERSION = "v9"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

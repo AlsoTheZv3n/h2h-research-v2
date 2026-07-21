@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, or_, select, update
+from sqlalchemy import ColumnElement, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,6 +158,26 @@ class CancerRepository:
             .group_by(DrugTarget.target_ensembl_id)
         )
         return {ensembl_id: chembl_id for ensembl_id, chembl_id in rows.all()}
+
+    async def potent_ligand_symbols(self) -> set[str]:
+        """The gene symbols that ANY catalog drug binds POTENTLY -- a target that appears as a
+        within-threshold `is_target` in some drug's selectivity profile (Epic A). This is the
+        "has potent chemical matter" signal for the TDL verdict (C3), computed once per request
+        over the selectivity_profile facts. Uppercased so the match against a landscape target's
+        symbol is case-insensitive. Empty until drugs re-enrich with a selectivity profile.
+        """
+        rows = await self.session.execute(
+            text(
+                """
+                SELECT DISTINCT upper(t->>'gene_symbol') AS sym
+                  FROM fact f, jsonb_array_elements(f.value->'targets') t
+                 WHERE f.key = 'selectivity_profile'
+                   AND coalesce((t->>'is_target')::boolean, false)
+                   AND t->>'gene_symbol' IS NOT NULL
+                """
+            )
+        )
+        return {row.sym for row in rows if row.sym}
 
     def _filters(
         self,

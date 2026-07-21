@@ -72,6 +72,14 @@ class FacetCount(BaseModel):
     count: int
 
 
+class SynthesisStatement(BaseModel):
+    """One page-level synthesis line (Epic C): a derived reading and the anchor id of the block it
+    was derived from, so the reader can jump to and check the evidence behind it."""
+
+    text: str
+    block: str
+
+
 class DrugDetail(BaseModel):
     """The evidence brief: the catalog row plus every fact we hold, with provenance."""
 
@@ -134,6 +142,13 @@ class DrugDetail(BaseModel):
         ),
     )
 
+    synthesis: list[SynthesisStatement] = Field(
+        default_factory=list,
+        description="The page-level 'so what' (C2): derived threshold statements over the facts, "
+        "each linking to its block. Empty when no rule's inputs are present -- computed "
+        "server-side so the client renders, never invents, the reading.",
+    )
+
 
 class CancerSummary(BaseModel):
     """A cancer overview row. Index columns only, mirroring DrugSummary.
@@ -156,6 +171,22 @@ class CancerList(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class TdlCriterion(BaseModel):
+    """One pass/fail (or 'unknown') mark that explains a target's TDL verdict (C3)."""
+
+    label: str
+    state: str  # "pass" | "fail" | "unknown"
+
+
+class TdlVerdict(BaseModel):
+    """A Pharos-style Target Development Level (C3): the level, a short reading, and the criteria
+    that produced it. Surfaces the Tchem middle -- potent chemical matter with no approved drug."""
+
+    level: str  # "Tclin" | "Tchem" | "Tbio" | "Tdark"
+    label: str
+    criteria: list[TdlCriterion]
 
 
 class CancerDetail(BaseModel):
@@ -205,6 +236,20 @@ class CancerDetail(BaseModel):
         "that acts on it -- the drugged flag's separate, weaker catalog-link signal. A "
         "target absent here has no drug in OUR catalog, which is NOT 'unexploited' (the "
         "world's answer, from Open Targets); it just gets no link. Joined on Ensembl id.",
+    )
+
+    synthesis: list[SynthesisStatement] = Field(
+        default_factory=list,
+        description="The page-level 'so what' (C1): derived threshold statements over the facts "
+        "above, each linking to the block it came from. Empty when no rule's inputs are present -- "
+        "computed here so the client renders, never invents, the reading.",
+    )
+
+    target_tdl: dict[str, TdlVerdict] = Field(
+        default_factory=dict,
+        description="For each landscape target's Ensembl id, its Pharos-style Target Development "
+        "Level (C3): the level plus the pass/fail criteria that produced it. Derived from drug "
+        "status and whether the catalog binds it potently; a parallel map, not on the fact.",
     )
 
 

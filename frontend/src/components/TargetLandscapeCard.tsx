@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { DrugStatus, SourcedFact, TargetLandscape, TargetLandscapeEntry } from '../api/types'
+import type {
+  DrugStatus,
+  SourcedFact,
+  TargetLandscape,
+  TargetLandscapeEntry,
+  TdlVerdict,
+} from '../api/types'
+import { TdlBadge } from './TdlBadge'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
@@ -23,11 +30,15 @@ export function TargetLandscapeCard({
   id,
   facts,
   catalogDrugByTarget,
+  targetTdl,
 }: {
   id?: string
   facts?: SourcedFact[]
   /** Ensembl id -> a catalog drug's ChEMBL id, for the per-target "open a brief" link. */
   catalogDrugByTarget?: Record<string, string>
+  /** Ensembl id -> the target's TDL verdict (C3). Absent -> the row falls back to the drug-status
+   *  badge (a pre-C3 payload), so nothing regresses. */
+  targetTdl?: Record<string, TdlVerdict>
 }) {
   return (
     <Card
@@ -56,6 +67,7 @@ export function TargetLandscapeCard({
               targets={targets}
               fact={fact}
               catalogDrugByTarget={catalogDrugByTarget}
+              targetTdl={targetTdl}
             />
           )
         }}
@@ -115,10 +127,12 @@ function TargetLandscapeBody({
   targets,
   fact,
   catalogDrugByTarget,
+  targetTdl,
 }: {
   targets: TargetLandscapeEntry[]
   fact: SourcedFact
   catalogDrugByTarget?: Record<string, string>
+  targetTdl?: Record<string, TdlVerdict>
 }) {
   const [status, setStatus] = useState('')
   const filtered = useMemo(
@@ -183,7 +197,13 @@ function TargetLandscapeBody({
             <span className="flex shrink-0 items-center gap-1">
               <Tractable on={t.sm_tractable} label="SM" title="Small-molecule tractable" />
               <Tractable on={t.ab_tractable} label="AB" title="Antibody tractable" />
-              <DrugStatusBadge status={statusOf(t)} />
+              {/* C3: the TDL verdict extends the drugged flag with the Tchem middle and its
+                  criteria. Falls back to the plain drug-status badge on a pre-C3 payload. */}
+              {t.ensembl_id && targetTdl?.[t.ensembl_id] ? (
+                <TdlBadge verdict={targetTdl[t.ensembl_id]} />
+              ) : (
+                <DrugStatusBadge status={statusOf(t)} />
+              )}
             </span>
             <span className="ml-auto flex min-w-0 items-center gap-3">
               <span
