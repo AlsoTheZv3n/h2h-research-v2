@@ -19,8 +19,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 import httpx
 from sqlalchemy import ColumnElement, or_, select
@@ -34,7 +36,7 @@ from backend.ingestion.chembl import ChEMBLAdapter
 from backend.ingestion.clinicaltrials import ClinicalTrialsAdapter
 from backend.ingestion.clinicaltrials_combinations import ClinicalTrialsCombinationsAdapter
 from backend.ingestion.http import build_client
-from backend.ingestion.literature import LiteratureFetcher
+from backend.ingestion.literature import Article, LiteratureFetcher
 from backend.ingestion.opentargets import OpenTargetsAdapter
 from backend.ingestion.pubmed import PubMedAdapter
 from backend.models import DataMaturity, Drug
@@ -164,25 +166,75 @@ async def _enrich_literature(
         logger.info("%s: literature fetch failed: %s", drug.chembl_id, record.error)
         return
     if embedded:
-        await _rank_titles_by_relevance(session, drug, query, record.retrieved_at)
+        await _rank_titles_by_relevance(session, drug, query, record.retrieved_at, record.articles)
+
+
+# The PubMed publication-type evidence hierarchy (#42), most decision-weighty first. A paper carries
+# several tags (always "Journal Article"); surface the single most-informative one, and nothing
+# for a plain journal article -- a badge on every row is noise, not signal.
+_PUB_TYPE_PRIORITY: tuple[str, ...] = (
+    "Meta-Analysis",
+    "Systematic Review",
+    "Practice Guideline",
+    "Guideline",
+    "Randomized Controlled Trial",
+    "Clinical Trial, Phase IV",
+    "Clinical Trial, Phase III",
+    "Clinical Trial, Phase II",
+    "Clinical Trial, Phase I",
+    "Clinical Trial",
+    "Comparative Study",
+    "Review",
+    "Case Reports",
+)
+
+
+def _best_publication_type(pub_types: Sequence[str]) -> str | None:
+    """The single most decision-weighty publication type, or None for a plain journal article."""
+    present = set(pub_types)
+    return next((t for t in _PUB_TYPE_PRIORITY if t in present), None)
 
 
 async def _rank_titles_by_relevance(
-    session: AsyncSession, drug: Drug, query: str, retrieved_at: datetime
+    session: AsyncSession,
+    drug: Drug,
+    query: str,
+    retrieved_at: datetime,
+    articles: Sequence[Article],
 ) -> None:
-    """Write `relevant_titles` (B4): the drug's just-embedded abstracts, ranked by oncology
-    relevance rather than recency. A separate fact from pubmed's `sample_titles`, so the block
-    falls back to the recency order if this step is unavailable and pubmed's honest states stay
-    intact. Best-effort: any failure leaves only sample_titles, never a broken brief.
+    """Write `relevant_titles` (B4 + #42): the drug's just-embedded abstracts, ranked by oncology
+    relevance rather than recency, each carrying its publication type and MeSH-indexed status. A
+    separate fact from pubmed's `sample_titles`, so the block falls back to the recency order when
+    this step is unavailable and pubmed's honest states stay intact. Best-effort: any failure leaves
+    only sample_titles, never a broken brief.
+
+    `indexed` rides through so an un-indexed (recent) paper reads as 'not yet indexed', never as low
+    quality -- and the RANKING is the oncology-embedding relevance, not a MeSH-topic match, so an
+    un-indexed paper is never sunk to the bottom for lacking MeSH.
     """
     try:
         vector = await _oncology_query_vector()
         ranked = await LiteratureRepository(session).search(drug.chembl_id, vector, limit=5)
-        titles = [a.title for a in ranked if a.title]
     except Exception as exc:
         logger.info("%s: title relevance rerank skipped: %s", drug.chembl_id, exc)
         return
-    if not titles:
+    # The just-saved fetch is exactly this drug's linked set, so every ranked pmid is here; a
+    # missing one (a stale link) gets no type and is assumed indexed, not false-flagged.
+    by_pmid = {a.pmid: a for a in articles}
+    items: list[dict[str, Any]] = []
+    for ra in ranked:
+        if not ra.title:
+            continue
+        art = by_pmid.get(ra.pmid)
+        items.append(
+            {
+                "title": ra.title,
+                "pmid": ra.pmid,
+                "publication_type": _best_publication_type(art.publication_types) if art else None,
+                "indexed": art.indexed if art else True,
+            }
+        )
+    if not items:
         return
     url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query}"
     await DrugRepository(session).save_record(
@@ -192,7 +244,7 @@ async def _rank_titles_by_relevance(
             query,
             ok=True,
             facts={
-                "relevant_titles": fact(titles, "pubmed", source_url=url, retrieved_at=retrieved_at)
+                "relevant_titles": fact(items, "pubmed", source_url=url, retrieved_at=retrieved_at)
             },
             provenance={"source_url": url, "retrieved_at": retrieved_at},
         ),

@@ -77,6 +77,32 @@ BOOK = """
 </BookDocument></PubmedBookArticle>
 """
 
+# An indexed RCT: carries a PublicationTypeList and a MeshHeadingList (#42).
+INDEXED_RCT = """
+<PubmedArticle><MedlineCitation><PMID>44444444</PMID>
+<Article>
+  <ArticleTitle>A randomized controlled trial.</ArticleTitle>
+  <PublicationTypeList>
+    <PublicationType>Journal Article</PublicationType>
+    <PublicationType>Randomized Controlled Trial</PublicationType>
+  </PublicationTypeList>
+</Article>
+<MeshHeadingList><MeshHeading>
+  <DescriptorName MajorTopicYN="Y">Neoplasms</DescriptorName>
+</MeshHeading></MeshHeadingList>
+</MedlineCitation></PubmedArticle>
+"""
+
+# A just-posted paper: a PublicationTypeList but NO MeshHeadingList -> not yet indexed.
+UNINDEXED = """
+<PubmedArticle><MedlineCitation><PMID>55555555</PMID>
+<Article>
+  <ArticleTitle>A fresh paper, not yet indexed.</ArticleTitle>
+  <PublicationTypeList><PublicationType>Journal Article</PublicationType></PublicationTypeList>
+</Article>
+</MedlineCitation></PubmedArticle>
+"""
+
 
 class TestParsing:
     def test_a_structured_abstract_keeps_every_section(self) -> None:
@@ -95,6 +121,16 @@ class TestParsing:
         # The part that carries the finding, not just the part that sets it up.
         assert "MUC1-C was upregulated" in art.text
         assert "MUC1-C is a therapeutic target" in art.text
+
+    def test_publication_types_and_indexed_status_are_parsed(self) -> None:
+        # #42: the pub types (an evidence hierarchy) and the MeSH-indexed status ride in the same
+        # efetch XML we already fetch.
+        indexed_art, fresh_art = parse_articles(_set(INDEXED_RCT, UNINDEXED))
+        assert "Randomized Controlled Trial" in indexed_art.publication_types
+        assert indexed_art.indexed is True
+        # No MeshHeadingList -> not yet indexed, kept distinct from "no topics".
+        assert fresh_art.indexed is False
+        assert fresh_art.publication_types == ("Journal Article",)
 
     def test_labels_are_kept_not_stripped(self) -> None:
         """Which section a number came from changes what it means.

@@ -21,7 +21,9 @@ _client: redis.Redis | None = None
 # so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
 # v4: the C2 page-level `synthesis` (derived server-side from the facts) joined DrugDetail.
 # v5: E1 `disagreements` (cross-source conflicts, e.g. the clinical phase) joined DrugDetail.
-_DETAIL_SCHEMA_VERSION = "v5"
+# v6: #42 reshaped `relevant_titles` from title strings to objects carrying publication type +
+# MeSH-indexed status, so a stale brief lacks the per-paper evidence signals.
+_DETAIL_SCHEMA_VERSION = "v6"
 
 
 def get_redis() -> redis.Redis:
