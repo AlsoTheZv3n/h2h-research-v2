@@ -115,6 +115,16 @@ function TrialRealityBody({ data, fact }: { data: TrialReality; fact: SourcedFac
         )}
       </p>
 
+      {/* E3: how fresh the trial landscape is -- the most-recent registration year. The derived
+          silent-stalling signal (in the synthesis up top) reads from this same date. Shown only when
+          known; a missing date is silent, never "0" or "never". */}
+      {data.latest_registration && (
+        <p className="mt-1 text-xs" data-testid="trial-latest-registration">
+          <span className="text-ink-muted">Last new trial registered: </span>
+          <span className="font-medium text-ink">{data.latest_registration.slice(0, 4)}</span>
+        </p>
+      )}
+
       {/* Phase distribution as COUNTS, never shares: a combined-design trial (Phase 1/2) counts in
           each of its phases, so these need not sum to the scanned total. */}
       <Distribution

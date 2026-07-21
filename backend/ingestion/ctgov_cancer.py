@@ -98,6 +98,35 @@ async def _dach_recruiting(client: httpx.AsyncClient, condition: str) -> int | N
         return None
 
 
+async def _latest_registration(client: httpx.AsyncClient, condition: str) -> str | None:
+    """The TRUE most-recent first-posted date over ALL trials for this condition (E3), via a SORT
+    not a scan: the main page is not date-ordered, so its max would understate recency and could
+    manufacture a false "stalled". studyFirstPostDate is the registration date and is always ACTUAL.
+    A sub-signal like DACH: on failure return None (freshness unknown), never a wrong/old date."""
+    try:
+        r = await client.get(
+            BASE,
+            params={
+                "query.cond": condition,
+                "sort": "StudyFirstPostDate:desc",
+                "pageSize": 1,
+                "fields": "protocolSection.statusModule.studyFirstPostDateStruct",
+            },
+        )
+        r.raise_for_status()
+        studies = r.json().get("studies") or []
+        if not studies:
+            return None
+        sm = (studies[0].get("protocolSection") or {}).get("statusModule") or {}
+        date = (sm.get("studyFirstPostDateStruct") or {}).get("date")
+        return date if isinstance(date, str) and date else None
+    except Exception as exc:
+        logger.warning(
+            "trial-reality latest-registration sub-query failed for %r: %s", condition, exc
+        )
+        return None
+
+
 async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict[str, Any] | None:
     """The registered-trial landscape for one cancer condition, or None for a measured ZERO
     trials (a clean EMPTY). Raises on an outage (the caller records source_failed).
@@ -146,6 +175,7 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
                 stop_reasons[why] += 1
 
     dach = await _dach_recruiting(client, condition)
+    latest_registration = await _latest_registration(client, condition)
 
     return {
         # The text actually queried -- so the card can say "trials mentioning <condition>", owning
@@ -168,4 +198,7 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
         },
         # TRUE query-side count of DACH-recruiting trials, or None if that sub-query failed.
         "dach_recruiting": dach,
+        # E3: the most-recent trial registration date for this condition (true, sort-based), or None
+        # if unknown. Feeds the "last new trial" display and the derived silent-stalling signal.
+        "latest_registration": latest_registration,
     }

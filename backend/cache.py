@@ -46,8 +46,9 @@ def detail_cache_key(chembl_id: str) -> str:
 # the C3 `target_tdl` map (per-target Pharos development level) joined it too. v9: the TDL verdict
 # for an unresolved-status target with a potent ligand now reads "approval not measured" instead of
 # a false "none approved" -- an honest-state fix to target_tdl's label, so stale v8 briefs must
-# recompute rather than keep serving the old wording.
-_CANCER_DETAIL_SCHEMA_VERSION = "v9"
+# recompute rather than keep serving the old wording. v10: E3 added `latest_registration` to the
+# trial_reality fact and a derived silent-stalling synthesis line, so a stale brief lacks both.
+_CANCER_DETAIL_SCHEMA_VERSION = "v10"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

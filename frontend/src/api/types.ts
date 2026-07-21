@@ -564,6 +564,10 @@ export interface TrialReality {
   by_status: TrialStatus[]
   stopped: { count: number; reasons: TrialStopReason[] }
   dach_recruiting: number | null
+  /** E3: the most-recent trial registration date (YYYY-MM-DD) for this condition, or null when
+   *  unknown. Drives the "last new trial" line and the derived silent-stalling signal. Optional:
+   *  absent on pre-E3 facts. */
+  latest_registration?: string | null
 }
 
 /** One example trial in a drug's observed-combinations fact. `drugs` are the drugs the arm
