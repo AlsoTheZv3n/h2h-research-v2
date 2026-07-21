@@ -20,7 +20,8 @@ _client: redis.Redis | None = None
 # potency card reads it); paired with the a1b3c5d7e9f0 migration that back-dates last_enriched_at
 # so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
 # v4: the C2 page-level `synthesis` (derived server-side from the facts) joined DrugDetail.
-_DETAIL_SCHEMA_VERSION = "v4"
+# v5: E1 `disagreements` (cross-source conflicts, e.g. the clinical phase) joined DrugDetail.
+_DETAIL_SCHEMA_VERSION = "v5"
 
 
 def get_redis() -> redis.Redis:

@@ -11,6 +11,7 @@ import { MaturityPill } from '../components/MaturityPill'
 import { MechanismsFact } from '../components/MechanismsFact'
 import { PotencyCard } from '../components/PotencyCard'
 import { SynthesisPanel } from '../components/SynthesisPanel'
+import { DisagreementPanel } from '../components/DisagreementPanel'
 import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
 import { orderTargetsByPotency } from '../targets'
@@ -156,6 +157,10 @@ export function DetailPage() {
         {/* C2: the page-level "so what" leads the evidence cards -- derived statements, each
             linking to the block it came from. Renders nothing when no rule's inputs are present. */}
         <SynthesisPanel synthesis={detail.synthesis} />
+
+        {/* E1: cross-source conflicts (e.g. the clinical phase), named where the reader used to
+            have to spot them. Renders nothing when sources agree. */}
+        <DisagreementPanel disagreements={detail.disagreements} />
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* Hero, first row: the molecule beside the distilled potency. Four cards, not

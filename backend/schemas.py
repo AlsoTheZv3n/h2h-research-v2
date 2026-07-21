@@ -80,6 +80,25 @@ class SynthesisStatement(BaseModel):
     block: str
 
 
+class DisagreementValue(BaseModel):
+    """One source's stance in a disagreement: its own value (in its own words) and where it came
+    from, so a reader can see and check each side."""
+
+    source: str
+    display: str
+    source_url: str | None = None
+
+
+class Disagreement(BaseModel):
+    """Sources conflict on one underlying fact (Epic E1): the honest state after ok/empty/
+    source_failed, computed serve-time. Every conflicting source's own value stays visible and
+    none silently wins -- naming the conflict is the reliability signal."""
+
+    label: str
+    block: str
+    values: list[DisagreementValue]
+
+
 class DrugDetail(BaseModel):
     """The evidence brief: the catalog row plus every fact we hold, with provenance."""
 
@@ -147,6 +166,13 @@ class DrugDetail(BaseModel):
         description="The page-level 'so what' (C2): derived threshold statements over the facts, "
         "each linking to its block. Empty when no rule's inputs are present -- computed "
         "server-side so the client renders, never invents, the reading.",
+    )
+
+    disagreements: list[Disagreement] = Field(
+        default_factory=list,
+        description="Cross-source conflicts (E1): where two sources give a comparable fact a "
+        "different value (e.g. the clinical phase), computed server-time from the OK facts. Empty "
+        "when sources agree or only one answered -- naming a conflict, never inventing one.",
     )
 
 

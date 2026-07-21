@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.cache import detail_cache_key, get_redis, invalidate_detail
 from backend.config import get_settings
 from backend.db import get_session
+from backend.domain.disagreement import SourceValue, drug_disagreements
 from backend.domain.structure import render_svg
 from backend.domain.synthesis import drug_synthesis
 from backend.ingestion.base import FactStatus
@@ -19,6 +20,7 @@ from backend.models import DataMaturity
 from backend.repositories import DrugRepository
 from backend.repositories.drugs import is_small_molecule
 from backend.schemas import (
+    Disagreement,
     DrugDetail,
     DrugList,
     DrugSummary,
@@ -262,6 +264,19 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         )
     ]
 
+    # Cross-source conflicts (E1): named where two sources give a comparable fact different values.
+    # Only OK entries participate -- an empty/failed source is a missing value, never a disagreeing
+    # one -- so it is computed from the OK facts grouped by key, mirroring the ok-only synthesis.
+    ok_by_key = {
+        key: [
+            SourceValue(value=e.value, source=e.source, source_url=e.source_url)
+            for e in entries
+            if e.status is FactStatus.OK
+        ]
+        for key, entries in facts.items()
+    }
+    disagreements = [Disagreement(**d) for d in drug_disagreements(ok_by_key)]
+
     detail = DrugDetail(
         chembl_id=drug.chembl_id,
         pref_name=drug.pref_name,
@@ -283,6 +298,7 @@ async def get_drug(chembl_id: str, session: SessionDep) -> DrugDetail:
         facts=dict(facts),
         unavailable=unavailable,
         synthesis=synthesis,
+        disagreements=disagreements,
     )
 
     # Only cache a finished brief, and not one whose sources are being re-fetched right

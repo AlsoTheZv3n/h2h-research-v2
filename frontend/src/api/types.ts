@@ -218,6 +218,9 @@ export interface DrugDetail {
   /** The page-level "so what" (C2): derived threshold statements over the facts, each linking to
    *  its block. Empty when no rule's inputs are present. Optional: absent on pre-C2 payloads. */
   synthesis?: SynthesisStatement[]
+  /** Cross-source conflicts (E1): where two sources give a comparable fact different values.
+   *  Empty when sources agree or only one answered. Optional: absent on pre-E1 payloads. */
+  disagreements?: Disagreement[]
 }
 
 /** Columns the overview can sort by; must match the API's accepted `sort` values. */
@@ -310,6 +313,23 @@ export interface TargetLandscape {
 export interface SynthesisStatement {
   text: string
   block: string
+}
+
+/** One source's stance in a disagreement (E1): its own value in its own words, plus where it came
+ *  from -- so a reader can see and check each side. */
+export interface DisagreementValue {
+  source: string
+  display: string
+  source_url: string | null
+}
+
+/** A cross-source conflict (E1): two sources give a comparable fact (e.g. the clinical phase)
+ *  different values. Names the conflict where today the reader had to notice it; every side stays
+ *  visible, none silently wins. Links to the block it came from. */
+export interface Disagreement {
+  label: string
+  block: string
+  values: DisagreementValue[]
 }
 
 /** One pass/fail (or 'unknown') criterion behind a target's TDL verdict (C3). */
