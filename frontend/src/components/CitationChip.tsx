@@ -10,6 +10,7 @@ const SOURCE_LABELS: Record<string, string> = {
   eurostat: 'Eurostat',
   seer: 'SEER',
   cbioportal: 'cBioPortal',
+  pubtator: 'PubTator3 (NLM)',
 }
 
 function confidenceTone(confidence: number | null): string {

@@ -28,6 +28,16 @@ from backend.repositories.cancers import CancerRepository
 from backend.repositories.targets import TargetRepository
 
 OT = "https://api.platform.opentargets.org/api/v4/graphql"
+MYGENE = "https://mygene.info/v3/query"
+
+
+def _mock_mygene_empty() -> None:
+    # The #44 extracted-relations source resolves the gene's Entrez via mygene before it can reach
+    # PubTator; an empty response short-circuits it to a gene_unmapped fact, so these tests (about
+    # the associated-cancers source) never hit the PubTator network. Registered only where a target
+    # resolves (record.ok) and the source therefore runs.
+    respx.post(MYGENE).mock(return_value=httpx.Response(200, json=[]))
+
 
 # Two cancers in our catalog + one non-cancer (a RASopathy) that is NOT -- the exact shape the
 # filter must handle: KRAS-style, where a syndrome outscores the cancers.
@@ -137,7 +147,8 @@ async def test_enrich_sets_catalog_row_and_persists_fact(
 
     target = await repo.get("ENSG_TEST")
     assert target is not None
-    await enrich_target(session, target, fast_client, catalog_ids, {}, TargetEnrichStats())
+    _mock_mygene_empty()
+    await enrich_target(session, target, fast_client, catalog_ids, {}, {}, TargetEnrichStats())
     await session.commit()
 
     refreshed = await repo.get("ENSG_TEST")
@@ -163,13 +174,14 @@ async def test_outage_is_source_failed_and_preserves_prior_counts(
     # First enrich: OK, two cancers -> name + n_cancers measured and stored.
     ok_rows = [_row(_LUNG, "lung", 0.85), _row(_BREAST, "breast", 0.70)]
     respx.post(OT).mock(return_value=httpx.Response(200, json=_ot_response(ok_rows)))
-    await enrich_target(session, target, fast_client, catalog_ids, {}, TargetEnrichStats())
+    _mock_mygene_empty()
+    await enrich_target(session, target, fast_client, catalog_ids, {}, {}, TargetEnrichStats())
     await session.commit()
 
     # Then an outage: the fact becomes source_failed, but name / n_cancers must survive (they
     # were not remeasured -- None, not a new value), and last_enriched_at still advances.
     respx.post(OT).mock(return_value=httpx.Response(503, text="Service Unavailable"))
-    await enrich_target(session, target, fast_client, catalog_ids, {}, TargetEnrichStats())
+    await enrich_target(session, target, fast_client, catalog_ids, {}, {}, TargetEnrichStats())
     await session.commit()
 
     refreshed = await repo.get("ENSG_TEST")
@@ -194,7 +206,7 @@ async def test_unresolved_target_writes_no_fact(
     # Open Targets answers but does not resolve the id -> target: null. NOT "no cancers": no
     # fact is written, so nothing claims this target drives nothing.
     respx.post(OT).mock(return_value=httpx.Response(200, json={"data": {"target": None}}))
-    await enrich_target(session, target, fast_client, catalog_ids, {}, TargetEnrichStats())
+    await enrich_target(session, target, fast_client, catalog_ids, {}, {}, TargetEnrichStats())
     await session.commit()
 
     assert await repo.facts_for("ENSG_TEST") == []
@@ -220,7 +232,8 @@ async def test_no_catalog_cancers_is_measured_empty(
     respx.post(OT).mock(
         return_value=httpx.Response(200, json=_ot_response([_row(_NOONAN, "Noonan", 0.9)]))
     )
-    await enrich_target(session, target, fast_client, catalog_ids, {}, TargetEnrichStats())
+    _mock_mygene_empty()
+    await enrich_target(session, target, fast_client, catalog_ids, {}, {}, TargetEnrichStats())
     await session.commit()
 
     facts = {f.key: f for f in await repo.facts_for("ENSG_TEST")}

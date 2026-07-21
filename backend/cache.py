@@ -85,8 +85,10 @@ async def invalidate_cancer_detail(disease_id: str) -> None:
 # Open Targets reverse query, filtered to our cancer catalog) plus the drugs our catalog holds
 # against the target. v2: #43 added the `target_alteration_frequency` fact (this gene's cBioPortal
 # mutation frequency across the cancers it drives), so a stale v1 brief lacks the block; paired with
-# the e7a9c1b3d5f6 migration that back-dates last_enriched_at so enriched targets re-derive it.
-_TARGET_DETAIL_SCHEMA_VERSION = "v2"
+# the e7a9c1b3d5f6 migration that back-dates last_enriched_at so enriched targets re-derive it. v3:
+# #44 added the `extracted_relations` fact (PubTator machine-extracted gene<->disease/chemical
+# relations), so a stale v2 brief lacks it; paired with the c3d5e7f9a1b4 migration back-dating them.
+_TARGET_DETAIL_SCHEMA_VERSION = "v3"
 
 
 def target_detail_cache_key(ensembl_id: str) -> str:

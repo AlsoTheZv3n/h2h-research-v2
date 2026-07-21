@@ -394,6 +394,33 @@ export interface AlterationFrequency {
   attribution?: AlterationAttribution
 }
 
+/** One machine-EXTRACTED relation between a target gene and another entity (#44, PubTator). `name`
+ *  is the entity (disease or chemical); `rel_type` is PubTator's relation label (associate,
+ *  positive/negative_correlate, inhibit, stimulate); `co_mentions` is the co-mention VOLUME (not
+ *  curated weight). Diseases carry a `mondo_id`/`mondo_label` when the MeSH id bridges to our
+ *  catalog (a link); otherwise it is an unlinked extracted mention. */
+export interface ExtractedRelation {
+  name: string
+  rel_type: string
+  co_mentions: number
+  mondo_id?: string | null
+  mondo_label?: string | null
+}
+
+/** A target's PubTator machine-extracted literature relations (#44). `state: 'extracted'` carries
+ *  the lists; `gene_unmapped` means the gene could not be joined to an Entrez id (so PubTator could
+ *  not be queried). EXTRACTED, not curated -- `provenance` is the stamp the UI must show so these are
+ *  never read as settled facts, and `co_mentions` is volume, not evidence weight. */
+export interface ExtractedRelations {
+  state: 'extracted' | 'gene_unmapped'
+  provenance?: string
+  diseases?: ExtractedRelation[]
+  chemicals?: ExtractedRelation[]
+  n_disease_relations?: number
+  n_chemical_relations?: number
+  attribution?: string
+}
+
 /** One cancer's reading in a TARGET's mutation-frequency reflection (#43, the transpose of the
  *  cancer block): how often this gene is mutated in that cancer's cohort. `measured_zero` = profiled
  *  never mutated (a real 0%); `source_failed` = that one cohort's fetch failed (amber, not a zero). */

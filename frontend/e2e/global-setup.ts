@@ -174,7 +174,18 @@ VALUES ('ENSG_E2E_EGFR', 'associated_cancers', 'opentargets',
         '{"state":"measured","entrez_id":1956,"alteration_scope":"somatic mutation (SNV/indel); excludes copy-number & fusions",
           "cancers":[{"disease_id":"MONDO_E2E_NSCLC","name":"E2E lung carcinoma","study_label":"E2E Lung — TCGA PanCancer Atlas","state":"measured","pct":12.4,"altered_n":62,"denominator_n":500}],
           "n_more":0,"attribution":{"portal":["Cerami E, et al. Cancer Discov. 2012;2(5):401-404.","Gao J, et al. Sci Signal. 2013;6(269):pl1.","de Bruijn I, et al. Cancer Res. 2023;83(23):3861-3867."]}}'::jsonb,
-        'ok', 'https://www.cbioportal.org/', now())
+        'ok', 'https://www.cbioportal.org/', now()),
+       -- The PubTator extracted-relations block (#44): machine-extracted, NOT curated. A linked
+       -- disease (bridged to our catalog) + an unlinked one, and a chemical -- so the e2e checks the
+       -- "extracted, not curated" banner and the by-ID link render DB -> API -> UI.
+       ('ENSG_E2E_EGFR', 'extracted_relations', 'pubtator',
+        '{"state":"extracted","provenance":"extracted, not curated — PubTator3, NLP over the literature",
+          "diseases":[{"name":"E2E lung carcinoma","rel_type":"associate","co_mentions":10913,"mondo_id":"MONDO_E2E_NSCLC","mondo_label":"E2E lung carcinoma"},
+                      {"name":"Neoplasms","rel_type":"associate","co_mentions":12134,"mondo_id":null,"mondo_label":null}],
+          "chemicals":[{"name":"E2E Gefitinib","rel_type":"negative_correlate","co_mentions":3188}],
+          "n_disease_relations":2551,"n_chemical_relations":4556,
+          "attribution":"Extracted relations via PubTator3, courtesy of the U.S. National Library of Medicine. Wei C-H, et al."}'::jsonb,
+        'ok', 'https://www.ncbi.nlm.nih.gov/research/pubtator3/', now())
 ON CONFLICT (ensembl_id, key, source) DO UPDATE
    SET value = excluded.value, status = excluded.status, retrieved_at = excluded.retrieved_at;
 `
