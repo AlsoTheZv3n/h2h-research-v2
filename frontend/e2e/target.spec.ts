@@ -30,6 +30,13 @@ test.describe('target detail', () => {
       .getByRole('link', { name: /E2E lung carcinoma/i })
     await expect(cancerLink).toBeVisible()
 
+    // #43: the target-side mutation-frequency reflection -- this gene's frequency across the cancers
+    // it drives (seeded). The card renders the cancer row with its measured %, DB -> API -> UI.
+    const altCard = page.getByTestId('target-alt-cancers')
+    await expect(altCard).toBeVisible()
+    await expect(altCard).toContainText('E2E lung carcinoma')
+    await expect(page.getByTestId('target-alt-measured').first()).toContainText('12.4%')
+
     // A target page belongs to neither catalog: no primary tab is lit.
     await expect(page.getByTestId('nav-drugs')).not.toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('nav-cancers')).not.toHaveAttribute('aria-current', 'page')

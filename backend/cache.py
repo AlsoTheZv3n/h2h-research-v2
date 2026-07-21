@@ -50,7 +50,10 @@ def detail_cache_key(chembl_id: str) -> str:
 # a false "none approved" -- an honest-state fix to target_tdl's label, so stale v8 briefs must
 # recompute rather than keep serving the old wording. v10: E3 added `latest_registration` to the
 # trial_reality fact and a derived silent-stalling synthesis line, so a stale brief lacks both.
-_CANCER_DETAIL_SCHEMA_VERSION = "v10"
+# v11: #43 added the `alteration_frequency` fact (cBioPortal per-gene somatic-mutation frequency for
+# the landscape genes), so a stale v10 brief lacks the whole block; paired with the d5f7a9c1e3b5
+# migration that back-dates last_enriched_at so enriched cancers re-derive it lazily.
+_CANCER_DETAIL_SCHEMA_VERSION = "v11"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:
@@ -78,8 +81,10 @@ async def invalidate_cancer_detail(disease_id: str) -> None:
 # The target brief has its own shape and its own version, so a change to one entity's brief
 # cannot strand entries of another. v1: the first target detail -- associated_cancers (the
 # Open Targets reverse query, filtered to our cancer catalog) plus the drugs our catalog holds
-# against the target.
-_TARGET_DETAIL_SCHEMA_VERSION = "v1"
+# against the target. v2: #43 added the `target_alteration_frequency` fact (this gene's cBioPortal
+# mutation frequency across the cancers it drives), so a stale v1 brief lacks the block; paired with
+# the e7a9c1b3d5f6 migration that back-dates last_enriched_at so enriched targets re-derive it.
+_TARGET_DETAIL_SCHEMA_VERSION = "v2"
 
 
 def target_detail_cache_key(ensembl_id: str) -> str:

@@ -69,10 +69,15 @@ date**, and gaps are shown honestly instead of papered over.
   fact shows **how fresh it is** — *checked yesterday* vs *three months ago* — from the retrieval date it
   always carried.
 
-The cancer view is deliberately partial, and says which parts exist. **Known gaps, named not shipped:**
-the molecular profile (alteration frequency per entity), cost-of-care and unmet-need blocks are not built
-yet. What is shown is sourced; what is missing is stated rather than faked — the
-same discipline as the honest states below. It is a research and drug-intelligence view of the
+The cancer view is deliberately partial, and says which parts exist. A **molecular layer** now sits
+beside the target landscape: how often each landscape gene is somatically **mutated** in a matched
+tumour cohort (cBioPortal, TCGA PanCancer Atlas), and the transpose on each target page — where a gene
+is mutated across the cancers it drives. It is mutation-only (a floor on the true alteration frequency,
+copy-number and fusions excluded, and it says so), covers the ~two dozen tumour types with a curated
+cohort (the rest read *not measured*, never zero), and carries its ODbL attribution. **Known gaps, named
+not shipped:** copy-number/fusion alteration, cost-of-care and unmet-need blocks are not built yet. What
+is shown is sourced; what is missing is stated rather than faked — the same discipline as the honest
+states below. It is a research and drug-intelligence view of the
 evidence, not clinical decision support and not medical advice.
 
 Other things were **measured and deliberately left out** — its own kind of honesty, since a measured

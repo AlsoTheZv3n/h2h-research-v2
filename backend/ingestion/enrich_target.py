@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -28,11 +28,14 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import get_sessionmaker
+from backend.ingestion import cbioportal
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
+from backend.ingestion.gene_ids import resolve_entrez
 from backend.ingestion.http import build_client
 from backend.models import Target
 from backend.repositories.cancers import CancerRepository
 from backend.repositories.targets import TargetRepository
+from backend.services.cbioportal_map import StudyMap, load_study_map
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +114,9 @@ class ReverseResult:
     record: SourceRecord
     approved_name: str | None
     n_cancers: int | None
+    # The displayed associated cancers (disease_id + name + score), so the alteration-frequency
+    # source can reuse them without a second reverse query. Empty on an outage / not-resolved.
+    cancers: list[dict[str, Any]] = field(default_factory=list)
 
 
 async def opentargets_associated_cancers(
@@ -196,7 +202,8 @@ async def opentargets_associated_cancers(
             n_cancers=0,
         )
 
-    value = {"n_cancers": len(cancers), "cancers": cancers[:_TOP_CANCERS]}
+    displayed = cancers[:_TOP_CANCERS]
+    value = {"n_cancers": len(cancers), "cancers": displayed}
     return ReverseResult(
         SourceRecord(
             source,
@@ -207,7 +214,104 @@ async def opentargets_associated_cancers(
         ),
         approved_name=approved_name,
         n_cancers=len(cancers),
+        cancers=displayed,
     )
+
+
+_CBIOPORTAL_HOME = "https://www.cbioportal.org/"
+
+# The reflection of the cancer-page mutation-frequency block, run BACKWARDS: for THIS gene, how
+# often it is mutated across the cancers it drives. Bounded per enrichment -- each cohort is 3
+# cBioPortal calls, so the associated cancers (already score-sorted) are capped; the rest are a
+# documented "not shown", never silently dropped.
+_ALT_COHORT_CAP = 12
+
+
+async def target_alteration_frequency(
+    client: httpx.AsyncClient,
+    target: Target,
+    cancers: list[dict[str, Any]],
+    study_map: StudyMap,
+) -> SourceRecord:
+    """This gene's somatic-mutation frequency across the cancers it drives that have a cBioPortal
+    cohort (issue #43, the target-side twin of the cancer block). Honest states kept apart:
+    gene_unmapped (no Entrez join -> no frequency anywhere), no_cohort (none of its cancers have a
+    cohort), measured (per-cancer readings), and per-cohort source_failed for a single outage."""
+    source, key = "cbioportal", "target_alteration_frequency"
+    retrieved_at = utcnow()
+    prov: dict[str, Any] = {"source_url": _CBIOPORTAL_HOME, "retrieved_at": retrieved_at}
+
+    def _ok(value: dict[str, Any]) -> SourceRecord:
+        return SourceRecord(
+            source,
+            target.ensembl_id,
+            ok=True,
+            provenance=prov,
+            facts={
+                key: fact(value, source, source_url=_CBIOPORTAL_HOME, retrieved_at=retrieved_at)
+            },
+        )
+
+    with_cohort = [
+        (c, study_map[c["disease_id"]]) for c in cancers if c.get("disease_id") in study_map
+    ]
+    if not with_cohort:
+        # None of the cancers this gene drives have a curated cohort -> nothing to measure. Checked
+        # FIRST, before any network call (not even the gene-id lookup): an honest state, distinct
+        # from gene_unmapped and from a measured zero.
+        return _ok({"state": "no_cohort"})
+
+    entrez_by_ensembl = await resolve_entrez(client, [target.ensembl_id])
+    entrez = entrez_by_ensembl.get(target.ensembl_id)
+    if entrez is None:
+        # This gene could not be joined to a cBioPortal (Entrez) id -> no frequency measurable
+        # anywhere. An honest state, distinct from "no cohort" and from a zero.
+        return _ok({"state": "gene_unmapped"})
+
+    shown, capped = with_cohort[:_ALT_COHORT_CAP], with_cohort[_ALT_COHORT_CAP:]
+    if capped:
+        logger.info(
+            "target_alteration_frequency capped %s at %d cohorts (%d more not shown)",
+            target.ensembl_id,
+            _ALT_COHORT_CAP,
+            len(capped),
+        )
+    rows: list[dict[str, Any]] = []
+    for cancer, (study_id, study_label) in shown:
+        base = {
+            "disease_id": cancer["disease_id"],
+            "name": cancer.get("name"),
+            "study_label": study_label,
+        }
+        try:
+            freqs = await cbioportal.fetch_mutation_frequencies(client, study_id, [entrez])
+        except cbioportal.CBioPortalError:
+            # One cohort's fetch failed -> that row is source_failed (amber), the rest still stand.
+            rows.append({**base, "state": "source_failed"})
+            continue
+        altered = freqs.altered_by_entrez.get(entrez, 0)
+        pct = round(100.0 * altered / freqs.denominator, 1)
+        rows.append(
+            {
+                **base,
+                "state": "measured_zero" if altered == 0 else "measured",
+                "pct": pct,
+                "altered_n": altered,
+                "denominator_n": freqs.denominator,
+            }
+        )
+
+    value = {
+        "state": "measured",
+        "entrez_id": entrez,
+        "alteration_scope": cbioportal.ALTERATION_SCOPE,
+        "cancers": rows,
+        "n_more": len(capped),
+        # All cohorts are TCGA PanCancer studies; the portal citations are the constant ODbL grant
+        # condition, and each row names its own cohort (study_label) as the specific source.
+        "attribution": {"portal": list(cbioportal.CBIOPORTAL_CITATIONS)},
+    }
+    return _ok(value)
 
 
 async def _save_source_record(
@@ -234,20 +338,33 @@ async def enrich_target(
     target: Target,
     client: httpx.AsyncClient,
     catalog_ids: set[str],
+    study_map: StudyMap,
     stats: TargetEnrichStats,
     *,
     commit_each: bool = False,
 ) -> None:
-    """Fetch the associated-cancers source for one target and persist the result.
+    """Fetch a target's sources and persist them: the associated cancers (Open Targets), then its
+    mutation frequency across those cancers (cBioPortal, #43), reusing the cancers already found so
+    the reverse query runs once.
 
-    last_enriched_at is stamped even when the source failed -- it records that we *looked*,
-    distinct from a never-analyzed target. name and n_cancers are updated only when actually
-    measured (see mark_enriched)."""
+    last_enriched_at is stamped even when a source failed -- it records that we *looked*, distinct
+    from a never-analyzed target. name and n_cancers are updated only when actually measured."""
     repo = TargetRepository(session)
     result = await opentargets_associated_cancers(client, target, catalog_ids)
     await _save_source_record(repo, target.ensembl_id, result.record, stats)
     if commit_each:
         await session.commit()
+
+    # The cBioPortal reflection reuses the cancers just found -- no second reverse query. Only when
+    # the associated-cancers source actually resolved the target (record.ok): an outage or an
+    # unresolved id leaves the cancers unknown, so we must not assert a "no cohort" state for a
+    # target we could not look up (the same skip the associated-cancers source itself makes).
+    if result.record.ok:
+        alt = await target_alteration_frequency(client, target, result.cancers, study_map)
+        await _save_source_record(repo, target.ensembl_id, alt, stats)
+        if commit_each:
+            await session.commit()
+
     await repo.mark_enriched(
         target.ensembl_id, utcnow(), name=result.approved_name, n_cancers=result.n_cancers
     )
@@ -279,8 +396,9 @@ async def enrich_target_catalog(
 
     stats = TargetEnrichStats()
     repo = TargetRepository(session)
-    # The catalog id set, loaded once and reused across the batch (see all_cancer_ids).
+    # The catalog id set + the cBioPortal study crosswalk, loaded once and reused across the batch.
     catalog_ids = await CancerRepository(session).all_cancer_ids()
+    study_map = await load_study_map(session)
 
     targets = await repo.enrichment_targets(
         limit=limit,
@@ -292,7 +410,7 @@ async def enrich_target_catalog(
     logger.info("enriching %d targets", len(targets))
 
     for target in targets:
-        await enrich_target(session, target, client, catalog_ids, stats)
+        await enrich_target(session, target, client, catalog_ids, study_map, stats)
         await session.commit()
 
     return stats
