@@ -40,6 +40,12 @@ class Article:
     `text is None` means this record has no abstract -- common and unremarkable for
     editorials, letters and meeting reports. It is a measurement, not a failure, and
     the caller must not retry it.
+
+    `publication_types` are PubMed's own tags (Randomized Controlled Trial, Meta-Analysis,
+    Review, Case Reports, ...), a ready-made evidence hierarchy (#42). `indexed` is whether
+    MeSH indexing has been applied yet: recent papers are often NOT yet indexed, which is
+    "not yet indexed", NOT "irrelevant" -- the same None-vs-0 rule, so the caller must keep
+    the two distinct and never let an un-indexed paper read as low-quality.
     """
 
     pmid: str
@@ -48,6 +54,8 @@ class Article:
     journal: str | None
     year: int | None
     rank: int
+    publication_types: tuple[str, ...] = ()
+    indexed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +121,22 @@ def _year_of(article: ET.Element) -> int | None:
     return int(head) if head.isdigit() else None
 
 
+def _publication_types_of(article: ET.Element) -> tuple[str, ...]:
+    """PubMed's own publication-type tags for this record (#42) -- a free evidence hierarchy.
+    Every article carries at least "Journal Article"; the meaningful ones (Randomized Controlled
+    Trial, Meta-Analysis, Systematic Review, Review, Case Reports, Guideline) sit alongside it."""
+    types = [_all_text(el) for el in article.findall(".//PublicationTypeList/PublicationType")]
+    return tuple(t for t in types if t)
+
+
+def _is_indexed(article: ET.Element) -> bool:
+    """Whether MeSH indexing has been applied. A MeshHeadingList with headings appears once NLM has
+    indexed the record; recent papers lack it -- that is 'not yet indexed', never 'no topics'. An
+    empty <MeshHeadingList/> counts as un-indexed too: no headings is not 'indexed with none'."""
+    mesh = article.find(".//MeshHeadingList")
+    return mesh is not None and len(mesh) > 0
+
+
 def parse_articles(xml: str) -> list[Article]:
     """PubmedArticleSet -> Articles, in document order.
 
@@ -146,6 +170,8 @@ def parse_articles(xml: str) -> list[Article]:
                 or article.findtext(".//Journal/Title"),
                 year=_year_of(article),
                 rank=rank,
+                publication_types=_publication_types_of(article),
+                indexed=_is_indexed(article),
             )
         )
     return out

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getDrug, retryDrug, structureUrl } from '../api/client'
-import type { DrugDetail, SelectivityProfile, SourcedFact } from '../api/types'
+import type { DrugDetail, KeyPaper, SelectivityProfile, SourcedFact } from '../api/types'
 import { ctgovPhaseLabel, otStageLabel } from '../phases'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
@@ -17,7 +17,7 @@ import { SourceAdvisory } from '../components/SourceAdvisory'
 import { lipinskiReading } from '../physchem'
 import { orderTargetsByPotency } from '../targets'
 import { chooseTitleFacts } from '../titles'
-import { formatCount } from '../format'
+import { KeyPapersList } from '../components/KeyPapersList'
 
 /** Facts for a key, from whichever source(s) asserted it. */
 function pick(detail: DrugDetail, key: string): SourcedFact[] | undefined {
@@ -340,30 +340,13 @@ export function DetailPage() {
                     label="Key papers"
                     facts={titleFacts}
                     emptyLabel="None"
-                    render={(v) => {
-                      const titles = v as string[]
-                      const total = num(detail, 'n_pubmed')
-                      // A sample, labelled: the N most relevant OF the M PubMed hits above.
-                      const ofTotal =
-                        total !== null && total > titles.length ? ` of ${formatCount(total)}` : ''
-                      return (
-                    <>
-                      <span className="text-[11px] text-ink-faint">
-                        the {titles.length} {ranked ? 'most relevant' : 'most recent'}
-                        {ofTotal}
-                      </span>
-                      <ul className="mt-0.5 space-y-0.5">
-                        {/* keyed by index+title: two records can share a title (errata, duplicate
-                            deposits) and a title-only key would drop one row. */}
-                        {titles.map((t, i) => (
-                          <li key={`${i}-${t}`} className="text-xs text-ink-muted">
-                            {t}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                      )
-                    }}
+                    render={(v) => (
+                      <KeyPapersList
+                        items={v as (string | KeyPaper)[]}
+                        ranked={ranked}
+                        total={num(detail, 'n_pubmed')}
+                      />
+                    )}
                   />
                 )
               })()}

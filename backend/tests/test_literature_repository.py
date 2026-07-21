@@ -25,8 +25,24 @@ OSI = "CHEMBL_OSI_TEST"
 SOTO = "CHEMBL_SOTO_TEST"
 
 
-def _article(pmid: str, text: str | None, rank: int = 0, title: str = "T") -> Article:
-    return Article(pmid=pmid, title=title, text=text, journal="J Test", year=2024, rank=rank)
+def _article(
+    pmid: str,
+    text: str | None,
+    rank: int = 0,
+    title: str = "T",
+    publication_types: tuple[str, ...] = (),
+    indexed: bool = False,
+) -> Article:
+    return Article(
+        pmid=pmid,
+        title=title,
+        text=text,
+        journal="J Test",
+        year=2024,
+        rank=rank,
+        publication_types=publication_types,
+        indexed=indexed,
+    )
 
 
 def _record(*articles: Article) -> LiteratureRecord:
@@ -257,36 +273,38 @@ class TestRelevanceRerank:
 
         repo = LiteratureRepository(session)
         # A drug's PubMed hits by name include off-topic papers; only one is about its cancer use.
-        await repo.save(
-            OSI,
-            _record(
-                _article(
-                    "1",
-                    "A transgenic mouse model of Alzheimer's disease with amyloid-beta plaques and "
-                    "cognitive decline; no relation to cancer.",
-                    rank=0,
-                    title="Alzheimer mouse model",
-                ),
-                _article(
-                    "2",
-                    "The drug inhibits its kinase target and induces regression of the tumour in "
-                    "patients with this malignancy; an antitumour, oncology result.",
-                    rank=1,
-                    title="Antitumour efficacy in the clinic",
-                ),
-                _article(
-                    "3",
-                    "Hepatic stellate cell activation and the progression of liver fibrosis in a "
-                    "non-oncological model.",
-                    rank=2,
-                    title="Liver fibrosis pathway",
-                ),
+        rec = _record(
+            _article(
+                "1",
+                "A transgenic mouse model of Alzheimer's disease with amyloid-beta plaques and "
+                "cognitive decline; no relation to cancer.",
+                rank=0,
+                title="Alzheimer mouse model",
+                indexed=True,
+            ),
+            _article(
+                "2",
+                "The drug inhibits its kinase target and induces regression of the tumour in "
+                "patients with this malignancy; an antitumour, oncology result.",
+                rank=1,
+                title="Antitumour efficacy in the clinic",
+                publication_types=("Journal Article", "Randomized Controlled Trial"),
+                indexed=True,
+            ),
+            _article(
+                "3",
+                "Hepatic stellate cell activation and the progression of liver fibrosis in a "
+                "non-oncological model.",
+                rank=2,
+                title="Liver fibrosis pathway",
+                indexed=True,
             ),
         )
+        await repo.save(OSI, rec)
 
         drug = await session.get(Drug, OSI)
         assert drug is not None
-        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow())
+        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow(), rec.articles)
 
         facts = {f.key: f for f in await DrugRepository(session).facts_for(OSI)}
         rel = facts["relevant_titles"]
@@ -294,12 +312,17 @@ class TestRelevanceRerank:
         assert rel.source == "pubmed"
         titles = rel.value
         assert isinstance(titles, list)
+        names = [t["title"] for t in titles]
         # The oncology paper leads; recency (rank order) would have led with the Alzheimer's one.
-        assert titles[0] == "Antitumour efficacy in the clinic"
+        assert names[0] == "Antitumour efficacy in the clinic"
         # And the off-topic papers rank below it, not above.
-        assert titles.index("Antitumour efficacy in the clinic") < titles.index(
+        assert names.index("Antitumour efficacy in the clinic") < names.index(
             "Alzheimer mouse model"
         )
+        # #42: the leading paper carries its most-weighty publication type (the evidence hierarchy),
+        # not the generic "Journal Article".
+        assert titles[0]["publication_type"] == "Randomized Controlled Trial"
+        assert titles[0]["indexed"] is True
 
     async def test_skips_when_no_abstract_has_text(
         self, session: AsyncSession, drugs: None
@@ -309,10 +332,40 @@ class TestRelevanceRerank:
         from backend.models import Drug
         from backend.repositories.drugs import DrugRepository
 
-        await LiteratureRepository(session).save(OSI, _record(_article("9", None, title="No body")))
+        rec = _record(_article("9", None, title="No body"))
+        await LiteratureRepository(session).save(OSI, rec)
         drug = await session.get(Drug, OSI)
         assert drug is not None
-        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow())
+        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow(), rec.articles)
 
         facts = {f.key for f in await DrugRepository(session).facts_for(OSI)}
         assert "relevant_titles" not in facts
+
+    async def test_an_unindexed_paper_is_labelled_not_ranked_down(
+        self, session: AsyncSession, drugs: None
+    ) -> None:
+        # #42's trap: a recent, not-yet-MeSH-indexed paper must ride through as indexed=False (a
+        # label), never sunk in the ranking -- the ranking is embedding relevance, not a MeSH match.
+        from backend.ingestion.enrich import _rank_titles_by_relevance
+        from backend.models import Drug
+        from backend.repositories.drugs import DrugRepository
+
+        rec = _record(
+            _article(
+                "10",
+                "A first-in-human trial of this drug against the tumour; strong antitumour signal.",
+                title="Fresh oncology trial",
+                indexed=False,  # just posted, not yet indexed
+            ),
+        )
+        await LiteratureRepository(session).save(OSI, rec)
+        drug = await session.get(Drug, OSI)
+        assert drug is not None
+        await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow(), rec.articles)
+
+        rel = {f.key: f for f in await DrugRepository(session).facts_for(OSI)}["relevant_titles"]
+        item = rel.value[0]
+        assert item["title"] == "Fresh oncology trial"
+        # Not sunk: it still ranks (the only paper) and is honestly flagged, not dropped.
+        assert item["indexed"] is False
+        assert item["publication_type"] is None  # no meaningful type -> no false badge

@@ -315,6 +315,17 @@ export interface SynthesisStatement {
   block: string
 }
 
+/** One entry in the relevance-ranked "Key papers" list (B4 + #42): the title, its most-weighty
+ *  PubMed publication type (null for a plain journal article), and whether MeSH indexing has been
+ *  applied yet -- `indexed: false` means "not yet indexed" (a recent paper), NOT low quality. The
+ *  `relevant_titles` fact carries these; the `sample_titles` fallback carries plain strings. */
+export interface KeyPaper {
+  title: string
+  pmid: string | null
+  publication_type: string | null
+  indexed: boolean
+}
+
 /** One source's stance in a disagreement (E1): its own value in its own words, plus where it came
  *  from -- so a reader can see and check each side. */
 export interface DisagreementValue {
