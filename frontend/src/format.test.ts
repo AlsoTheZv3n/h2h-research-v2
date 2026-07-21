@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { countLabel, formatCount, formatNm } from './format'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { countLabel, formatAge, formatCount, formatNm } from './format'
 
 /**
  * These exist because the rendered page showed "480.000 nM" on a German browser.
@@ -54,5 +54,33 @@ describe('countLabel', () => {
     expect(countLabel(3922, null, false)).toBe('3,922 in catalog')
     // Whole corpus showing (data === catalogTotal) is not a subset.
     expect(countLabel(3922, 3922, false)).toBe('3,922 in catalog')
+  })
+})
+
+/**
+ * Freshness in words (E4). "Today" moves, so the clock is pinned per test rather than
+ * compared to a hardcoded date -- the same reason the helper reads Date.now() at call time.
+ */
+describe('formatAge', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reads the recent past in natural words, largest sensible unit', () => {
+    expect(formatAge('2026-07-21T08:00:00Z')).toBe('today') // same day
+    expect(formatAge('2026-07-20T12:00:00Z')).toBe('yesterday')
+    expect(formatAge('2026-07-18T12:00:00Z')).toBe('3 days ago')
+    expect(formatAge('2026-07-07T12:00:00Z')).toBe('2 weeks ago')
+    expect(formatAge('2026-04-21T12:00:00Z')).toBe('3 months ago')
+    expect(formatAge('2024-07-21T12:00:00Z')).toBe('2 years ago')
+  })
+
+  it('degrades to the raw string on an unparseable timestamp, never a fabricated "today"', () => {
+    // The same discipline as the absolute date: show the bad value, do not invent freshness.
+    expect(formatAge('not-a-date')).toBe('not-a-date')
   })
 })
