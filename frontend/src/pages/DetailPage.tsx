@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getDrug, retryDrug, structureUrl } from '../api/client'
 import type { DrugDetail, SelectivityProfile, SourcedFact } from '../api/types'
+import { ctgovPhaseLabel, otStageLabel } from '../phases'
 import { Card, NotApplicable } from '../components/Card'
 import { AnalyzingNotice } from '../components/AnalyzingNotice'
 import { Ask } from '../components/Ask'
@@ -32,7 +33,11 @@ function num(detail: DrugDetail, key: string): number | null {
   return typeof f.value === 'number' ? f.value : null
 }
 
-const list = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v))
+// The trial-phase enums read as jargon raw (the harness misread "EARLY_PHASE1", "APPROVAL"):
+// humanise each through the shared labeller so the clinical block speaks English.
+const phaseList = (v: unknown) =>
+  Array.isArray(v) ? v.map((p) => ctgovPhaseLabel(String(p))).join(', ') : String(v)
+const stage = (v: unknown) => otStageLabel(String(v))
 
 // Long enough not to hammer the API, short enough that a finished enrichment shows
 // up while the reader is still looking at the page.
@@ -289,10 +294,10 @@ export function DetailPage() {
               <Fact
                 label="Phases seen"
                 facts={pick(detail, 'phases')}
-                render={list}
+                render={phaseList}
                 emptyLabel="None recorded"
               />
-              <Fact label="Stage (Open Targets)" facts={pick(detail, 'max_stage')} />
+              <Fact label="Stage (Open Targets)" facts={pick(detail, 'max_stage')} render={stage} />
               <Fact
                 label="Any terminated/withdrawn"
                 facts={pick(detail, 'has_terminated')}
