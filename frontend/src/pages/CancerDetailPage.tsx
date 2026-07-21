@@ -160,8 +160,8 @@ export function CancerDetailPage() {
 
           <p className="mt-4 text-[11px] text-ink-faint">
             Target landscape and pipeline from Open Targets (CC0), epidemiology from Eurostat,
-            survival from SEER, trial reality from ClinicalTrials.gov. The molecular profile is the
-            next block. H2H surfaces evidence; it does not predict or advise.
+            survival from SEER, trial reality from ClinicalTrials.gov, mutation frequency from
+            cBioPortal (ODbL). H2H surfaces evidence; it does not predict or advise.
           </p>
         </div>
       </article>

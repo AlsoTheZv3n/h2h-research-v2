@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { TargetDetail } from '../api/types'
 import { AssociatedCancersCard } from '../components/AssociatedCancersCard'
 import { CatalogDrugsCard } from '../components/CatalogDrugsCard'
+import { TargetAlterationCard } from '../components/TargetAlterationCard'
 
 /**
  * One content section of the target detail page. The single source of truth for section ORDER,
@@ -23,6 +24,18 @@ export const TARGET_SECTIONS: TargetSection[] = [
     label: 'Associated cancers',
     render: (d) => (
       <AssociatedCancersCard id="associated-cancers" facts={d.facts['associated_cancers']} />
+    ),
+  },
+  // #43: the transpose of the cancer page's mutation-frequency block -- for this gene, how often it
+  // is mutated in each cancer it drives (cBioPortal). Sits under the associated cancers it augments.
+  {
+    id: 'mutation-frequency',
+    label: 'Mutation frequency',
+    render: (d) => (
+      <TargetAlterationCard
+        id="mutation-frequency"
+        facts={d.facts['target_alteration_frequency']}
+      />
     ),
   },
   {

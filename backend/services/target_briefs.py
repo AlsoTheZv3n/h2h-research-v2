@@ -22,6 +22,7 @@ from backend.ingestion.http import build_client
 from backend.models import Target
 from backend.repositories.cancers import CancerRepository
 from backend.services.briefs import BriefState
+from backend.services.cbioportal_map import load_study_map
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,15 @@ async def _enrich_in_background(ensembl_id: str, maker: async_sessionmaker[Async
             if target is None:
                 return
             catalog_ids = await CancerRepository(session).all_cancer_ids()
+            study_map = await load_study_map(session)
             async with build_client(
                 timeout=_INTERACTIVE_TIMEOUT, attempts=_INTERACTIVE_ATTEMPTS
             ) as client:
                 stats = TargetEnrichStats()
                 await asyncio.wait_for(
-                    enrich_target(session, target, client, catalog_ids, stats, commit_each=True),
+                    enrich_target(
+                        session, target, client, catalog_ids, study_map, stats, commit_each=True
+                    ),
                     timeout=_ENRICH_DEADLINE,
                 )
                 await session.commit()
