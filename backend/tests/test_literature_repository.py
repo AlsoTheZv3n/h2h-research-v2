@@ -11,6 +11,8 @@ told it to call".
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -310,7 +312,7 @@ class TestRelevanceRerank:
         rel = facts["relevant_titles"]
         assert rel.status.value == "ok"
         assert rel.source == "pubmed"
-        titles = rel.value
+        titles = cast(list[dict[str, Any]], rel.value)
         assert isinstance(titles, list)
         names = [t["title"] for t in titles]
         # The oncology paper leads; recency (rank order) would have led with the Alzheimer's one.
@@ -364,7 +366,7 @@ class TestRelevanceRerank:
         await _rank_titles_by_relevance(session, drug, "osimertinib", utcnow(), rec.articles)
 
         rel = {f.key: f for f in await DrugRepository(session).facts_for(OSI)}["relevant_titles"]
-        item = rel.value[0]
+        item = cast(list[dict[str, Any]], rel.value)[0]
         assert item["title"] == "Fresh oncology trial"
         # Not sunk: it still ranks (the only paper) and is honestly flagged, not dropped.
         assert item["indexed"] is False
