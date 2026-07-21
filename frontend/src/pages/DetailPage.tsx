@@ -340,13 +340,19 @@ export function DetailPage() {
                     label="Key papers"
                     facts={titleFacts}
                     emptyLabel="None"
-                    render={(v) => (
-                      <KeyPapersList
-                        items={v as (string | KeyPaper)[]}
-                        ranked={ranked}
-                        total={num(detail, 'n_pubmed')}
-                      />
-                    )}
+                    render={(v) => {
+                      // Same guard as the targets/indications renders above: a title fact is
+                      // an array of strings or KeyPaper objects, but a malformed value must
+                      // degrade to its text rather than crash KeyPapersList's items.map.
+                      if (!Array.isArray(v)) return String(v)
+                      return (
+                        <KeyPapersList
+                          items={v as (string | KeyPaper)[]}
+                          ranked={ranked}
+                          total={num(detail, 'n_pubmed')}
+                        />
+                      )
+                    }}
                   />
                 )
               })()}
