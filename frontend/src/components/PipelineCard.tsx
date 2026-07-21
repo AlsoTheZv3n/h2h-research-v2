@@ -184,6 +184,19 @@ function PipelineBody({
         </label>
       </div>
 
+      {/* #40 (spike S5): drug_type is reliable for ADC / antibody / cell / small molecule, but the
+          catalog is NOT a complete modality census -- some drugs are typed "Unknown", and mRNA
+          cancer vaccines in particular are absent or mistyped. So the modality filter reflects the
+          CATALOG, not every trial: a filter that finds no vaccines is a fact about this catalog, not
+          the world (an mRNA vaccine can still surface under trial reality). Stated so "no vaccines"
+          is never read as a finding. */}
+      <p className="mt-1.5 text-[11px] text-ink-faint" data-testid="pipeline-modality-note">
+        Modality is ChEMBL's <span className="italic">drug_type</span> over the catalog — not a
+        complete census. Some drugs are typed <span className="italic">Unknown</span>, and mRNA
+        cancer vaccines in particular are absent or mistyped, so this filter reflects the catalog,
+        not every trial.
+      </p>
+
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[32rem] text-left text-xs" data-testid="pipeline-table">
           <thead>
