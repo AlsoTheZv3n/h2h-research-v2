@@ -2,28 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { PipelineData, SourcedFact } from '../api/types'
 import { formatCount } from '../format'
+import { otStageLabel } from '../phases'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
-
-// Open Targets' maxClinicalStage enum, in human words. Most advanced first is the order
-// the backend already sorts by.
-const PHASE_LABELS: Record<string, string> = {
-  APPROVAL: 'Approved',
-  PHASE_4: 'Phase 4',
-  PREAPPROVAL: 'Pre-registration',
-  PHASE_3: 'Phase 3',
-  PHASE_2_3: 'Phase 2/3',
-  PHASE_2: 'Phase 2',
-  PHASE_1_2: 'Phase 1/2',
-  PHASE_1: 'Phase 1',
-  EARLY_PHASE_1: 'Early Phase 1',
-  PHASE_0: 'Phase 0',
-  PRECLINICAL: 'Preclinical',
-  UNKNOWN: 'Unknown stage',
-}
-
-const phaseLabel = (stage: string) => PHASE_LABELS[stage] ?? stage
 
 // How many table rows to reveal at a time. The table pages rather than truncating, so
 // the whole pipeline is reachable without a wall of names.
@@ -126,7 +108,7 @@ function PipelineBody({
       <div className="mt-3 space-y-1" data-testid="pipeline-distribution">
         {data.by_phase.map((p) => (
           <div key={p.stage} className="flex items-center gap-2 text-xs">
-            <span className="w-24 shrink-0 text-ink-muted">{phaseLabel(p.stage)}</span>
+            <span className="w-24 shrink-0 text-ink-muted">{otStageLabel(p.stage)}</span>
             <div className="h-2 flex-1 rounded bg-surface">
               <div
                 className="h-2 rounded bg-accent"
@@ -154,7 +136,7 @@ function PipelineBody({
           <option value="">All phases</option>
           {data.by_phase.map((p) => (
             <option key={p.stage} value={p.stage}>
-              {phaseLabel(p.stage)}
+              {otStageLabel(p.stage)}
             </option>
           ))}
         </select>
@@ -237,7 +219,7 @@ function PipelineBody({
                     </span>
                   )}
                 </td>
-                <td className="py-1 pr-2 text-ink-muted">{phaseLabel(d.stage)}</td>
+                <td className="py-1 pr-2 text-ink-muted">{otStageLabel(d.stage)}</td>
                 <td className="py-1 pr-2 text-ink-muted">{d.modality ?? '—'}</td>
                 <td className="py-1 text-ink-muted">{d.mechanism ?? '—'}</td>
               </tr>

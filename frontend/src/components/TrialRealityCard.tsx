@@ -1,19 +1,9 @@
 import type { SourcedFact, TrialReality } from '../api/types'
 import { formatCount } from '../format'
+import { ctgovPhaseLabel, humanize } from '../phases'
 import { Card } from './Card'
 import { CitationChip } from './CitationChip'
 import { FactGate } from './FactGate'
-
-// ClinicalTrials.gov phase enum, in human words. NA is a real value (a trial with no phase, e.g.
-// a device or observational study), not "unknown".
-const PHASE_LABELS: Record<string, string> = {
-  EARLY_PHASE1: 'Early Phase 1',
-  PHASE1: 'Phase 1',
-  PHASE2: 'Phase 2',
-  PHASE3: 'Phase 3',
-  PHASE4: 'Phase 4',
-  NA: 'Not applicable',
-}
 
 // overallStatus enum, in human words.
 const STATUS_LABELS: Record<string, string> = {
@@ -31,15 +21,6 @@ const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'Available',
 }
 
-// A fallback so a NEW ClinicalTrials.gov enum lands readable rather than as a raw SCREAMING token.
-const humanize = (s: string) =>
-  s
-    .split('_')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : ''))
-    .join(' ')
-    .trim()
-
-const phaseLabel = (p: string) => PHASE_LABELS[p] ?? humanize(p)
 const statusLabel = (s: string) => STATUS_LABELS[s] ?? humanize(s)
 
 /**
@@ -132,7 +113,7 @@ function TrialRealityBody({ data, fact }: { data: TrialReality; fact: SourcedFac
         testid="trial-phase-distribution"
         items={data.by_phase.map((p) => ({
           key: p.phase,
-          label: phaseLabel(p.phase),
+          label: ctgovPhaseLabel(p.phase),
           count: p.count,
         }))}
       />
