@@ -15,24 +15,27 @@ import respx
 
 from backend.ingestion import ctgov_cancer
 from backend.ingestion.base import FactStatus
-from backend.ingestion.enrich_cancer import cancer_trial_reality
+from backend.ingestion.enrich_cancer import make_trial_reality_source
 from backend.models import Cancer
 
 CTGOV = ctgov_cancer.BASE
 COND = "non-small cell lung carcinoma"
 
 
-def _study(status: str, *, phase: str | None = None, why: str | None = None) -> dict[str, Any]:
+def _study(
+    status: str, *, phase: str | None = None, why: str | None = None, sponsor: str | None = None
+) -> dict[str, Any]:
     sm: dict[str, Any] = {"overallStatus": status}
     if why is not None:
         sm["whyStopped"] = why
-    return {
-        "protocolSection": {
-            "identificationModule": {"nctId": "NCT00000000"},
-            "statusModule": sm,
-            "designModule": {"phases": [phase] if phase else []},
-        }
+    ps: dict[str, Any] = {
+        "identificationModule": {"nctId": "NCT00000000"},
+        "statusModule": sm,
+        "designModule": {"phases": [phase] if phase else []},
     }
+    if sponsor is not None:
+        ps["sponsorCollaboratorsModule"] = {"leadSponsor": {"name": sponsor}}
+    return {"protocolSection": ps}
 
 
 def _main(total: int | None, studies: list[dict[str, Any]]) -> httpx.Response:
@@ -78,6 +81,58 @@ def _route(
 async def _fetch(cond: str = COND) -> dict[str, Any] | None:
     async with httpx.AsyncClient(timeout=10) as client:
         return await ctgov_cancer.fetch_trial_reality(client, cond)
+
+
+# A curated map that merges Pfizer's subsidiaries and keeps the two Mercks apart.
+_SPONSOR_MAP = {
+    "Seagen Inc.": "Pfizer",
+    "Array BioPharma": "Pfizer",
+    "Merck Sharp & Dohme LLC": "Merck & Co. (MSD, US)",
+    "Merck KGaA, Darmstadt, Germany": "Merck KGaA (Darmstadt, DE)",
+}
+
+
+class TestSponsorNormalisation:
+    @respx.mock
+    async def test_counts_merge_subsidiaries_and_keep_the_two_mercks_apart(self) -> None:
+        studies = [
+            _study("RECRUITING", sponsor="Pfizer"),
+            _study("RECRUITING", sponsor="Seagen Inc."),  # -> Pfizer
+            _study("COMPLETED", sponsor="Array BioPharma"),  # -> Pfizer
+            _study("RECRUITING", sponsor="Merck Sharp & Dohme LLC"),  # -> Merck & Co (US)
+            _study("COMPLETED", sponsor="Merck KGaA, Darmstadt, Germany"),  # -> Merck KGaA (DE)
+            _study("RECRUITING", sponsor="M.D. Anderson Cancer Center"),  # uncurated -> itself
+        ]
+        _route(6, studies, dach=0)
+        async with httpx.AsyncClient(timeout=10) as client:
+            data = await ctgov_cancer.fetch_trial_reality(client, COND, _SPONSOR_MAP)
+        assert data is not None
+        assert data["sponsors_normalised"] is True
+        by = {s["sponsor"]: s["count"] for s in data["by_sponsor"]}
+        # Pfizer's three subsidiary strings collapse to one canonical of 3.
+        assert by["Pfizer"] == 3
+        # THE TRAP: the two Mercks are DIFFERENT companies -- never merged.
+        assert by["Merck & Co. (MSD, US)"] == 1
+        assert by["Merck KGaA (Darmstadt, DE)"] == 1
+        assert "Merck" not in by  # no bare "Merck" that collapsed the two
+        # An uncurated academic sponsor normalises to itself.
+        assert by["M.D. Anderson Cancer Center"] == 1
+        # Distinct canonicals: Pfizer, Merck&Co, MerckKGaA, MD Anderson.
+        assert data["n_sponsors"] == 4
+
+    @respx.mock
+    async def test_no_map_leaves_counts_raw_but_still_labelled(self) -> None:
+        studies = [
+            _study("RECRUITING", sponsor="Seagen Inc."),
+            _study("COMPLETED", sponsor="Pfizer"),
+        ]
+        _route(2, studies, dach=0)
+        # No sponsor_map -> raw counts (Seagen and Pfizer stay separate); the label still travels.
+        data = await _fetch()
+        assert data is not None
+        assert data["sponsors_normalised"] is True
+        by = {s["sponsor"]: s["count"] for s in data["by_sponsor"]}
+        assert by == {"Seagen Inc.": 1, "Pfizer": 1}
 
 
 class TestFetchTrialReality:
@@ -195,7 +250,9 @@ def _cancer(name: str | None = COND) -> Cancer:
 
 async def _record(cancer: Cancer) -> Any:
     async with httpx.AsyncClient(timeout=10) as client:
-        return await cancer_trial_reality(client, cancer)
+        # An empty sponsor map: the source still runs, counts are just un-normalised (each raw
+        # leadSponsor stands alone) -- the source behaviour under test is unchanged by #39.
+        return await make_trial_reality_source({})(client, cancer)
 
 
 class TestTrialRealitySource:

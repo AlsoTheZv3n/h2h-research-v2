@@ -34,7 +34,13 @@ _FIELDS = (
     "protocolSection.statusModule.overallStatus",
     "protocolSection.statusModule.whyStopped",
     "protocolSection.designModule.phases",
+    "protocolSection.sponsorCollaboratorsModule.leadSponsor.name",
 )
+
+# How many top sponsors the card shows. The count is over the scanned page (a sample for a big
+# cancer, like by_phase/by_status) and is NORMALISED via the curated map, so subsidiaries of one
+# company count as that company rather than fragmenting (~4:1 in the pharma head). Issue #39 / S4.
+_MAX_SPONSORS = 8
 
 # A "stopped" trial: started (or was to) and did not run to completion. whyStopped carries a reason
 # on most of these (NSCLC: 155/172), never all -- a missing reason is omitted, never invented.
@@ -127,7 +133,9 @@ async def _latest_registration(client: httpx.AsyncClient, condition: str) -> str
         return None
 
 
-async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict[str, Any] | None:
+async def fetch_trial_reality(
+    client: httpx.AsyncClient, condition: str, sponsor_map: dict[str, str] | None = None
+) -> dict[str, Any] | None:
     """The registered-trial landscape for one cancer condition, or None for a measured ZERO
     trials (a clean EMPTY). Raises on an outage (the caller records source_failed).
 
@@ -135,7 +143,12 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
     page but no count (count unavailable -- NEVER inferred from the page length). `n_trials` is
     never 0 here: a true zero returns None (EMPTY) above, so a null n_trials means only "count
     unavailable", never "no trials". `dach_recruiting` is likewise int (>=0) or None (unknown).
+
+    `sponsor_map` (raw leadSponsor.name -> canonical company) NORMALISES the sponsor counts so a
+    company's subsidiaries merge; an uncurated string normalises to itself. None -> no map (counts
+    are raw); the value always labels whether it was normalised (`sponsors_normalised`).
     """
+    sponsor_map = sponsor_map or {}
     r = await client.get(
         BASE,
         params={
@@ -155,9 +168,16 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
     phases: Counter[str] = Counter()
     statuses: Counter[str] = Counter()
     stop_reasons: Counter[str] = Counter()
+    sponsors: Counter[str] = Counter()
     stopped = 0
     for s in studies:
         ps = s.get("protocolSection") or {}
+        # The lead sponsor, NORMALISED: a curated raw->canonical map merges a company's
+        # subsidiaries; an uncurated string maps to itself. Display would use the raw name, but
+        # the COUNT must be normalised or big pharma fragments ~4:1. (#39)
+        lead = ((ps.get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}).get("name")
+        if lead:
+            sponsors[sponsor_map.get(lead, lead)] += 1
         # `phases` is a multi-valued array: a combined-design trial (e.g. ["PHASE1","PHASE2"], very
         # common in oncology) counts in EACH of its phases. So by_phase is trials-PER-phase and
         # need NOT sum to n_trials_scanned -- unlike by_status, whose overallStatus is single-valued
@@ -187,6 +207,14 @@ async def fetch_trial_reality(client: httpx.AsyncClient, condition: str) -> dict
         "n_trials_scanned": len(studies),
         "by_phase": _distribution(phases, _PHASE_ORDER, "phase"),
         "by_status": _distribution(statuses, _STATUS_ORDER, "status"),
+        # Top sponsors over the scanned page, NORMALISED (subsidiaries merged). n_sponsors is the
+        # distinct-canonical total so the card can say "top 8 of N". `sponsors_normalised` tells the
+        # reader the counts merged subsidiaries -- a raw display would look different, on purpose.
+        "by_sponsor": [
+            {"sponsor": name, "count": n} for name, n in sponsors.most_common(_MAX_SPONSORS)
+        ],
+        "n_sponsors": len(sponsors),
+        "sponsors_normalised": True,
         # count over the scanned page; reasons are the top stated ones (a stopped trial with no
         # whyStopped is counted but contributes no reason -- "—" in the UI, never an invented one).
         "stopped": {

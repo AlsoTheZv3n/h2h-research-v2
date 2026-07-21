@@ -186,6 +186,11 @@ test.describe('cancer catalog', () => {
     const stopped = page.getByTestId('trial-stopped')
     await expect(stopped).toContainText('172')
     await expect(stopped).toContainText('Slow accrual')
+    // #39: top sponsors, normalised (a canonical company + the "normalised" note), DB -> API -> UI.
+    const sponsors = page.getByTestId('trial-sponsors')
+    await expect(sponsors).toContainText('Pfizer')
+    await expect(sponsors).toContainText('Merck & Co. (MSD, US)')
+    await expect(sponsors).toContainText(/normalised/i)
   })
 
   test('the drug catalog still works, and its tab is active there', async ({ page }) => {

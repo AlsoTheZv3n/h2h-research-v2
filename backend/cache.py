@@ -52,8 +52,10 @@ def detail_cache_key(chembl_id: str) -> str:
 # trial_reality fact and a derived silent-stalling synthesis line, so a stale brief lacks both.
 # v11: #43 added the `alteration_frequency` fact (cBioPortal per-gene somatic-mutation frequency for
 # the landscape genes), so a stale v10 brief lacks the whole block; paired with the d5f7a9c1e3b5
-# migration that back-dates last_enriched_at so enriched cancers re-derive it lazily.
-_CANCER_DETAIL_SCHEMA_VERSION = "v11"
+# migration that back-dates last_enriched_at so enriched cancers re-derive it lazily. v12: #39 added
+# a normalised `by_sponsor` distribution inside the trial_reality fact, so a stale v11 brief lacks
+# it; paired with the a9c1b3d5e7f8 migration that back-dates enriched cancers to re-derive it.
+_CANCER_DETAIL_SCHEMA_VERSION = "v12"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

@@ -91,6 +91,32 @@ describe('TrialRealityCard', () => {
     expect(screen.queryByTestId('trial-latest-registration')).not.toBeInTheDocument()
   })
 
+  it('shows the top sponsors with the normalised label (#39)', () => {
+    renderCard([
+      fact({
+        value: {
+          ...trial,
+          by_sponsor: [
+            { sponsor: 'Pfizer', count: 19 },
+            { sponsor: 'Merck & Co. (MSD, US)', count: 8 },
+          ],
+          n_sponsors: 532,
+          sponsors_normalised: true,
+        },
+      }),
+    ])
+    const block = screen.getByTestId('trial-sponsors')
+    expect(within(block).getByText('Pfizer')).toBeInTheDocument()
+    expect(within(block).getByText('Merck & Co. (MSD, US)')).toBeInTheDocument()
+    // The load-bearing label: counts merged subsidiaries, so they differ from the raw names.
+    expect(block.textContent).toMatch(/normalised/i)
+  })
+
+  it('omits the sponsors block on a pre-#39 fact (no by_sponsor), never an empty list', () => {
+    renderCard([fact({ value: trial })])
+    expect(screen.queryByTestId('trial-sponsors')).not.toBeInTheDocument()
+  })
+
   it('renders an outage as an unavailable chip, never "no trials"', () => {
     renderCard([fact({ value: null, status: 'source_failed', error: 'boom' })])
     expect(screen.getByTestId('fact-source-failed')).toBeInTheDocument()
