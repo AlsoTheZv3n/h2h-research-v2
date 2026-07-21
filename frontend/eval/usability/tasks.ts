@@ -233,6 +233,18 @@ export const TASKS: Task[] = [
     capture: (page, base) => targetPage(page, base, EGFR_TARGET),
   },
   {
+    id: 'sponsor-normalisation',
+    question:
+      'Read the "Top sponsors" list in the trial-reality block. Are these the raw sponsor names exactly as ClinicalTrials.gov records them, or something else -- and what does that mean for the counts?',
+    expected:
+      'Something else: the counts are NORMALISED -- a company\'s subsidiaries are merged onto one canonical name (Pfizer absorbs Seagen/Wyeth/Array; the counts therefore differ from, and are larger than, any single raw string). The card says so. The reader should NOT read the list as the literal raw ClinicalTrials.gov strings.',
+    labels: [
+      'the counts are NORMALISED (subsidiaries merged), not raw leadSponsor strings',
+      'a canonical company name stands for several raw strings -> its count is larger than any one',
+    ],
+    capture: (page, base) => cancerSection(page, base, 'trial-reality'),
+  },
+  {
     id: 'epidemiology-most-common',
     question:
       'Where is this cancer most common / most deadly? Read the epidemiology block and say what the country figures actually measure.',
