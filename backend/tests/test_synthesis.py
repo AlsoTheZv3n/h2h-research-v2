@@ -7,6 +7,7 @@ from __future__ import annotations
 from backend.domain.synthesis import (
     CROWDED_PIPELINE,
     HIGH_ATTRITION,
+    STALE_TRIAL_YEARS,
     WELL_STUDIED_TRIALS,
     WIDE_STAGE_GAP,
     cancer_synthesis,
@@ -94,6 +95,28 @@ class TestCancerSynthesis:
         # staged=False (leukemias): there is no localized/distant split to hinge on.
         unstaged = {"staged": False, "by_stage": []}
         assert cancer_synthesis(None, None, None, unstaged) == []
+
+    def test_silent_stalling_fires_when_no_new_trial_in_years(self) -> None:
+        # E3: no attrition inputs here, so only the stalling rule can fire on this trial fact.
+        stalled = {"latest_registration": "2019-05-01"}
+        out = cancer_synthesis(None, None, stalled, None, now_year=2026)
+        assert (
+            _text_for(out, "trial-reality") == "Silent stalling: no new trial registered since 2019"
+        )
+
+    def test_silent_stalling_is_silent_for_a_recently_registered_field(self) -> None:
+        # A new trial within STALE_TRIAL_YEARS -> active, no stalling line.
+        recent = {"latest_registration": "2025-01-01"}
+        assert cancer_synthesis(None, None, recent, None, now_year=2026) == []
+
+    def test_silent_stalling_fires_exactly_at_the_threshold(self) -> None:
+        at = {"latest_registration": f"{2026 - STALE_TRIAL_YEARS}-01-01"}
+        assert _blocks(cancer_synthesis(None, None, at, None, now_year=2026)) == {"trial-reality"}
+
+    def test_silent_stalling_withheld_without_a_date_or_a_clock(self) -> None:
+        # Missing latest_registration -> nothing (never inferred). No now_year -> rule skipped.
+        assert cancer_synthesis(None, None, {"n_trials_scanned": 5}, None, now_year=2026) == []
+        assert cancer_synthesis(None, None, {"latest_registration": "2010-01-01"}, None) == []
 
     def test_missing_inputs_yield_no_statements_never_a_zero(self) -> None:
         # The derived-value discipline: absent facts -> empty synthesis, not "0 targets / 0 drugs".

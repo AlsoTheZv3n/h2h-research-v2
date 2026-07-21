@@ -127,7 +127,8 @@ test.describe('detail brief', () => {
     await chip.hover()
     const tip = page.getByRole('tooltip').first()
     await expect(tip).toBeVisible()
-    await expect(tip).toContainText(/retrieved/i)
+    // E4: the panel leads with freshness in words ("Checked N ago"), the exact date beneath.
+    await expect(tip).toContainText(/Checked /)
     await expect(tip.getByRole('link')).toHaveAttribute('href', /^https?:\/\//)
   })
 
@@ -237,7 +238,10 @@ test.describe('detail redesign', () => {
     await expect(info).not.toContainText(/chembl|pubmed|open targets/i)
 
     await info.hover()
-    await expect(page.getByRole('tooltip').first()).toContainText(/Retrieved \d{4}-\d{2}-\d{2}/)
+    // E4: freshness in words plus the exact date underneath (still an ISO date, no "Retrieved" prefix).
+    const tooltip = page.getByRole('tooltip').first()
+    await expect(tooltip).toContainText(/Checked /)
+    await expect(tooltip).toContainText(/\d{4}-\d{2}-\d{2}/)
   })
 
   test('a source failure reads as a calm advisory, not a red field-name wall', async ({ page }) => {

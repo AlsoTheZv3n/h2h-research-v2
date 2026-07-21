@@ -20,7 +20,8 @@ _client: redis.Redis | None = None
 # potency card reads it); paired with the a1b3c5d7e9f0 migration that back-dates last_enriched_at
 # so drugs enriched before it re-derive the fact on next open rather than showing "Not collected".
 # v4: the C2 page-level `synthesis` (derived server-side from the facts) joined DrugDetail.
-_DETAIL_SCHEMA_VERSION = "v4"
+# v5: E1 `disagreements` (cross-source conflicts, e.g. the clinical phase) joined DrugDetail.
+_DETAIL_SCHEMA_VERSION = "v5"
 
 
 def get_redis() -> redis.Redis:
@@ -45,8 +46,9 @@ def detail_cache_key(chembl_id: str) -> str:
 # the C3 `target_tdl` map (per-target Pharos development level) joined it too. v9: the TDL verdict
 # for an unresolved-status target with a potent ligand now reads "approval not measured" instead of
 # a false "none approved" -- an honest-state fix to target_tdl's label, so stale v8 briefs must
-# recompute rather than keep serving the old wording.
-_CANCER_DETAIL_SCHEMA_VERSION = "v9"
+# recompute rather than keep serving the old wording. v10: E3 added `latest_registration` to the
+# trial_reality fact and a derived silent-stalling synthesis line, so a stale brief lacks both.
+_CANCER_DETAIL_SCHEMA_VERSION = "v10"
 
 
 def cancer_detail_cache_key(disease_id: str) -> str:

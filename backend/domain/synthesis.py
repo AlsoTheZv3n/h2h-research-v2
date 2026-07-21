@@ -25,6 +25,11 @@ WIDE_STAGE_GAP = 30.0
 outcome hinges on stage at diagnosis -- the 'catch it early' story."""
 WELL_STUDIED_TRIALS = 20
 """>= this many registered trials marks a drug as well-studied rather than early or sparse."""
+STALE_TRIAL_YEARS = 3
+"""No new trial registered for this cancer in >= this many years reads as SILENT stalling -- a field
+that quietly stopped attracting trials, complementary to attrition (documented failure). A disclosed
+judgement; withheld entirely when the latest-registration date is missing (never inferred from now).
+"""
 
 
 @dataclass
@@ -42,6 +47,14 @@ def _num(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
+def _year(value: Any) -> int | None:
+    """The leading YYYY of an ISO date string, or None -- so a missing/partial date withholds the
+    stalling rule rather than guessing."""
+    if isinstance(value, str) and len(value) >= 4 and value[:4].isdigit():
+        return int(value[:4])
+    return None
+
+
 def _stage_rate(survival: dict[str, Any], needle: str) -> float | None:
     """The 5-year survival rate for the SEER summary stage whose name contains `needle`."""
     for stage in survival.get("by_stage") or []:
@@ -55,9 +68,12 @@ def cancer_synthesis(
     pipeline: dict[str, Any] | None,
     trial_reality: dict[str, Any] | None,
     survival: dict[str, Any] | None,
+    *,
+    now_year: int | None = None,
 ) -> list[dict[str, str]]:
     """The cancer page's "so what", as derived statements. Each arg is a fact's value, or None when
-    that fact is missing/failed/empty -- in which case its statements are simply absent."""
+    that fact is missing/failed/empty -- in which case its statements are simply absent. `now_year`
+    is the serve-time year, only for the silent-stalling rule; omitted (None) it is skipped."""
     out: list[Statement] = []
 
     if landscape:
@@ -99,6 +115,20 @@ def cancer_synthesis(
                     "trial-reality",
                 )
             )
+
+        # E3 silent stalling: no new trial registered in STALE_TRIAL_YEARS. Undeclared dormancy --
+        # the field stopped attracting trials without any being formally terminated. Withheld unless
+        # both the latest-registration date and the serve-time year are known (never inferred).
+        latest_year = _year(trial_reality.get("latest_registration"))
+        if now_year is not None and latest_year is not None:
+            gap = now_year - latest_year
+            if gap >= STALE_TRIAL_YEARS:
+                out.append(
+                    Statement(
+                        f"Silent stalling: no new trial registered since {latest_year}",
+                        "trial-reality",
+                    )
+                )
 
     if survival and survival.get("staged"):
         loc = _stage_rate(survival, "local")

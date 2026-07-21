@@ -78,6 +78,19 @@ describe('TrialRealityCard', () => {
     expect(screen.getByText('Slow accrual')).toBeInTheDocument()
   })
 
+  it('shows the last-new-trial year when the registration date is known (E3)', () => {
+    renderCard([fact({ value: { ...trial, latest_registration: '2019-05-14' } })])
+    expect(screen.getByTestId('trial-latest-registration')).toHaveTextContent(
+      /Last new trial registered:\s*2019/,
+    )
+  })
+
+  it('omits the last-new-trial line when the date is unknown, never "never" or a zero (E3)', () => {
+    // A pre-E3 fact (no latest_registration) shows no line rather than a fabricated date.
+    renderCard([fact({ value: trial })])
+    expect(screen.queryByTestId('trial-latest-registration')).not.toBeInTheDocument()
+  })
+
   it('renders an outage as an unavailable chip, never "no trials"', () => {
     renderCard([fact({ value: null, status: 'source_failed', error: 'boom' })])
     expect(screen.getByTestId('fact-source-failed')).toBeInTheDocument()

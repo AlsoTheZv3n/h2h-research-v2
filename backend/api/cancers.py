@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -218,6 +219,9 @@ async def get_cancer(disease_id: str, session: SessionDep) -> CancerDetail:
             pipeline=ok_value("pipeline"),
             trial_reality=ok_value("trial_reality"),
             survival=ok_value("survival"),
+            # Serve-time year for the silent-stalling rule (E3): "no new trial since YYYY" is
+            # measured against now, not baked into the fact, so it stays true as time passes.
+            now_year=datetime.now(UTC).year,
         )
     ]
 

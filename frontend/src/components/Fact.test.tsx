@@ -217,7 +217,10 @@ describe('CitationChip', () => {
     await user.hover(chip)
 
     const tip = screen.getByRole('tooltip')
-    expect(tip).toHaveTextContent('Retrieved 2026-07-16')
+    // E4: freshness in words plus the exact date underneath. The age is clock-relative (unit-tested
+    // in format.test.ts with a pinned clock); here we assert the chip renders it and keeps the date.
+    expect(screen.getByTestId('fact-age')).toHaveTextContent(/^Checked /)
+    expect(tip).toHaveTextContent('2026-07-16')
     expect(tip).toHaveTextContent('Confidence 90%')
     expect(screen.getByRole('link')).toHaveAttribute(
       'href',

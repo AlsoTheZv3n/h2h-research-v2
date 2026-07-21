@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import type { SourcedFact } from '../api/types'
+import { formatAge } from '../format'
 
 const SOURCE_LABELS: Record<string, string> = {
   chembl: 'ChEMBL',
@@ -73,8 +74,14 @@ export function CitationChip({ fact }: { fact: SourcedFact }) {
                      border-line bg-card p-2.5 text-xs shadow-lg"
         >
           <span className="block font-medium text-ink">{label}</span>
-          <span className="mt-1 block text-ink-muted">
-            Retrieved {formatRetrieved(fact.retrieved_at)}
+          {/* E4: freshness in words -- "checked 3 months ago" reads at a glance where an ISO
+              date does not, so a stale fact and a fresh one no longer look identical. The exact
+              date stays underneath, faint, so nothing is lost. */}
+          <span className="mt-1 block text-ink-muted" data-testid="fact-age">
+            Checked {formatAge(fact.retrieved_at)}
+          </span>
+          <span className="block text-[10px] text-ink-faint">
+            {formatRetrieved(fact.retrieved_at)}
           </span>
           {fact.confidence !== null && (
             <span className={`mt-0.5 block ${confidenceTone(fact.confidence)}`}>

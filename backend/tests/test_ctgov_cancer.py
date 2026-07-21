@@ -42,13 +42,34 @@ def _main(total: int | None, studies: list[dict[str, Any]]) -> httpx.Response:
     return httpx.Response(200, json=body)
 
 
-def _route(total: int | None, studies: list[dict[str, Any]], *, dach: int | None = 0) -> None:
-    """Mock both CT.gov calls by inspecting the request: the DACH sub-query (RECRUITING filter)
-    vs the main condition page. `dach=None` simulates a response carrying no count on that call."""
+def _route(
+    total: int | None,
+    studies: list[dict[str, Any]],
+    *,
+    dach: int | None = 0,
+    latest: str | None = None,
+) -> None:
+    """Mock the three CT.gov calls by request: the DACH sub-query (RECRUITING filter), the
+    latest-registration sub-query (sort=StudyFirstPostDate), and the main condition page.
+    `dach=None` simulates a missing count; `latest=None` an empty sort result (no dated study)."""
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if dict(request.url.params).get("filter.overallStatus") == "RECRUITING":
+        params = dict(request.url.params)
+        if params.get("filter.overallStatus") == "RECRUITING":
             return httpx.Response(200, json={} if dach is None else {"totalCount": dach})
+        if "sort" in params:
+            dated = (
+                [
+                    {
+                        "protocolSection": {
+                            "statusModule": {"studyFirstPostDateStruct": {"date": latest}}
+                        }
+                    }
+                ]
+                if latest
+                else []
+            )
+            return httpx.Response(200, json={"studies": dated})
         return _main(total, studies)
 
     respx.get(CTGOV).mock(side_effect=handler)
@@ -70,6 +91,22 @@ class TestFetchTrialReality:
         assert data["n_trials_scanned"] == 3
         assert data["dach_recruiting"] == 122
         assert data["condition"] == COND
+
+    @respx.mock
+    async def test_latest_registration_is_the_true_most_recent_date(self) -> None:
+        # E3: the sort sub-query's top study carries the most-recent first-posted date.
+        _route(50, [_study("COMPLETED")], latest="2024-03-15")
+        data = await _fetch()
+        assert data is not None
+        assert data["latest_registration"] == "2024-03-15"
+
+    @respx.mock
+    async def test_latest_registration_is_none_when_the_sub_query_finds_nothing(self) -> None:
+        # No dated study -> None (freshness unknown), never a wrong or fabricated date.
+        _route(50, [_study("COMPLETED")], latest=None)
+        data = await _fetch()
+        assert data is not None
+        assert data["latest_registration"] is None
 
     @respx.mock
     async def test_distributions_and_stopped_reasons(self) -> None:

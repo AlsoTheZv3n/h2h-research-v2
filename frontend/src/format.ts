@@ -43,3 +43,32 @@ export function formatNm(n: number | null | undefined): string {
   if (n !== 0 && Math.abs(n) < 0.01) return n.toExponential(1)
   return n >= 1000 ? INTEGER.format(n) : DECIMAL.format(n)
 }
+
+const MS_PER_DAY = 86_400_000
+// Explicit en-US, like the number formatters above: the UI is English, so "3 months
+// ago" must not become a localized string on a German browser. numeric:'auto' gives the
+// natural "yesterday" / "last week" for the -1 buckets instead of "1 day ago".
+const RELATIVE = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })
+
+/**
+ * How long ago a fact was checked, from its `retrieved_at` ISO string -- "today",
+ * "yesterday", "3 months ago". This is FRESHNESS (when we last verified the value), a
+ * separate axis from the change feed (when the value last moved) and from the honest
+ * states; it never becomes a state, only a per-fact age the citation chip can show.
+ *
+ * Computed against the render-time clock, so callers/tests must control "now" (the date
+ * moves). Degrades to the raw string on an unparseable input, exactly as the absolute
+ * date formatter does -- a bad timestamp is shown, never a fabricated "today".
+ */
+export function formatAge(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return iso
+  // Negative = in the past (the normal case); Math.round keeps the nearest whole unit.
+  const days = Math.round((then - Date.now()) / MS_PER_DAY)
+  const abs = Math.abs(days)
+  if (abs < 1) return 'today'
+  if (abs < 7) return RELATIVE.format(days, 'day')
+  if (abs < 30) return RELATIVE.format(Math.round(days / 7), 'week')
+  if (abs < 365) return RELATIVE.format(Math.round(days / 30), 'month')
+  return RELATIVE.format(Math.round(days / 365), 'year')
+}
