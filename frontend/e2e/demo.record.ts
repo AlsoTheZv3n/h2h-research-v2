@@ -47,6 +47,9 @@ const ADC = 'CHEMBL4297844'
 // non-small cell lung carcinoma: the disease osimertinib treats, where EGFR is the
 // first associated target -- the drug->cancer thread paying off.
 const NSCLC = 'MONDO_0005233'
+// EGFR: the third entity. The target osimertinib inhibits and NSCLC's top landscape gene -- its own
+// page carries the cBioPortal mutation-frequency transpose and the PubTator extracted relations.
+const EGFR_TARGET = 'ENSG00000146648'
 
 const browser = await chromium.launch()
 const context = await browser.newContext({
@@ -120,6 +123,12 @@ await page.getByTestId('targets-stat').waitFor()
 await page.getByTestId('targets-stat').scrollIntoViewIfNeeded()
 await page.waitForTimeout(2600)
 
+// The molecular layer (cBioPortal): how often each landscape gene is somatically mutated in a
+// matched tumour cohort. Broad NSCLC has no exactly-matched TCGA cohort, so the block says "no
+// matched cohort" -- a coverage gap, not a zero. The same None-vs-0 honesty, now on genomics.
+await page.locator('#mutation-frequency').scrollIntoViewIfNeeded()
+await page.waitForTimeout(2200)
+
 // EGFR leads the target landscape -- the same target osimertinib inhibits, closing the
 // thread -- beside the pipeline as a phase distribution rather than a wall of names.
 await page.getByTestId('pipeline-distribution').scrollIntoViewIfNeeded()
@@ -138,13 +147,30 @@ await page.waitForTimeout(2600)
 //      the scanned sample beside it, a phase/status split, stopped-with-reasons, DACH recruiting;
 await page.locator('#trial-reality').scrollIntoViewIfNeeded()
 await page.getByTestId('trial-count').waitFor()
-await page.waitForTimeout(2600)
+await page.waitForTimeout(2400)
+// The trial block now also names its TOP SPONSORS, normalised: a company's subsidiaries collapse
+// onto one canonical name, the count labelled normalised -- and Merck KGaA never merges with Merck & Co.
+await page.getByTestId('trial-sponsors').scrollIntoViewIfNeeded()
+await page.waitForTimeout(2200)
 //    - European mortality by country (Eurostat), labelled as the broader ICD-10 rollup it is;
 await page.locator('#epidemiology').scrollIntoViewIfNeeded()
 await page.waitForTimeout(2600)
 //    - and 5-year relative survival by stage (SEER), the same honest-rollup discipline.
 await page.locator('#survival').scrollIntoViewIfNeeded()
-await page.waitForTimeout(2600)
+await page.waitForTimeout(2400)
+
+// 8. Follow EGFR into its own TARGET page -- the third entity, closing the drug->cancer->target
+//    thread. Its mutation frequency ACROSS the cancers it drives (cBioPortal, the transpose).
+await page.goto(`${BASE}/targets/${EGFR_TARGET}`)
+await page.getByTestId('target-alt-cancers').waitFor()
+await page.locator('#mutation-frequency').scrollIntoViewIfNeeded()
+await page.waitForTimeout(2400)
+
+// 9. ...and its machine-EXTRACTED literature relations (PubTator): a dashed "extracted, not curated"
+//    frame, a co-mention count rather than evidence, never blended with the sourced cards above it.
+await page.locator('#extracted-relations').scrollIntoViewIfNeeded()
+await page.getByTestId('extracted-banner').waitFor()
+await page.waitForTimeout(2800)
 
 await context.close()
 await browser.close()

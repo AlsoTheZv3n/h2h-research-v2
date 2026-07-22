@@ -40,6 +40,10 @@ date**, and gaps are shown honestly instead of papered over.
 - Biologics and other non-small-molecule drugs are handled honestly: they appear in the catalog, but
   the structure and binding cards say *"not applicable — … is not a small molecule"* (the structure
   card naming the actual modality) rather than showing empty panels.
+- **Key papers, ranked by relevance** to oncology rather than by recency, each tagged with its
+  strongest PubMed **publication type** (randomized trial, meta-analysis, review, …) and a distinct
+  *not yet indexed* label for recent papers MeSH indexing hasn't reached — kept apart from *low
+  relevance*, the same None-vs-0 discipline.
 - **Ask a question about the drug** and get an answer built only from that drug's facts and
   abstracts, with every source linked — see below.
 - **Browse cancers, not just drugs.** Open any cancer → its **drug pipeline** as a phase distribution
@@ -52,7 +56,9 @@ date**, and gaps are shown honestly instead of papered over.
   Targets (not our catalog), joined on stable Ensembl ids, with a separate link to a catalog drug
   against it where we hold one. A high-association target with no drug anywhere is the finding; one
   merely absent from *our* catalog is not. Three more blocks ship beside these — **trial reality** (the
-  registered-trial landscape from ClinicalTrials.gov: phase and status distributions, stopped-with-reasons,
+  registered-trial landscape from ClinicalTrials.gov: phase and status distributions, its **top sponsors normalised** (subsidiaries collapse onto one
+  canonical name, the count labelled as normalised, and **Merck KGaA ≠ Merck & Co** never merged),
+  stopped-with-reasons,
   and a derived *no new trial since YYYY* stalled-programme signal), **epidemiology** (European
   age-standardised cancer mortality, from Eurostat) and **survival** (SEER 5-year relative survival by
   stage) — each attached through a MONDO disease crosswalk and each loading and failing on its own, with
@@ -74,7 +80,11 @@ beside the target landscape: how often each landscape gene is somatically **muta
 tumour cohort (cBioPortal, TCGA PanCancer Atlas), and the transpose on each target page — where a gene
 is mutated across the cancers it drives. It is mutation-only (a floor on the true alteration frequency,
 copy-number and fusions excluded, and it says so), covers the ~two dozen tumour types with a curated
-cohort (the rest read *not measured*, never zero), and carries its ODbL attribution. **Known gaps, named
+cohort (the rest read *not measured*, never zero), and carries its ODbL attribution. A
+**literature-extracted layer** joins it on each target page — machine-extracted gene↔disease and
+gene↔chemical relations from PubTator3, kept deliberately apart as *extracted, not curated* (a
+co-mention count, a measure of attention rather than evidence), never blended with the sourced
+cards, so a co-occurrence is never read as a settled fact. **Known gaps, named
 not shipped:** copy-number/fusion alteration, cost-of-care and unmet-need blocks are not built yet. What
 is shown is sourced; what is missing is stated rather than faked — the same discipline as the honest
 states below. It is a research and drug-intelligence view of the
@@ -90,10 +100,9 @@ Other things were **measured and deliberately left out** — its own kind of hon
 - **No tissue-agnostic badge.** An organ-span count measures commercial breadth, not biomarker
   agnosticism; on a golden set it ranked lung-bound osimertinib above genuinely tissue-agnostic drugs.
   No badge without a biomarker signal Open Targets does not expose.
-- **No aggregate sponsor counts.** Big pharma fragments across subsidiaries (~4:1 in the head, and
-  Merck KGaA ≠ Merck & Co), so sponsors stay display-only until a curated name map exists.
 - **Individualised mRNA vaccines are not catalog drugs.** They have no fixed compound and surface via
-  trials, not the drug table — a modality filter over the catalog cannot see them.
+  trials, not the drug table — so the pipeline's modality filter carries a caveat that it reflects the
+  *catalog*, not every trial, rather than letting "no vaccines" read as a finding.
 
 ### The honest states, and why they are the point
 
@@ -201,6 +210,8 @@ flowchart LR
   AD --> CT[ClinicalTrials.gov]
   AD --> OT[Open Targets]
   AD --> PM[PubMed]
+  AD --> CB[cBioPortal]
+  AD --> PT[PubTator3]
   AD -->|"normalize + provenance + status"| DB
 ```
 
@@ -253,8 +264,9 @@ that emptying the `fact` table makes it fail, which is the only way to know a te
 
 Built entirely on open data, no API keys required: **ChEMBL** (CC BY-SA), **ClinicalTrials.gov**
 (public domain), **Open Targets**, **PubMed** (read locally, never redistributed), **Eurostat** (EU
-open-data reuse — the cancer epidemiology block) and **SEER** (U.S. public domain — the survival
-block). See
+open-data reuse — the cancer epidemiology block), **SEER** (U.S. public domain — the survival
+block), **cBioPortal** (ODC-ODbL — the mutation-frequency block, with its mandatory attribution) and
+**PubTator3** (NLM, U.S. public domain — the extracted-relations layer, courtesy attribution). See
 [`NOTICE.md`](NOTICE.md) — the PubMed section is worth reading before you fork this, because NLM
 does not own the abstracts it serves and so cannot license them to you either. Literature data
 courtesy of the U.S. National Library of Medicine. The software is MIT-licensed (see
