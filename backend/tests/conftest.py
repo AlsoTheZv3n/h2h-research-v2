@@ -137,13 +137,24 @@ def db_url() -> str:
 
     try:
         asyncio.run(prepare())
-    except Exception as exc:  # pragma: no cover - environment, not logic
+    except (sa.exc.OperationalError, sa.exc.InterfaceError, OSError) as exc:  # pragma: no cover
         # Fail, don't skip. A skip here would let CI go green having tested none of
         # the persistence guarantees these tests exist to protect.
+        # A connection-level error: postgres really is unreachable, so this advice fits.
         pytest.fail(
             f"postgres unreachable at {dsn}: {exc}\n"
-            "Start it with `docker compose up -d postgres`, and check DATABASE_URL "
-            "in .env if the host port is remapped."
+            "Start it with `docker compose up -d postgres`; if it is already up, check "
+            "DATABASE_URL in .env for a remapped host port."
+        )
+    except Exception as exc:  # pragma: no cover - environment, not logic
+        # Connected fine, but preparing the schema failed. Do NOT guess "stack is down"
+        # here -- that was the precedent bug (a chembl_id one char past varchar(20) read
+        # as "the compose stack must be up" while it was up). Name the real class of cause
+        # and say plainly that restarting will not help.
+        pytest.fail(
+            f"the test database at {dsn} was reachable, but preparing its schema failed: {exc}\n"
+            "This is a DDL/type error (e.g. a column too small, or a missing extension), not "
+            "a stack that is down -- fix the cause named above; `docker compose up` will not help."
         )
     return dsn
 
