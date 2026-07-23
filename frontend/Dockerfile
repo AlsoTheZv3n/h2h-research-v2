@@ -21,8 +21,13 @@ COPY package.json pnpm-lock.yaml ./
 # the image cannot build the lockfile it was handed. Written to .npmrc rather than
 # passed as a flag because `pnpm build` re-verifies deps and would hit the guard
 # again on its own install.
-RUN printf 'minimum-release-age=0\n' > .npmrc \
-    && pnpm install --frozen-lockfile
+# The cache mount is the build-time lever (mirrors the backend's uv cache): pnpm's
+# content-addressable store persists across builds, so a warm install hardlinks from
+# it instead of re-fetching every tarball. The store lives outside the image layer --
+# only the materialised node_modules is committed -- so it adds nothing to image size.
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    printf 'minimum-release-age=0\n' > .npmrc \
+    && pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 COPY . .
 

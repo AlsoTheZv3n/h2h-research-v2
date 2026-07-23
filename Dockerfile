@@ -48,12 +48,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
-COPY --chown=appuser:appuser backend/ ./backend/
-COPY --chown=appuser:appuser alembic.ini ./
-
-RUN chmod +x backend/entrypoint.sh
-
-USER appuser
 
 # Bake the embedding model into the image rather than fetching it at first use.
 #
@@ -62,6 +56,12 @@ USER appuser
 # slow, and a hard failure on any host that cannot reach huggingface.co, in a
 # container that had otherwise started perfectly. `docker compose up` promises a
 # working system; a working system does not depend on a CDN nobody was told about.
+#
+# In its OWN layer, keyed only on embeddings.py, and BEFORE the full backend COPY --
+# so editing any other Python file reuses this layer instead of re-downloading the
+# ~130 MB model (the inner-loop cost) or failing an offline rebuild. embeddings.py is
+# self-contained (fastembed + stdlib, no backend imports), so the package __init__
+# and it alone are enough to run the real check here.
 #
 # Run as appuser, after the USER switch: the cache lands in /home/appuser, which is
 # where the process will look for it. Doing this as root would put it in /root and
@@ -73,7 +73,14 @@ USER appuser
 # the model without migrating the column now fails the build, which is the cheapest
 # place to find it -- the alternative is an INSERT blowing up mid-ingest.
 ENV FASTEMBED_CACHE_PATH=/home/appuser/.cache/fastembed
+USER appuser
+COPY --chown=appuser:appuser backend/__init__.py backend/embeddings.py ./backend/
 RUN python -c "from backend.embeddings import verify_dimension; verify_dimension()"
+
+# App code last: a change here reuses the resolved venv and the baked model above.
+COPY --chown=appuser:appuser backend/ ./backend/
+COPY --chown=appuser:appuser alembic.ini ./
+RUN chmod +x backend/entrypoint.sh
 
 EXPOSE 8000
 
