@@ -4,6 +4,7 @@ import { getDrug, retryDrug, structureUrl } from '../api/client'
 import type { DrugDetail, KeyPaper, SelectivityProfile, SourcedFact } from '../api/types'
 import { ctgovPhaseLabel, otStageLabel } from '../phases'
 import { Card, NotApplicable } from '../components/ui/Card'
+import { UnavailableNotice } from '../components/ui/UnavailableNotice'
 import { AnalyzingNotice } from '../components/ui/AnalyzingNotice'
 import { Ask } from '../components/drug/Ask'
 import { CombinationsCard } from '../components/drug/CombinationsCard'
@@ -99,9 +100,7 @@ export function DetailPage() {
 
   if (error) {
     return (
-      <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-        Could not load {chemblId}: {error}
-      </p>
+      <UnavailableNotice>Could not load {chemblId}: {error}</UnavailableNotice>
     )
   }
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>

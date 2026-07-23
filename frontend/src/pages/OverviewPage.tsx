@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDrugFacets, listDrugs, listTargetClasses } from '../api/client'
 import type { DataMaturity, DrugList, FacetCounts, SortField, SortOrder } from '../api/types'
 import { Facet } from '../components/ui/Facet'
+import { UnavailableNotice } from '../components/ui/UnavailableNotice'
 import { MaturityPill, PhasePill } from '../components/ui/MaturityPill'
 import { Pagination } from '../components/ui/Pagination'
 import { countLabel, formatCount } from '../format'
@@ -353,9 +354,7 @@ export function OverviewPage() {
       )}
 
       {error && (
-        <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-          Could not load the catalog: {error}
-        </p>
+        <UnavailableNotice>Could not load the catalog: {error}</UnavailableNotice>
       )}
 
       <div className="overflow-x-auto rounded-lg border border-line bg-card">

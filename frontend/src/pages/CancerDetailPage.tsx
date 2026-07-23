@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { getCancer, retryCancer } from '../api/client'
 import type { CancerDetail, TargetLandscape } from '../api/types'
 import { AnalyzingNotice } from '../components/ui/AnalyzingNotice'
+import { UnavailableNotice } from '../components/ui/UnavailableNotice'
 import { BriefStateProvider } from '../components/ui/Fact'
 import { SectionErrorBoundary } from '../components/ui/SectionErrorBoundary'
 import { SectionNav } from '../components/ui/SectionNav'
@@ -84,9 +85,7 @@ export function CancerDetailPage() {
 
   if (error) {
     return (
-      <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-        Could not load this cancer: {error}
-      </p>
+      <UnavailableNotice>Could not load this cancer: {error}</UnavailableNotice>
     )
   }
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
