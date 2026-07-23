@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { ApiError, askDrug } from '../api/client'
 import type { Answer, Citation } from '../api/types'
 
@@ -27,7 +27,7 @@ export function Ask({ chemblId, drugName }: { chemblId: string; drugName: string
   const [answer, setAnswer] = useState<Answer | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
 
-  async function onSubmit(event: FormEvent) {
+  async function onSubmit(event: SyntheticEvent) {
     event.preventDefault()
     const asked = question.trim()
     if (asked.length < 3 || asking) return
