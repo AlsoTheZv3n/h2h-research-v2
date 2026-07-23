@@ -189,10 +189,3 @@ class LiteratureRepository:
             )
             for abstract, dist in rows
         ]
-
-    async def forget_drug(self, chembl_id: str) -> None:
-        """Drop this drug's links. Orphaned abstracts are left for a sweep."""
-        await self.session.execute(
-            delete(DrugAbstract).where(DrugAbstract.drug_chembl_id == chembl_id)
-        )
-        await self.session.commit()

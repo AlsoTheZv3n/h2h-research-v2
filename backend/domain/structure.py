@@ -13,12 +13,6 @@ from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 
 
-def is_valid_smiles(smiles: str | None) -> bool:
-    if not smiles:
-        return False
-    return Chem.MolFromSmiles(smiles) is not None
-
-
 @lru_cache(maxsize=512)
 def render_svg(smiles: str, width: int = 380, height: int = 300) -> str | None:
     """SMILES -> SVG, or None when RDKit cannot parse it.
