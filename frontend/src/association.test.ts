@@ -26,6 +26,32 @@ describe('evidenceContributions', () => {
   it('de-slugs an unknown id rather than dropping it', () => {
     expect(evidenceContributions(['brand_new_type'])).toEqual(['brand new type'])
   })
+
+  it('maps every known evidence type to its reader word (the full display contract)', () => {
+    // Without this, five labels (known drug, pathway, literature, expression, animal model) are
+    // never asserted and could silently change. Pin all eight ids -> their words at once.
+    expect(
+      evidenceContributions([
+        'genetic_association',
+        'somatic_mutation',
+        'known_drug',
+        'affected_pathway',
+        'literature',
+        'rna_expression',
+        'animal_model',
+        'clinical',
+      ]),
+    ).toEqual([
+      'genetic',
+      'somatic mutation',
+      'known drug',
+      'pathway',
+      'literature',
+      'expression',
+      'animal model',
+      'clinical',
+    ])
+  })
 })
 
 describe('associationReading', () => {
