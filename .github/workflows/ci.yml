@@ -193,3 +193,48 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report/
           retention-days: 7
+
+  supply-chain:
+    name: supply-chain — pip-audit, pnpm audit
+    runs-on: ubuntu-latest
+
+    # Known-vulnerability scan of the locked dependencies, on every PR. The lint/type/
+    # test jobs prove the code; this proves the tree it runs on hasn't grown a published
+    # advisory since it was pinned. Both stacks are clean today -- the point is to catch
+    # the day one of them isn't, rather than a human remembering to run an audit.
+    steps:
+      - uses: actions/checkout@v5
+
+      # --- Python dependencies ---
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: pip-audit
+        # Audits the resolved environment against the PyPI advisory database. The local
+        # `h2h` package is skipped (not published), which is expected and not a failure.
+        run: uv run --with pip-audit pip-audit
+
+      # --- JS dependencies ---
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: pnpm audit
+        # high+ only: a moderate transitive advisory with no fix available should not
+        # wedge every PR red. Tighten the level as the tree earns it.
+        run: pnpm audit --audit-level high
+        working-directory: frontend
