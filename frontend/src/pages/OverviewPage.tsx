@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDrugFacets, listDrugs, listTargetClasses } from '../api/client'
 import type { DataMaturity, DrugList, FacetCounts, SortField, SortOrder } from '../api/types'
-import { Facet } from '../components/Facet'
-import { MaturityPill, PhasePill } from '../components/MaturityPill'
-import { Pagination } from '../components/Pagination'
+import { Facet } from '../components/ui/Facet'
+import { MaturityPill, PhasePill } from '../components/ui/MaturityPill'
+import { Pagination } from '../components/ui/Pagination'
 import { countLabel, formatCount } from '../format'
 
 const PAGE_SIZE = 25
