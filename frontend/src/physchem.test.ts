@@ -40,4 +40,21 @@ describe('lipinskiReading', () => {
     const r = lipinskiReading({ mw: 500, alogp: 5, hbd: 5, hba: 10, ro5_violations: 0 })
     expect(r?.tone).toBe('ok')
   })
+
+  it('evaluates the > limit boundary where it actually runs (count >= 1, value AT the limit)', () => {
+    // The `ro5_violations: 0` case above returns before the per-property check, so it never
+    // exercises `value > limit`. Here the count is 1, forcing that check, with LogP exactly at 5:
+    // strictly-greater-than must NOT name it, so the count stands alone. A `>=`-off-by-one would
+    // name "LogP 5" instead.
+    const r = lipinskiReading({ mw: 400, alogp: 5, hbd: 3, hba: 5, ro5_violations: 1 })
+    expect(r).toEqual({ text: '1 Lipinski violation — see the values below.', tone: 'caution' })
+  })
+
+  it('names H-bond donor and acceptor violations (the two RULES rows only these reach)', () => {
+    // Only hbd > 5 and hba > 10 are over, so this is the one case that renders those two rows --
+    // their value accessors, labels and (empty) units -- which LogP/MW cases never touch.
+    const r = lipinskiReading({ mw: 400, alogp: 3, hbd: 7, hba: 12, ro5_violations: 2 })
+    expect(r?.text).toBe('2 Lipinski violations: H-bond donors 7, H-bond acceptors 12.')
+    expect(r?.tone).toBe('caution')
+  })
 })

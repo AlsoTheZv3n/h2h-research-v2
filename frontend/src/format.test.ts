@@ -28,6 +28,14 @@ describe('formatNm', () => {
     // And an actual zero is still a zero.
     expect(formatNm(0)).toBe('0')
   })
+
+  it('switches to exponential strictly BELOW 0.01, not at it', () => {
+    // The boundary: 0.009 is too small for two decimals (would round to "0.01", a 10% lie), so it
+    // goes exponential; 0.01 itself still reads cleanly as "0.01". A `<=` here would push 0.01 into
+    // exponential needlessly.
+    expect(formatNm(0.009)).toBe('9.0e-3')
+    expect(formatNm(0.01)).toBe('0.01')
+  })
 })
 
 describe('formatCount', () => {
@@ -77,6 +85,16 @@ describe('formatAge', () => {
     expect(formatAge('2026-07-07T12:00:00Z')).toBe('2 weeks ago')
     expect(formatAge('2026-04-21T12:00:00Z')).toBe('3 months ago')
     expect(formatAge('2024-07-21T12:00:00Z')).toBe('2 years ago')
+  })
+
+  it('rolls up at the exact bucket edge to the larger unit (strictly-less-than boundaries)', () => {
+    // The bucket cutoffs are `< 7`, `< 30`, `< 365`. A value sitting exactly ON a cutoff must fall
+    // through to the LARGER unit -- 7 days is "last week", not "7 days ago"; 30 is "last month";
+    // 365 is "last year". These edges are what a `<`→`<=` slip would flip, and nothing else pins
+    // them (now = 2026-07-21T12:00:00Z).
+    expect(formatAge('2026-07-14T12:00:00Z')).toBe('last week') // exactly 7 days
+    expect(formatAge('2026-06-21T12:00:00Z')).toBe('last month') // exactly 30 days
+    expect(formatAge('2025-07-21T12:00:00Z')).toBe('last year') // exactly 365 days
   })
 
   it('degrades to the raw string on an unparseable timestamp, never a fabricated "today"', () => {
