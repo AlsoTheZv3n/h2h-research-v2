@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listCancerFacets, listCancers, listTherapeuticAreas } from '../api/client'
 import type { CancerList, CancerSortField, FacetCounts, SortOrder } from '../api/types'
 import { Facet } from '../components/ui/Facet'
+import { UnavailableNotice } from '../components/ui/UnavailableNotice'
 import { Pagination } from '../components/ui/Pagination'
 import { formatCount } from '../format'
 
@@ -229,9 +230,7 @@ export function CancerOverviewPage() {
       )}
 
       {error && (
-        <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-          Could not load the catalog: {error}
-        </p>
+        <UnavailableNotice>Could not load the catalog: {error}</UnavailableNotice>
       )}
 
       <div className="overflow-x-auto rounded-lg border border-line bg-card">

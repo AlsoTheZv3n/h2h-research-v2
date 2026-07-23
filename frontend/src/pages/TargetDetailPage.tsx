@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { getTarget, retryTarget } from '../api/client'
 import type { TargetDetail } from '../api/types'
 import { AnalyzingNotice } from '../components/ui/AnalyzingNotice'
+import { UnavailableNotice } from '../components/ui/UnavailableNotice'
 import { BriefStateProvider } from '../components/ui/Fact'
 import { SectionErrorBoundary } from '../components/ui/SectionErrorBoundary'
 import { SectionNav } from '../components/ui/SectionNav'
@@ -81,9 +82,7 @@ export function TargetDetailPage() {
 
   if (error) {
     return (
-      <p className="rounded-md bg-unavailable-bg px-3 py-2 text-sm text-unavailable">
-        Could not load this target: {error}
-      </p>
+      <UnavailableNotice>Could not load this target: {error}</UnavailableNotice>
     )
   }
   if (!detail) return <p className="text-sm text-ink-faint">Loading…</p>
