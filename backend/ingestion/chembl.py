@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -9,6 +10,8 @@ import httpx
 from backend.domain.potency import summarize_ic50
 from backend.domain.selectivity import SelectivityProfile, compute_selectivity
 from backend.ingestion.base import SourceRecord, fact, failed, utcnow
+
+logger = logging.getLogger(__name__)
 
 BASE = "https://www.ebi.ac.uk/chembl/api/data"
 
@@ -251,7 +254,16 @@ class ChEMBLAdapter:
             )
             r.raise_for_status()
             targets = r.json().get("targets", [])
-        except Exception:
+        except Exception as exc:
+            # Best-effort (see docstring): the profile is safe, so we don't fail. But log
+            # with context -- source, the operation, the ids -- so "the target list isn't
+            # ordered" is a findable line, not a silent gap a developer has to guess at.
+            logger.warning(
+                "chembl gene-symbol lookup failed for %d target(s) %s: %s",
+                len(ids),
+                ids,
+                str(exc)[:150],
+            )
             return
 
         symbols: dict[str, str] = {}
