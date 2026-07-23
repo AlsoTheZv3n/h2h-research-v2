@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import type { TargetDetail } from '../api/types'
-import { AssociatedCancersCard } from '../components/AssociatedCancersCard'
-import { CatalogDrugsCard } from '../components/CatalogDrugsCard'
-import { ExtractedRelationsCard } from '../components/ExtractedRelationsCard'
-import { TargetAlterationCard } from '../components/TargetAlterationCard'
+import { AssociatedCancersCard } from '../components/target/AssociatedCancersCard'
+import { CatalogDrugsCard } from '../components/target/CatalogDrugsCard'
+import { ExtractedRelationsCard } from '../components/target/ExtractedRelationsCard'
+import { TargetAlterationCard } from '../components/target/TargetAlterationCard'
 
 /**
  * One content section of the target detail page. The single source of truth for section ORDER,

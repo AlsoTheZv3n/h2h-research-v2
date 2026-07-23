@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listCancerFacets, listCancers, listTherapeuticAreas } from '../api/client'
 import type { CancerList, CancerSortField, FacetCounts, SortOrder } from '../api/types'
-import { Facet } from '../components/Facet'
-import { Pagination } from '../components/Pagination'
+import { Facet } from '../components/ui/Facet'
+import { Pagination } from '../components/ui/Pagination'
 import { formatCount } from '../format'
 
 const PAGE_SIZE = 25

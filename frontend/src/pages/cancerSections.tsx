@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
 import type { CancerDetail } from '../api/types'
-import { AlterationFrequencyCard } from '../components/AlterationFrequencyCard'
-import { EpidemiologyCard } from '../components/EpidemiologyCard'
-import { PipelineCard } from '../components/PipelineCard'
-import { SurvivalCard } from '../components/SurvivalCard'
-import { TargetLandscapeCard } from '../components/TargetLandscapeCard'
-import { TrialRealityCard } from '../components/TrialRealityCard'
+import { AlterationFrequencyCard } from '../components/cancer/AlterationFrequencyCard'
+import { EpidemiologyCard } from '../components/cancer/EpidemiologyCard'
+import { PipelineCard } from '../components/cancer/PipelineCard'
+import { SurvivalCard } from '../components/cancer/SurvivalCard'
+import { TargetLandscapeCard } from '../components/cancer/TargetLandscapeCard'
+import { TrialRealityCard } from '../components/cancer/TrialRealityCard'
 
 /**
  * One content section of the cancer detail page.
